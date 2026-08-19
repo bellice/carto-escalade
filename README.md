@@ -41,17 +41,37 @@ serveur — hors de portée d'un site statique gratuit.
 Trois catégories dans une seule FeatureCollection, distinguées par `properties.categorie`.
 
 **Falaise**
-`nom`, `categorie` ("falaise"), `parking_associe`, `approche_min`, `approche_metre`,
-`lien_oblyk`, `type_roche`, `orientation`, `cotation_min`, `cotation_max`,
-`nb_voies`, `nb_voies_cot5`, `nb_voies_cot6a`
+`nom`, `site`, `secteur`, `categorie` ("falaise"), `parking_associe`, `approche_min`,
+`approche_metre`, `lien_oblyk`, `type_roche`, `orientation`, `cotation_min`, `cotation_max`,
+`nb_voies`, `nb_voies_cot5`, `nb_voies_cot6a`, `nb_gv`, `nb_couenne`
+
+Une feature par **secteur**, pas par sommet : un même `nom` (sommet) peut
+apparaître plusieurs fois, une fois par `secteur`. `nom` seul n'est donc plus
+unique — la carte identifie chaque falaise par `nom`+`secteur` en interne, et
+n'affiche le secteur en sous-titre de popup que s'il diffère du nom (secteur
+unique : les deux valeurs sont identiques dans les données, pas de doublon
+affiché). `site` est le regroupement géographique le plus large (ex. "Saoû I") ;
+sert aussi à générer le badge affiché sur la popup des parkings associés.
 
 `nb_voies*` ne comptabilise que les voies d'escalade **sportive** (pas de trad).
 `nb_voies_cot5`/`nb_voies_cot6a` ne couvrent que les grades 5 et 6a-6a+ : il peut
 exister des voies encore plus faciles (3, 4) non comptées — l'écart entre
 `nb_voies` et ces deux compteurs n'indique pas forcément des voies plus dures.
 
+`nb_gv`/`nb_couenne` (facultatifs) : classification exclusive des voies
+(grande voie / couenne), `nb_gv + nb_couenne = nb_voies` quand renseignés.
+Activent le mode "Type de voies" du sélecteur de cercles proportionnels sur
+la carte — ce mode reste masqué tant qu'aucune falaise de la sortie n'a ces
+champs remplis.
+
 **Parking**
 `nom`, `categorie` ("parking"), `trajet_gite_min`
+
+`nom` sert de description ET de clé de jointure avec `parking_associe` côté
+falaise (ne pas le raccourcir). Le libellé affiché sur la popup parking est
+généré automatiquement — un badge avec le/les `site` des falaises desservies,
+au-dessus de `nom` en description complète — donc aucun champ supplémentaire
+à remplir.
 
 **Gîte** (facultatif, un seul par sortie)
 `nom`, `categorie` ("hébergement")

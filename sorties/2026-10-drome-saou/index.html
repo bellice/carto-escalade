@@ -2,9 +2,10 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
   <title>Sortie escalade - Drôme, forêt de Saoû</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
 
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
@@ -28,17 +29,32 @@
 
   <div id="map"></div>
 
+  <div id="etat-chargement" class="etat-chargement">Chargement de la carte…</div>
+
   <button type="button" class="btn-tout-voir" aria-label="Revenir à la vue d'ensemble">Tout voir</button>
 
   <div class="legende">
-    <div class="legende-cats">
-      <span class="cle"><span class="dot falaise"></span> Falaises</span>
-      <span class="cle"><span class="dot parking"></span> Parkings</span>
+    <div class="legende-contenu" id="legende-contenu" hidden>
+      <div class="legende-cats">
+        <div class="legende-falaises" id="legende-falaises"></div>
+        <span class="cle"><span class="dot parking"></span> Parkings</span>
+        <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
+      </div>
+      <div class="legende-figure">
+        <label for="mode-figure">Cercles</label>
+        <select id="mode-figure">
+          <option value="aucun">Uni (nb. voies)</option>
+          <option value="faciles">Nb. voies 5-6a+</option>
+          <option value="couenne" id="option-couenne">Nb. couenne</option>
+          <option value="gv" id="option-gv">Nb. grande voie</option>
+          <option value="type" id="option-type">Type de voies</option>
+        </select>
+      </div>
+      <div class="legende-filtres">
+        <label><input type="checkbox" data-filter="gite" /> Proche du gîte (≤ 20 min)</label>
+      </div>
     </div>
-    <div class="legende-filtres">
-      <label><input type="checkbox" data-filter="faciles" /> Faciles seulement (≤ 6a+)</label>
-      <label><input type="checkbox" data-filter="gite" /> Proche du gîte (≤ 20 min)</label>
-    </div>
+    <button type="button" class="legende-toggle" aria-expanded="false" aria-controls="legende-contenu">Légende</button>
   </div>
 
   <script src="../../assets/app.js" defer></script>
