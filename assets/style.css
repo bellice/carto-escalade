@@ -1,0 +1,337 @@
+/* ===== Tokens ===== */
+:root {
+  --stone: #efece3;
+  --stone-dark: #ddd8c9;
+  --ink: #232a23;
+  --forest: #2f4a37;
+  --clay: #a8452f;
+  --clay-dark: #7e3122;
+  --teal: #2f6e6a;
+  --teal-dark: #204d4a;
+  --paper: #fbfaf6;
+
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  --radius: 3px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--stone);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+a { color: var(--forest); }
+a:visited { color: var(--forest); }
+
+/* ===== Home page (liste des sorties) ===== */
+.home {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 20px;
+}
+
+.home h1 {
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+  color: var(--forest);
+}
+
+.home .tagline {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: #5a6058;
+  margin: 0 0 32px;
+}
+
+.sortie-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--stone-dark);
+}
+
+.sortie-list li {
+  border-bottom: 1px solid var(--stone-dark);
+}
+
+.sortie-list a {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 16px 4px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.sortie-list a:hover { color: var(--clay); }
+
+.sortie-list .nom { font-weight: 600; }
+.sortie-list .date {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: #5a6058;
+}
+
+/* ===== Map page ===== */
+.map-header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--stone-dark);
+  font-size: 0.9rem;
+}
+
+.map-header a {
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.map-header .titre {
+  font-weight: 600;
+  color: var(--forest);
+}
+
+#map {
+  position: absolute;
+  top: 44px; bottom: 0; left: 0; right: 0;
+}
+
+/* Recherche */
+.recherche {
+  position: absolute;
+  top: 54px;
+  left: 12px;
+  z-index: 10;
+  width: min(260px, calc(100vw - 24px));
+  display: flex;
+  gap: 6px;
+}
+
+.recherche input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 8px 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.recherche input:focus {
+  outline: 2px solid var(--forest);
+  outline-offset: 1px;
+}
+
+.recherche button {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 8px 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+.recherche button:hover { background: var(--stone-dark); }
+
+/* Vue d'ensemble */
+.btn-tout-voir {
+  position: absolute;
+  top: 100px;
+  left: 12px;
+  z-index: 10;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 6px 8px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn-tout-voir:hover { background: var(--stone-dark); }
+
+/* Légende / filtres */
+.legende {
+  position: absolute;
+  bottom: 20px;
+  left: 12px;
+  z-index: 10;
+  background: var(--paper);
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legende-cats {
+  display: flex;
+  gap: 14px;
+}
+
+.legende-filtres {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--stone-dark);
+  padding-top: 8px;
+}
+
+.legende-cats .cle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legende-filtres label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.legende .dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot.falaise { background: var(--clay); }
+.dot.parking { background: var(--teal); }
+
+/* Popup MapLibre */
+.maplibregl-popup-content {
+  background: var(--paper) !important;
+  border-radius: var(--radius) !important;
+  padding: 14px 16px !important;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.18) !important;
+  font-family: var(--font-body);
+  max-width: 260px;
+}
+
+.popup h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--forest);
+}
+
+.popup .cat-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 2px;
+  margin-bottom: 8px;
+  color: white;
+}
+.cat-tag.falaise { background: var(--clay); }
+.cat-tag.parking { background: var(--teal); }
+.cat-tag.gite { background: var(--ink); }
+
+.popup dl {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.popup dt {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: #5a6058;
+  margin-top: 6px;
+}
+.popup dd {
+  margin: 0 0 2px;
+}
+
+.barre-cotations {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--stone-dark);
+  margin-top: 2px;
+}
+.barre-cotations .segment-5 { background: var(--forest); }
+.barre-cotations .segment-6a { background: color-mix(in srgb, var(--forest) 55%, white); }
+.barre-cotations .segment-reste { background: var(--stone-dark); }
+
+.legende-barre {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: #5a6058;
+}
+
+.popup .lien-secteur {
+  font: inherit;
+  color: var(--forest);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.popup .lien-secteur:hover { color: var(--clay); }
+
+.popup .actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.popup button, .popup a.btn {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  border: 1px solid var(--stone-dark);
+  background: var(--stone);
+  color: var(--ink);
+  padding: 5px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-decoration: none;
+}
+.popup button:hover, .popup a.btn:hover {
+  background: var(--stone-dark);
+}
+.popup button.copied {
+  background: var(--forest);
+  color: white;
+  border-color: var(--forest);
+}
+
+/* ===== Impression ===== */
+@media print {
+  .map-header, .recherche, .legende, .maplibregl-control-container { display: none !important; }
+  #map { position: static !important; height: 60vh; }
+  body::after {
+    content: "Version imprimée — carte interactive disponible en ligne.";
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    margin-top: 20px;
+  }
+}

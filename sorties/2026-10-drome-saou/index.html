@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Sortie escalade - Drôme, forêt de Saoû</title>
+
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://tiles.openfreemap.org" />
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4/dist/maplibre-gl.css" />
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4/dist/maplibre-gl.js" defer></script>
+  <link rel="stylesheet" href="../../assets/style.css" />
+</head>
+<body>
+
+  <header class="map-header">
+    <a href="../../index.html">← Sorties</a>
+    <span class="titre">Drôme - forêt de Saoû</span>
+  </header>
+
+  <div class="recherche">
+    <input type="search" list="falaises-liste" placeholder="Chercher une falaise…" aria-label="Rechercher une falaise" />
+    <datalist id="falaises-liste"></datalist>
+    <button type="button" aria-label="Centrer la carte sur le résultat">Centrer</button>
+  </div>
+
+  <div id="map"></div>
+
+  <button type="button" class="btn-tout-voir" aria-label="Revenir à la vue d'ensemble">Tout voir</button>
+
+  <div class="legende">
+    <div class="legende-cats">
+      <span class="cle"><span class="dot falaise"></span> Falaises</span>
+      <span class="cle"><span class="dot parking"></span> Parkings</span>
+    </div>
+    <div class="legende-filtres">
+      <label><input type="checkbox" data-filter="faciles" /> Faciles seulement (≤ 6a+)</label>
+      <label><input type="checkbox" data-filter="gite" /> Proche du gîte (≤ 20 min)</label>
+    </div>
+  </div>
+
+  <script src="../../assets/app.js" defer></script>
+  <script>
+    // defer sur les <script src> ci-dessus : ce code doit attendre qu'ils aient
+    // fini de s'exécuter (initCarte/maplibregl) avant de s'en servir.
+    document.addEventListener('DOMContentLoaded', () => {
+      initCarte('data.geojson');
+    });
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('../../sw.js', { scope: '../../' });
+    }
+  </script>
+</body>
+</html>
