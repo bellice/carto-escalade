@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4/dist/maplibre-gl.css" />
-  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4/dist/maplibre-gl.js" defer></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.css" />
+  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.js" defer></script>
   <link rel="stylesheet" href="../../assets/style.css" />
 </head>
 <body>
@@ -22,39 +22,37 @@
   </header>
 
   <div class="recherche">
-    <input type="search" list="falaises-liste" placeholder="Chercher une falaise…" aria-label="Rechercher une falaise" />
+    <div class="recherche-champ">
+      <input type="search" list="falaises-liste" placeholder="Chercher une falaise…" aria-label="Rechercher une falaise" />
+      <button type="button" class="btn-effacer" aria-label="Effacer la recherche" hidden>×</button>
+    </div>
     <datalist id="falaises-liste"></datalist>
-    <button type="button" aria-label="Centrer la carte sur le résultat">Centrer</button>
+    <button type="button" class="btn-centrer" aria-label="Centrer la carte sur le résultat">Centrer</button>
   </div>
 
   <div id="map"></div>
 
   <div id="etat-chargement" class="etat-chargement">Chargement de la carte…</div>
 
-  <button type="button" class="btn-tout-voir" aria-label="Revenir à la vue d'ensemble">Tout voir</button>
-
   <div class="legende">
-    <div class="legende-contenu" id="legende-contenu" hidden>
+    <div class="legende-contenu" id="legende-contenu">
       <div class="legende-cats">
-        <div class="legende-falaises" id="legende-falaises"></div>
-        <span class="cle"><span class="dot parking"></span> Parkings</span>
+        <span id="cle-falaises-zone"><span class="cle"><span class="dot"></span> Falaises</span></span>
+        <span class="cle"><span class="dot parking"></span> Parkings <span class="note">(via une falaise)</span></span>
         <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
       </div>
+      <div class="legende-falaises" id="legende-falaises"></div>
       <div class="legende-figure">
-        <label for="mode-figure">Cercles</label>
-        <select id="mode-figure">
-          <option value="aucun">Uni (nb. voies)</option>
-          <option value="faciles">Nb. voies 5-6a+</option>
-          <option value="couenne" id="option-couenne">Nb. couenne</option>
-          <option value="gv" id="option-gv">Nb. grande voie</option>
-          <option value="type" id="option-type">Type de voies</option>
+        <select id="mode-figure" aria-label="Grandeur utilisée pour la taille des cercles">
+          <option value="aucun">Voies</option>
+          <option value="faciles">Voies 5-6a+</option>
+          <option value="couenne" id="option-couenne">Couenne</option>
+          <option value="gv" id="option-gv">Grande voie</option>
+          <option value="type" id="option-type">Type de voie</option>
         </select>
       </div>
-      <div class="legende-filtres">
-        <label><input type="checkbox" data-filter="gite" /> Proche du gîte (≤ 20 min)</label>
-      </div>
     </div>
-    <button type="button" class="legende-toggle" aria-expanded="false" aria-controls="legende-contenu">Légende</button>
+    <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu">Masquer</button>
   </div>
 
   <script src="../../assets/app.js" defer></script>
