@@ -7,10 +7,60 @@
 // caché dessous. Padding asymétrique passé à flyTo/fitBounds.
 const MARGE_UI = { top: 120, bottom: 170, left: 70, right: 70 };
 
-// Rayon min/max des cercles proportionnels (falaises). Le minimum garantit
-// une cible tactile correcte (~24px de diamètre) même pour 0 voie.
-const RAYON_MIN = 12;
+// Rayon min/max des cercles proportionnels (falaises) — taille VISUELLE
+// réelle, cf. CIBLE_TACTILE_MIN ci-dessous pour la zone cliquable (les deux
+// sont découplés : réduire RAYON_MIN n'affecte pas la cible tactile).
+// Diamètre 14px → 52px (ratio ~3.7, ~14x en surface) : nettement plus
+// contrasté que l'ancien 24px → 52px (ratio ~2, ~4.7x), hérité d'une époque
+// où RAYON_MIN devait lui-même garantir une cible tactile correcte — ce
+// n'est plus le cas depuis poserTailleMarqueur().
+const RAYON_MIN = 7;
 const RAYON_MAX = 26;
+
+// Cible tactile minimale (repère Apple/Google), indépendante de la taille
+// visuelle du marqueur (cercle proportionnel, losange gîte, rond parking) —
+// un petit cercle proportionnel doit rester facile à taper du doigt.
+const CIBLE_TACTILE_MIN = 44;
+
+// Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
+// point uniforme (voir appliquerSimplificationZoom dans initCarte) — à
+// ajuster après un premier test réel sur le terrain.
+const ZOOM_SIMPLIFICATION = 13;
+
+// Pose la taille d'un marqueur : la zone tactile (el, l'élément externe posé
+// par MapLibre) fait au moins CIBLE_TACTILE_MIN, le disque/losange visuel
+// (visuel, l'enfant centré dedans) garde sa vraie taille, potentiellement
+// plus petite.
+function poserTailleMarqueur(el, visuel, diametre) {
+  const cote = Math.max(CIBLE_TACTILE_MIN, diametre);
+  el.style.width = cote + 'px';
+  el.style.height = cote + 'px';
+  visuel.style.width = diametre + 'px';
+  visuel.style.height = diametre + 'px';
+}
+
+// Contrôle MapLibre custom (interface IControl : onAdd/onRemove) pour le
+// bouton "Tout voir" — s'empile proprement avec NavigationControl dans le
+// même coin via l'API native, sans positionnement en dur à ajuster à l'œil.
+function creerControleToutVoir(onClick) {
+  return {
+    onAdd() {
+      const bouton = document.createElement('button');
+      bouton.type = 'button';
+      bouton.className = 'btn-tout-voir';
+      bouton.setAttribute('aria-label', "Revenir à la vue d'ensemble");
+      bouton.textContent = 'Tout voir';
+      bouton.addEventListener('click', onClick);
+      this._conteneur = document.createElement('div');
+      this._conteneur.className = 'maplibregl-ctrl';
+      this._conteneur.appendChild(bouton);
+      return this._conteneur;
+    },
+    onRemove() {
+      this._conteneur.remove();
+    },
+  };
+}
 
 function initCarte(dataUrl) {
   // --- Style de fond : OpenFreeMap (vecteur, libre, gratuit, sans clé) ---
@@ -31,6 +81,20 @@ function initCarte(dataUrl) {
 
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
   map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+  // Contrôle "Tout voir" ajouté via l'API de contrôles MapLibre (pas un
+  // bouton positionné en absolu à la main) : la carte gère elle-même
+  // l'empilement des contrôles partageant un coin, donc pas de collision
+  // possible avec NavigationControl au-dessus, quelle que soit sa hauteur
+  // réelle (icônes zoom+boussole, variable selon les options).
+  map.addControl(creerControleToutVoir(() => {
+    if (borneGlobale) map.fitBounds(borneGlobale, { padding: MARGE_UI, maxZoom: 15 });
+    // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
+    // recherche active — sinon la caméra revient mais les marqueurs restent
+    // restreints, contradiction avec "tout voir".
+    falaiseSelectionneeCle = null;
+    reinitialiserRecherche();
+    appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+  }), 'top-right');
 
   // Le contrôle d'attribution démarre parfois "déplié" (classe posée avant que
   // notre config compact ne s'applique pleinement) — on force l'état replié
@@ -40,10 +104,27 @@ function initCarte(dataUrl) {
     if (attrib) attrib.classList.remove('maplibregl-compact-show');
   });
 
-  const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, trajetGiteMin, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne }
+  const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
-  const filtres = { gitesProche: false, recherche: '' };
+  const filtres = { recherche: '' };
   let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
+  let falaiseSelectionneeCle = null; // falaise dont la popup est ouverte (ou origine/cible d'une navigation) — voir appliquerFiltres()
+
+  // Déclarés tôt (référencés par allerVers/reinitialiserRecherche ci-dessous,
+  // câblés plus bas dans la fonction).
+  const recherche = document.querySelector('.recherche input');
+  const btnCentrer = document.querySelector('.btn-centrer');
+  const btnEffacer = document.querySelector('.btn-effacer');
+
+  // Remet la recherche à zéro (texte, filtre, boutons dépendants) — utilisé
+  // par allerVers() et par "Tout voir", qui doivent tous les deux repartir
+  // d'un état neutre.
+  function reinitialiserRecherche() {
+    filtres.recherche = '';
+    if (recherche) recherche.value = '';
+    if (btnCentrer) btnCentrer.disabled = true;
+    if (btnEffacer) btnEffacer.hidden = true;
+  }
   let borneGlobale = null; // étendue de tous les marqueurs, pour le bouton "Tout voir"
   let maxima = { total: 0, couenne: 0, gv: 0 }; // pour la taille des cercles proportionnels
 
@@ -56,23 +137,103 @@ function initCarte(dataUrl) {
     });
   }
 
+  // Change la falaise "active" (popup ouverte) : ses parkings associés
+  // deviennent pertinents (voir appliquerFiltres, les parkings sont masqués
+  // par défaut — on cherche d'abord le secteur, le parking en découle).
+  function definirFalaiseSelectionnee(cle) {
+    falaiseSelectionneeCle = cle;
+    appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+  }
+
+  // Garde la trace de la popup actuellement ouverte, uniquement pour la
+  // fermer via la touche Échap (au clavier, absence d'équivalent au clic
+  // ailleurs sur la carte que MapLibre gère déjà nativement).
+  let popupOuverte = null;
+  function suivrePopup(popup, ouverte) {
+    popupOuverte = ouverte ? popup : (popupOuverte === popup ? null : popupOuverte);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && popupOuverte) popupOuverte.remove();
+  });
+
+  // Simplifie TOUS les marqueurs en petit point uniforme sous
+  // ZOOM_SIMPLIFICATION (vue d'ensemble) : à cette échelle, les cercles
+  // proportionnels se chevauchent trop entre eux pour rester lisibles
+  // (certains sommets ont leurs secteurs à quelques dizaines de mètres les
+  // uns des autres). Les parkings/gîte suivent la même règle — un parking à
+  // 22px à côté de falaises réduites à 7px jurerait visuellement, même si
+  // eux n'ont pas de recouvrement à résoudre en soi. Restaurés dès qu'on
+  // zoome sur un site — cf. .zoom-eloigne dans le CSS.
+  let modeSimplifieActuel = null;
+  function appliquerSimplificationZoom() {
+    const simplifie = map.getZoom() < ZOOM_SIMPLIFICATION;
+    if (simplifie === modeSimplifieActuel) return;
+    modeSimplifieActuel = simplifie;
+    entries.forEach((entree) => {
+      entree.marker.getElement().classList.toggle('zoom-eloigne', simplifie);
+    });
+    rafraichirLegendeFalaises();
+  }
+  map.on('zoom', appliquerSimplificationZoom);
+
+  // Reconstruit la mini-légende falaises selon le mode "Cercles" courant ET
+  // l'état de simplification par zoom — sinon la légende continuerait de
+  // montrer des cercles de référence à une échelle où seuls des points
+  // uniformes sont réellement affichés (trompeur).
+  function rafraichirLegendeFalaises() {
+    const { max, median, titre, couleurs, remplissage } = infosLegendePourMode(modeFigureActuel, maxima);
+    construireLegendeFalaises(max, median, titre, couleurs, remplissage, modeSimplifieActuel, maxima.total);
+  }
+
+  // Change le mode "Cercles" et redessine tout ce qui en dépend — utilisé
+  // par le sélecteur lui-même ET par allerVers (voir plus bas) : naviguer
+  // vers une falaise doit garantir qu'elle reste visible, quitte à sortir
+  // d'un thème qui l'aurait masquée (voir estFalaiseVideDansMode).
+  function definirModeFigure(nouveauMode) {
+    modeFigureActuel = nouveauMode;
+    if (selectFigure) selectFigure.value = nouveauMode;
+    entries.forEach((entree) => {
+      if (entree.cat === 'falaise') dessinerFalaise(entree, modeFigureActuel, maxima);
+    });
+    rafraichirLegendeFalaises();
+  }
+
   // Navigue vers le marqueur "cle" (falaise ou parking lié depuis une popup),
   // en levant les filtres actifs si besoin pour garantir qu'il soit visible.
   // "origineCle" (facultatif) : la popup depuis laquelle on clique un lien
   // croisé — dans ce cas on cadre sur les DEUX points plutôt que de voler
   // uniquement vers la cible, pour garder la relation spatiale visible.
-  function allerVers(cle, origineCle) {
+  // "conserverRecherche" (facultatif) : ne pas effacer le champ de recherche
+  // — utilisé par centrerSurRecherche(), où la recherche vient de motiver
+  // l'action elle-même (l'effacer serait perdre ce qu'on vient de taper).
+  function allerVers(cle, origineCle, conserverRecherche) {
     const cible = index.get(cle);
     if (!cible) return;
 
-    filtres.recherche = '';
-    filtres.gitesProche = false;
-    const champRecherche = document.querySelector('.recherche input');
-    if (champRecherche) champRecherche.value = '';
-    document.querySelectorAll('.legende input[data-filter]').forEach((cb) => { cb.checked = false; });
-    appliquerFiltres(entries, filtres, modeFigureActuel);
+    if (!conserverRecherche) reinitialiserRecherche();
 
     const origine = origineCle ? index.get(origineCle) : null;
+
+    // Naviguer vers une falaise garantit qu'elle reste visible : si le mode
+    // "Cercles" actif la masquerait (aucune donnée pour ce thème — voir
+    // estFalaiseVideDansMode), on repasse sur "Voies" plutôt que de laisser
+    // une popup s'ouvrir sans aucun figuré en dessous. Même vérification
+    // pour l'origine d'un lien croisé (cas plus rare, mais même risque).
+    const cibleSeraitMasquee = cible.cat === 'falaise' && estFalaiseVideDansMode(cible, modeFigureActuel);
+    const origineSeraitMasquee = origine && origine.cat === 'falaise' && estFalaiseVideDansMode(origine, modeFigureActuel);
+    if (cibleSeraitMasquee || origineSeraitMasquee) definirModeFigure('aucun');
+
+    // Cible falaise -> elle devient la sélection (ses parkings deviennent
+    // pertinents). Sinon (cible parking/gîte), on garde l'origine si c'est
+    // une falaise (ex. lien "Parking" depuis une falaise) pour que son
+    // parking reste visible ; sans ça le close de la popup d'origine (juste
+    // avant cet appel, voir attachPopupActions) masquerait la cible qu'on
+    // est justement en train de rejoindre.
+    falaiseSelectionneeCle = cible.cat === 'falaise' ? cible.cle
+      : (origine && origine.cat === 'falaise') ? origine.cle
+      : null;
+    appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+
     if (origine) {
       const bounds = new maplibregl.LngLatBounds();
       bounds.extend(origine.marker.getLngLat());
@@ -95,15 +256,34 @@ function initCarte(dataUrl) {
       maxima = calculerMaxima(geojson);
 
       geojson.features.forEach(f => {
-        const entree = addMarker(map, f, parkingInfos, maxima, allerVers, enSurbrillance);
+        const entree = addMarker(map, f, parkingInfos, maxima, allerVers, enSurbrillance, definirFalaiseSelectionnee, suivrePopup);
         entries.push(entree);
         index.set(entree.cle, entree);
       });
 
+      // Clic sur un label de site : cadre sur l'étendue de toutes ses
+      // falaises — pas de popup (ce n'est pas une entité unique), juste la
+      // caméra. La recherche se réinitialise (même logique qu'allerVers :
+      // une recherche active pourrait sinon masquer des falaises du site
+      // qu'on vient justement de rejoindre) ; la sélection courante n'a pas
+      // besoin d'être touchée, elle ne cache rien ici.
+      ajouterLabelsSites(map, geojson, (site) => {
+        const falaisesDuSite = geojson.features.filter(f =>
+          f.properties.categorie === 'falaise' && f.properties.site === site
+        );
+        if (!falaisesDuSite.length) return;
+        reinitialiserRecherche();
+        appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+        const bounds = new maplibregl.LngLatBounds();
+        falaisesDuSite.forEach(f => bounds.extend(f.geometry.coordinates));
+        map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 16 });
+      });
+      appliquerSimplificationZoom();
+
       borneGlobale = fitToMarkers(map, geojson);
       remplirAutocompletion(geojson);
-      const initiale = infosLegendePourMode('aucun', maxima);
-      construireLegendeFalaises(initiale.max, initiale.median, initiale.titre, initiale.couleurs, initiale.remplissage);
+      // La légende initiale est déjà construite par appliquerSimplificationZoom()
+      // ci-dessus (state changed depuis null au premier appel).
 
       // Les modes liés au type de voie (couenne / grande voie / répartition)
       // n'ont de sens que si au moins une falaise a nb_gv/nb_couenne
@@ -126,7 +306,7 @@ function initCarte(dataUrl) {
         if (legendeGite) legendeGite.remove();
       }
 
-      appliquerFiltres(entries, filtres, modeFigureActuel);
+      appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
       if (etatChargement) etatChargement.remove();
     })
     .catch(err => {
@@ -137,27 +317,28 @@ function initCarte(dataUrl) {
       }
     });
 
-  // --- Filtre "proche du gîte" ---
-  const filtreGite = document.querySelector('.legende input[data-filter="gite"]');
-  if (filtreGite) {
-    filtreGite.addEventListener('change', () => {
-      filtres.gitesProche = filtreGite.checked;
-      appliquerFiltres(entries, filtres, modeFigureActuel);
-    });
-  }
-
   // --- Recherche par nom (et secteur) ---
-  const recherche = document.querySelector('.recherche input');
   if (recherche) {
     recherche.addEventListener('input', () => {
       filtres.recherche = recherche.value.trim().toLowerCase();
-      appliquerFiltres(entries, filtres, modeFigureActuel);
+      appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+      if (btnCentrer) btnCentrer.disabled = !filtres.recherche;
+      if (btnEffacer) btnEffacer.hidden = !recherche.value;
     });
     recherche.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         centrerSurRecherche();
       }
+    });
+  }
+
+  // --- Effacer la recherche ---
+  if (btnEffacer) {
+    btnEffacer.addEventListener('click', () => {
+      reinitialiserRecherche();
+      appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+      if (recherche) recherche.focus();
     });
   }
 
@@ -171,7 +352,7 @@ function initCarte(dataUrl) {
     if (!correspondances.length) return;
 
     if (correspondances.length === 1) {
-      allerVers(correspondances[0].cle);
+      allerVers(correspondances[0].cle, undefined, true);
       return;
     }
     const bounds = new maplibregl.LngLatBounds();
@@ -179,8 +360,10 @@ function initCarte(dataUrl) {
     map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 16 });
   }
 
-  const btnCentrer = document.querySelector('.recherche button');
-  if (btnCentrer) btnCentrer.addEventListener('click', centrerSurRecherche);
+  if (btnCentrer) {
+    btnCentrer.disabled = true; // rien à centrer tant que le champ est vide
+    btnCentrer.addEventListener('click', centrerSurRecherche);
+  }
 
   // --- Repli/déploiement du panneau légende (fermé par défaut, cf. HTML) ---
   const legendeToggle = document.querySelector('.legende-toggle');
@@ -190,14 +373,9 @@ function initCarte(dataUrl) {
       const vaOuvrir = legendeContenu.hidden;
       legendeContenu.hidden = !vaOuvrir;
       legendeToggle.setAttribute('aria-expanded', String(vaOuvrir));
-    });
-  }
-
-  // --- Revenir à la vue d'ensemble ---
-  const btnToutVoir = document.querySelector('.btn-tout-voir');
-  if (btnToutVoir) {
-    btnToutVoir.addEventListener('click', () => {
-      if (borneGlobale) map.fitBounds(borneGlobale, { padding: MARGE_UI, maxZoom: 15 });
+      // Le texte porte l'état (repli/déploiement) — pas d'icône/chevron,
+      // cohérent avec le reste du site (contrôles en texte mono sobre).
+      legendeToggle.textContent = vaOuvrir ? 'Masquer' : 'Légende';
     });
   }
 
@@ -205,57 +383,53 @@ function initCarte(dataUrl) {
   const selectFigure = document.getElementById('mode-figure');
   if (selectFigure) {
     selectFigure.addEventListener('change', () => {
-      modeFigureActuel = selectFigure.value;
-      entries.forEach((entree) => {
-        if (entree.cat === 'falaise') dessinerFalaise(entree, modeFigureActuel, maxima);
-      });
-      const { max, median, titre, couleurs, remplissage } = infosLegendePourMode(modeFigureActuel, maxima);
-      construireLegendeFalaises(max, median, titre, couleurs, remplissage);
+      definirModeFigure(selectFigure.value);
       // Une falaise sans donnée pour ce thème disparaît (dessinerFalaise) —
       // son parking ne doit pas rester affiché seul, sans rien à proposer.
-      appliquerFiltres(entries, filtres, modeFigureActuel);
+      appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
     });
   }
 }
 
-const SEUIL_GITE_MIN = 20; // doit matcher le libellé "≤ 20 min" dans le HTML des sorties
-
-function appliquerFiltres(entries, filtres, mode) {
-  // Deux sources de restriction, deux sens de cascade :
-  // - recherche / mode thématique du sélecteur "Cercles" portent sur les
-  //   falaises -> un parking reste affiché tant qu'au moins une falaise qui
-  //   lui est associée les passe (voir estFalaiseVideDansMode : une falaise
-  //   sans donnée pour le thème affiché n'a rien à montrer, son parking ne
-  //   doit pas rester affiché seul).
-  // - "proche du gîte" porte sur les parkings -> une falaise reste affichée
-  //   tant qu'au moins un de ses parkings associés passe ce seuil.
-  const restrictionFalaises = Boolean(filtres.recherche) || mode !== 'aucun';
-
-  const parkingProche = new Map();
-  entries.forEach((entree) => {
-    if (entree.cat !== 'parking') return;
-    const proche = !filtres.gitesProche || entree.trajetGiteMin == null || entree.trajetGiteMin <= SEUIL_GITE_MIN;
-    parkingProche.set(entree.nom, proche);
-  });
-
+function appliquerFiltres(entries, filtres, mode, falaiseSelectionneeCle) {
+  // Le mode "Cercles" masque les falaises vides pour ce thème
+  // (estFalaiseVideDansMode) mais n'autorise PAS à lui seul l'affichage de
+  // leurs parkings — sinon changer de thème réafficherait tous les parkings
+  // d'un coup (le mode est un figuré, pas une recherche). Seuls deux
+  // déclencheurs positifs autorisent des parkings :
+  // - une recherche active (choix explicite) -> tous les parkings des
+  //   falaises qui la passent ;
+  // - la falaise sélectionnée (popup ouverte / cible d'une navigation), si
+  //   elle reste effectivement visible sous le mode/la recherche courants.
   const parkingsAutorises = new Set();
 
   entries.forEach((entree) => {
     if (entree.cat !== 'falaise') return;
     const visible =
       (!filtres.recherche || entree.recherche.includes(filtres.recherche)) &&
-      (!filtres.gitesProche || entree.parkingAssocie.some((nom) => parkingProche.get(nom))) &&
       !estFalaiseVideDansMode(entree, mode);
     entree.marker.getElement().style.display = visible ? '' : 'none';
-    if (visible) entree.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));
+    if (visible && filtres.recherche) entree.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));
   });
+
+  // La falaise sélectionnée ne compte que si elle est toujours effectivement
+  // visible (recherche/mode compris, cf. display posé juste au-dessus) —
+  // sinon son parking ne doit pas rester affiché seul, sans qu'aucune
+  // falaise visible ne le justifie.
+  if (falaiseSelectionneeCle) {
+    const falaise = entries.find((e) => e.cat === 'falaise' && e.cle === falaiseSelectionneeCle);
+    if (falaise && falaise.marker.getElement().style.display !== 'none') {
+      falaise.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));
+    }
+  }
+
+  // Masqués par défaut : visibles seulement si une recherche est active ou
+  // si une falaise est sélectionnée.
+  const montrerParkings = Boolean(filtres.recherche) || Boolean(falaiseSelectionneeCle);
 
   entries.forEach((entree) => {
     if (entree.cat !== 'parking') return;
-    const visible =
-      parkingProche.get(entree.nom) &&
-      (!restrictionFalaises || parkingsAutorises.has(entree.nom));
-    entree.marker.getElement().style.display = visible ? '' : 'none';
+    entree.marker.getElement().style.display = (montrerParkings && parkingsAutorises.has(entree.nom)) ? '' : 'none';
   });
 }
 
@@ -357,27 +531,31 @@ function remplissagePourMode(mode) {
 // rien n'indique quelle couleur correspond à quelle catégorie.
 function infosLegendePourMode(mode, maxima) {
   const remplissage = remplissagePourMode(mode);
-  if (mode === 'couenne') return { max: maxima.couenne, median: maxima.couenneMedian, titre: 'Falaises (nb. couenne)', remplissage };
-  if (mode === 'gv') return { max: maxima.gv, median: maxima.gvMedian, titre: 'Falaises (nb. grande voie)', remplissage };
-  if (mode === 'faciles') return { max: maxima.faciles, median: maxima.facilesMedian, titre: 'Falaises (nb. voies 5-6a+)', remplissage };
+  if (mode === 'couenne') return { max: maxima.couenne, median: maxima.couenneMedian, titre: 'Falaises (couenne)', remplissage };
+  if (mode === 'gv') return { max: maxima.gv, median: maxima.gvMedian, titre: 'Falaises (grande voie)', remplissage };
+  if (mode === 'faciles') return { max: maxima.faciles, median: maxima.facilesMedian, titre: 'Falaises (voies 5-6a+)', remplissage };
   if (mode === 'type') return {
-    max: maxima.total, median: maxima.totalMedian, titre: 'Falaises (nb. voies)', remplissage,
+    max: maxima.total, median: maxima.totalMedian, titre: 'Falaises (voies)', remplissage,
     couleurs: [{ nom: 'Grande voie', variable: '--gv' }, { nom: 'Couenne', variable: '--couenne' }],
   };
-  return { max: maxima.total, median: maxima.totalMedian, titre: 'Falaises (nb. voies)', remplissage };
+  return { max: maxima.total, median: maxima.totalMedian, titre: 'Falaises (voies)', remplissage };
 }
 
-function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance) {
+function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance, onSelectionFalaise, suivrePopup) {
   const p = feature.properties;
   const [lon, lat] = feature.geometry.coordinates;
   const cat = p.categorie;
   const cle = cat === 'falaise' ? cleFalaise(p) : p.nom;
+  const parkingAssocie = cat === 'falaise'
+    ? (p.parking_associe || '').split('|').map(s => s.trim()).filter(Boolean)
+    : [];
 
+  // "el" est la zone tactile (taille garantie par poserTailleMarqueur, voir
+  // plus bas) — MapLibre réécrit intégralement son style.transform à chaque
+  // repositionnement, donc AUCUN style visuel dépendant d'un transform (la
+  // rotation du losange gîte) ne doit vivre ici, seulement sur "visuel".
   const el = document.createElement('div');
   el.className = 'marqueur marqueur-' + cat;
-  el.style.cursor = 'pointer';
-  el.style.border = '2px solid white';
-  el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.4)';
 
   // Accessibilité : un <div> seul n'est ni focusable ni annoncé par un
   // lecteur d'écran — sans ça les marqueurs ne sont atteignables qu'à la
@@ -389,18 +567,20 @@ function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance
     : `Gîte : ${p.nom}`;
   el.setAttribute('aria-label', etiquette);
 
+  const visuel = document.createElement('div');
+  visuel.className = 'marqueur-visuel';
+  el.appendChild(visuel);
+
   if (cat === 'hébergement') {
-    el.style.width = '16px';
-    el.style.height = '16px';
-    el.style.background = 'var(--ink)';
-    el.style.transform = 'rotate(45deg)'; // losange : se distingue des ronds falaise/parking
+    poserTailleMarqueur(el, visuel, 16);
+    visuel.style.background = 'var(--ink)';
+    visuel.style.transform = 'rotate(45deg)'; // losange : se distingue des ronds falaise/parking
   } else if (cat === 'parking') {
-    el.style.width = '22px';
-    el.style.height = '22px';
-    el.style.borderRadius = '50%';
-    el.style.background = 'var(--teal)';
+    poserTailleMarqueur(el, visuel, 22);
+    visuel.style.borderRadius = '50%';
+    visuel.style.background = 'var(--teal)';
   } else {
-    el.style.borderRadius = '50%'; // taille + couleur posées par dessinerFalaise() ci-dessous
+    visuel.style.borderRadius = '50%'; // taille + couleur posées par dessinerFalaise() ci-dessous
   }
 
   const popupHtml =
@@ -408,6 +588,11 @@ function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance
     cat === 'parking' ? popupParking(p, lat, lon, parkingInfos) :
     popupGite(p, lat, lon);
 
+  // closeOnClick (par défaut, true) : ferme la popup ouverte au clic
+  // ailleurs sur la carte, y compris sur un autre marqueur — comportement
+  // volontairement gardé (voir suivrePopup plus bas pour Échap) : la
+  // fermeture ne touche plus falaiseSelectionneeCle, donc plus de risque de
+  // masquer par erreur le parking qu'on vient de rejoindre.
   const popup = new maplibregl.Popup({ offset: 14 }).setHTML(popupHtml);
 
   const marker = new maplibregl.Marker({ element: el })
@@ -423,27 +608,48 @@ function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance
   });
 
   popup.on('open', () => {
+    if (suivrePopup) suivrePopup(popup, true);
     document.body.classList.add('fiche-ouverte');
     attachPopupActions(popup, lat, lon, allerVers, cle);
-    enSurbrillance([cle]);
+    // La mise en surbrillance suit la relation falaise<->parking dans les
+    // deux sens : sélectionner l'un éclaire l'autre, cohérent et symétrique.
+    if (cat === 'falaise') {
+      if (onSelectionFalaise) onSelectionFalaise(cle);
+      enSurbrillance([cle, ...parkingAssocie]);
+    } else if (cat === 'parking') {
+      const info = parkingInfos.get(p.nom);
+      enSurbrillance([cle, ...(info ? info.falaises.map(f => f.cle) : [])]);
+    } else {
+      enSurbrillance([cle]);
+    }
   });
   popup.on('close', () => {
+    if (suivrePopup) suivrePopup(popup, false);
     document.body.classList.remove('fiche-ouverte');
     enSurbrillance(null);
+    // La sélection (falaiseSelectionneeCle) n'est PAS effacée ici : fermer
+    // une fiche (× ou clic sur un autre marqueur) garde le parking associé
+    // à la dernière falaise choisie visible, plutôt que de tout re-masquer
+    // aussitôt. Seuls "Tout voir" ou le choix d'une NOUVELLE falaise (voir
+    // onSelectionFalaise à l'ouverture) réinitialisent la sélection.
+    // La feuille du bas mobile peut avoir été réduite (poignée) : repartir
+    // dépliée à la prochaine ouverture, sinon l'état fuiterait d'une fiche
+    // à l'autre (le conteneur DOM persiste entre ouvertures/fermetures).
+    // getElement() peut renvoyer undefined ici (conteneur déjà détruit par
+    // remove() au moment où 'close' se déclenche) — d'où la garde.
+    const elPopup = popup.getElement();
+    const contenu = elPopup && elPopup.querySelector('.maplibregl-popup-content');
+    if (contenu) contenu.classList.remove('fiche-reduite');
   });
 
   const cot5 = p.nb_voies_cot5 ?? 0;
   const cot6a = p.nb_voies_cot6a ?? 0;
-  const parkingAssocie = cat === 'falaise'
-    ? (p.parking_associe || '').split('|').map(s => s.trim()).filter(Boolean)
-    : [];
-  const trajetGiteMin = cat === 'parking' ? (p.trajet_gite_min ?? null) : null;
   const secteur = cat === 'falaise' ? secteurDistinct(p) : null;
   const rechercheTexte = cat === 'falaise' ? libelleFalaise(p).toLowerCase() : p.nom.toLowerCase();
 
   const entree = {
     marker, cat, nom: p.nom, secteur, cle, recherche: rechercheTexte,
-    parkingAssocie, trajetGiteMin,
+    parkingAssocie,
     nbVoies: p.nb_voies ?? 0,
     nbFaciles: cot5 + cot6a,
     nbGrandeVoie: p.nb_gv ?? 0,
@@ -455,12 +661,18 @@ function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance
   return entree;
 }
 
-// Rayon proportionnel à la RACINE CARRÉE de la valeur (donc à la surface, pas
-// au rayon) — convention cartographique standard pour ne pas surestimer
-// visuellement les grandes valeurs.
+// Rayon proportionnel à la valeur (donc à la surface, pas au rayon, comme la
+// racine carrée classique) — mais avec la correction de Flannery : James
+// Flannery (1971) a montré empiriquement que les lecteurs de carte
+// sous-estiment perceptuellement la taille des grands cercles par rapport
+// aux petits sous un exposant 0.5 strict. Son exposant empirique (0.5716)
+// accentue légèrement l'écart entre petites et grandes valeurs pour mieux
+// correspondre à la perception réelle.
+const EXPOSANT_FLANNERY = 0.5716;
+
 function calculerRayon(valeur, max) {
   if (!max) return RAYON_MIN;
-  return RAYON_MIN + (RAYON_MAX - RAYON_MIN) * Math.sqrt((valeur || 0) / max);
+  return RAYON_MIN + (RAYON_MAX - RAYON_MIN) * Math.pow((valeur || 0) / max, EXPOSANT_FLANNERY);
 }
 
 // Redessine une falaise selon le mode choisi dans le sélecteur "Cercles".
@@ -490,29 +702,30 @@ function estFalaiseVideDansMode(entree, mode) {
 
 function dessinerFalaise(entree, mode, maxima) {
   const el = entree.marker.getElement();
+  const visuel = el.querySelector('.marqueur-visuel');
 
   const valeur = mode === 'couenne' ? entree.nbCouenne
     : mode === 'gv' ? entree.nbGrandeVoie
     : mode === 'faciles' ? entree.nbFaciles
     : entree.nbVoies;
-  const max = mode === 'couenne' ? maxima.couenne
-    : mode === 'gv' ? maxima.gv
-    : mode === 'faciles' ? maxima.faciles
-    : maxima.total;
 
   const estVide = estFalaiseVideDansMode(entree, mode);
-  el.classList.toggle('marqueur-invisible', estVide);
+  el.classList.toggle('marqueur-invisible', estVide); // cache la cible tactile entière
   if (estVide) return;
 
-  const rayon = calculerRayon(valeur, max);
-  el.style.width = (rayon * 2) + 'px';
-  el.style.height = (rayon * 2) + 'px';
+  // Échelle commune à tous les modes (maxima.total, jamais le max du thème
+  // affiché) : une même falaise garde une taille comparable d'un mode à
+  // l'autre. Contrepartie assumée pour un thème peu présent au global (ex.
+  // grande voie) : même sa meilleure falaise reste visuellement modeste —
+  // c'est une lecture honnête ("peu présent ici"), pas un défaut.
+  const rayon = calculerRayon(valeur, maxima.total);
+  poserTailleMarqueur(el, visuel, rayon * 2);
 
   if (mode === 'type') {
     const pctGV = Math.round((entree.nbGrandeVoie / (entree.nbGrandeVoie + entree.nbCouenne)) * 100);
-    el.style.background = `conic-gradient(var(--gv) 0% ${pctGV}%, var(--couenne) ${pctGV}% 100%)`;
+    visuel.style.background = `conic-gradient(var(--gv) 0% ${pctGV}%, var(--couenne) ${pctGV}% 100%)`;
   } else {
-    el.style.background = remplissagePourMode(mode);
+    visuel.style.background = remplissagePourMode(mode);
   }
 }
 
@@ -522,24 +735,50 @@ function dessinerFalaise(entree, mode, maxima) {
 // Le rayon de chaque repère passe par calculerRayon(), la même formule que
 // pour les marqueurs réels : sinon le repère "1" ne correspondrait pas à la
 // taille qu'aurait une vraie falaise à 1 voie sur la carte.
-function construireLegendeFalaises(max, median, titre, couleurs, remplissage) {
+function construireLegendeFalaises(max, median, titre, couleurs, remplissage, simplifie, echelle) {
+  // Chip(s) de catégorie "Falaises" (à côté de Parkings/Gîte dans
+  // .legende-cats). Cas normal : une seule pastille "Falaises", couleur du
+  // mode actif. Mode "Type de voie" : le remplissage réel est un dégradé à
+  // deux teintes propre à CHAQUE falaise (sa répartition grande voie/couenne),
+  // qu'une seule pastille ne peut pas représenter honnêtement — on affiche
+  // alors les deux catégories séparément (couleurs vient d'infosLegendePourMode).
+  // Remplace l'ancien double affichage (une pastille "Falaises" ET une clé
+  // couleurs séparée plus bas) qui montrait 3 couleurs pour 2 informations.
+  const zoneFalaises = document.getElementById('cle-falaises-zone');
+  if (zoneFalaises) {
+    zoneFalaises.innerHTML = (couleurs && couleurs.length)
+      ? couleurs.map(c => `<span class="cle"><span class="dot" style="background:var(${c.variable})"></span> ${escapeHtml(c.nom)}</span>`).join('')
+      : `<span class="cle"><span class="dot" style="background:${remplissage}"></span> Falaises</span>`;
+  }
+
   const conteneur = document.getElementById('legende-falaises');
   if (!conteneur) return;
   if (!max) { conteneur.innerHTML = ''; return; }
+  // Sous ZOOM_SIMPLIFICATION, les falaises sont de petits points uniformes
+  // (voir .zoom-eloigne) : des cercles de référence proportionnels seraient
+  // trompeurs puisque rien de tel n'est réellement affiché à cette échelle.
+  if (simplifie) {
+    conteneur.innerHTML = `
+      <span class="legende-titre">Falaises</span>
+      <span class="legende-note">Zoomez pour voir la taille proportionnelle</span>`;
+    return;
+  }
+  // "max"/"median" restent propres au thème affiché (1/médiane/max réels de
+  // ce thème, pour des repères parlants) — mais leur RAYON se calcule sur
+  // "echelle" (toujours maxima.total) : même une falaise au max de son
+  // thème peut donc rester visuellement modeste si ce thème est peu présent
+  // au global (ex. grande voie) — cohérent avec dessinerFalaise().
   const repere = (valeur) => `
     <span class="repere-taille">
-      <span class="cercle-repere" style="width:${calculerRayon(valeur, max) * 2}px; height:${calculerRayon(valeur, max) * 2}px; background:${remplissage};"></span>
+      <span class="cercle-repere" style="width:${calculerRayon(valeur, echelle) * 2}px; height:${calculerRayon(valeur, echelle) * 2}px;"></span>
       <span>${valeur}</span>
     </span>`;
   const valeurs = (median > 0 && median < max) ? [1, median, max] : [1, max];
-  const cle = (couleurs || []).map(c => `
-      <span class="cle-couleur"><span class="pastille" style="background:var(${c.variable})"></span>${escapeHtml(c.nom)}</span>`).join('');
   conteneur.innerHTML = `
     <span class="legende-titre">${escapeHtml(titre)}</span>
     <div class="reperes-taille">
       ${valeurs.map(repere).join('')}
-    </div>
-    ${cle ? `<div class="legende-couleurs">${cle}</div>` : ''}`;
+    </div>`;
 }
 
 function popupFalaise(p, lat, lon) {
@@ -564,6 +803,7 @@ function popupFalaise(p, lat, lon) {
 
   return `
     <div class="popup">
+      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"></button>
       <span class="cat-tag falaise">Falaise</span>
       <h3>${escapeHtml(p.nom)}</h3>
       ${secteur ? `<p class="sous-titre">${escapeHtml(secteur)}</p>` : ''}
@@ -589,6 +829,7 @@ function popupParking(p, lat, lon, parkingInfos) {
 
   return `
     <div class="popup">
+      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"></button>
       <span class="cat-tag parking">Parking</span>
       ${site ? `<span class="badge-site">${escapeHtml(site)}</span>` : ''}
       <h3>${escapeHtml(p.nom)}</h3>
@@ -604,6 +845,7 @@ function popupParking(p, lat, lon, parkingInfos) {
 function popupGite(p, lat, lon) {
   return `
     <div class="popup">
+      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"></button>
       <span class="cat-tag gite">Gîte</span>
       <h3>${escapeHtml(p.nom)}</h3>
       <div class="actions">
@@ -692,16 +934,22 @@ function cotationVersValeur(cotation) {
 }
 
 const COTATION_ECHELLE_MAX = 21; // couvre jusqu'à 9c+
+const COTATION_LABEL_MIN = '3a';
+const COTATION_LABEL_MAX = '9c+';
 
+// Bornes d'échelle affichées de part et d'autre de la jauge : sans elles, le
+// segment coloré n'a aucun repère et sa position/largeur n'est pas décodable.
 function jaugeCotation(min, max) {
   const vMin = cotationVersValeur(min);
   const vMax = cotationVersValeur(max);
   if (vMin == null || vMax == null) return '';
   const debut = (vMin / COTATION_ECHELLE_MAX) * 100;
   const largeur = Math.max(((vMax - vMin) / COTATION_ECHELLE_MAX) * 100, 3);
-  return `<div class="jauge-cotation" role="img" aria-label="Cotation de ${escapeHtml(min)} à ${escapeHtml(max)}">
+  return `
+    <div class="jauge-cotation" role="img" aria-label="Cotation de ${escapeHtml(min)} à ${escapeHtml(max)} sur l'échelle ${COTATION_LABEL_MIN} à ${COTATION_LABEL_MAX}">
       <span class="jauge-segment" style="left:${debut}%; width:${largeur}%"></span>
-    </div>`;
+    </div>
+    <div class="jauge-echelle"><span>${COTATION_LABEL_MIN}</span><span>${COTATION_LABEL_MAX}</span></div>`;
 }
 
 function champCotation(min, max) {
@@ -717,6 +965,18 @@ function escapeHtml(str) {
 
 function attachPopupActions(popup, lat, lon, allerVers, origineCle) {
   const el = popup.getElement();
+
+  // Poignée de la feuille du bas mobile : replie/déplie entre une hauteur
+  // "aperçu" et la hauteur normale (voir .fiche-reduite dans le CSS).
+  const poignee = el.querySelector('.poignee-fiche');
+  const contenu = el.querySelector('.maplibregl-popup-content');
+  if (poignee && contenu) {
+    poignee.addEventListener('click', () => {
+      const reduite = contenu.classList.toggle('fiche-reduite');
+      poignee.setAttribute('aria-expanded', String(!reduite));
+      poignee.setAttribute('aria-label', reduite ? 'Déplier la fiche' : 'Réduire la fiche');
+    });
+  }
 
   const btnCopy = el.querySelector('.btn-copy');
   if (btnCopy) {
@@ -738,6 +998,69 @@ function attachPopupActions(popup, lat, lon, allerVers, origineCle) {
       popup.remove();
       allerVers(btn.dataset.nom, origineCle);
     });
+  });
+}
+
+// Un point par "site" distinct (centroïde de ses falaises, pas la 1ʳᵉ
+// feature — certains sites s'étalent sur ~2km, un centroïde est nettement
+// mieux placé) — sert de source aux labels ajoutés ci-dessous.
+function construireGeojsonSites(geojson) {
+  const groupes = new Map();
+  geojson.features.forEach(f => {
+    const p = f.properties;
+    if (p.categorie !== 'falaise' || !p.site) return;
+    const [lon, lat] = f.geometry.coordinates;
+    if (!groupes.has(p.site)) groupes.set(p.site, { sumLon: 0, sumLat: 0, n: 0 });
+    const g = groupes.get(p.site);
+    g.sumLon += lon; g.sumLat += lat; g.n += 1;
+  });
+  return {
+    type: 'FeatureCollection',
+    features: Array.from(groupes, ([site, g]) => ({
+      type: 'Feature',
+      properties: { site },
+      geometry: { type: 'Point', coordinates: [g.sumLon / g.n, g.sumLat / g.n] },
+    })),
+  };
+}
+
+// Noms de site affichés par défaut, en marqueurs DOM (pas une couche GL,
+// contrairement au premier jet) : une couche GL est TOUJOURS rendue sous les
+// marqueurs/popups DOM (le canvas WebGL est une seule surface en dessous de
+// la superposition DOM, par construction) — le texte disparaissait donc
+// derrière un figuré ponctuel dès qu'il le chevauchait. En DOM, on récupère
+// l'empilement standard : ajoutés après les marqueurs falaise/parking/gîte
+// (voir l'appel dans initCarte), ils passent naturellement au-dessus.
+// Contrepartie assumée : pas de moteur de décollision automatique entre eux
+// (comme le ferait une couche GL) — un non-problème ici, seulement une
+// dizaine de sites répartis sur tout le département.
+//
+// Cliquables (cadrage sur l'étendue du site, voir onClicSite) : ils
+// redeviennent donc réceptifs aux clics, ce qui peut occasionnellement
+// intercepter un clic destiné à un marqueur juste en dessous s'ils se
+// chevauchent pile — accepté pour la même raison que ci-dessus (peu de
+// sites, chevauchement pile au pixel près improbable en pratique).
+function ajouterLabelsSites(map, geojson, onClicSite) {
+  const sitesGeojson = construireGeojsonSites(geojson);
+  sitesGeojson.features.forEach((f) => {
+    const site = f.properties.site;
+    const el = document.createElement('div');
+    el.className = 'label-site';
+    el.textContent = site;
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', `Centrer sur ${site}`);
+    const activer = () => onClicSite(site);
+    el.addEventListener('click', activer);
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        activer();
+      }
+    });
+    new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 2] })
+      .setLngLat(f.geometry.coordinates)
+      .addTo(map);
   });
 }
 
