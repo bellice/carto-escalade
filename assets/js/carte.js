@@ -178,6 +178,16 @@ export function initCarte(dataUrl) {
     popupOuverte = ouverte ? popup : (popupOuverte === popup ? null : popupOuverte);
     return popupOuverte;
   }
+
+  // État replié/déplié de la fiche mobile, PARTAGÉ entre toutes les popups
+  // (pas une propriété de telle ou telle falaise) : si l'utilisateur réduit
+  // la fiche pour voir plus de carte, ce choix reste valable en passant à une
+  // autre falaise/parking — comme le fait la fiche du bas de Google/Apple
+  // Maps, dont le niveau (replié/déplié) suit l'utilisateur d'un lieu à
+  // l'autre plutôt que d'être réinitialisé à chaque sélection. Mis à jour par
+  // l'écouteur délégué ci-dessous, lu par addMarker (voir estFicheReduite) à
+  // chaque ouverture de popup pour synchroniser SON contenu sur cet état.
+  let ficheReduite = false;
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && popupOuverte) popupOuverte.remove();
   });
@@ -194,9 +204,9 @@ export function initCarte(dataUrl) {
     if (poignee) {
       const contenu = poignee.closest('.maplibregl-popup-content');
       if (!contenu) return;
-      const reduite = contenu.classList.toggle('fiche-reduite');
-      poignee.setAttribute('aria-expanded', String(!reduite));
-      const texte = reduite ? 'Agrandir' : 'Réduire';
+      ficheReduite = contenu.classList.toggle('fiche-reduite');
+      poignee.setAttribute('aria-expanded', String(!ficheReduite));
+      const texte = ficheReduite ? 'Agrandir' : 'Réduire';
       poignee.setAttribute('aria-label', texte + ' la fiche');
       const spanTexte = poignee.querySelector('.poignee-texte');
       if (spanTexte) spanTexte.textContent = texte;
@@ -350,7 +360,7 @@ export function initCarte(dataUrl) {
       const bornesCotationParSite = calculerBornesCotationParSite(geojson);
 
       geojson.features.forEach(f => {
-        const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, bornesCotationParSite);
+        const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, bornesCotationParSite, () => ficheReduite);
         entries.push(entree);
         index.set(entree.cle, entree);
         if (entree.cat === 'falaise') {

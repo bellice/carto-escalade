@@ -6,7 +6,7 @@ import { cleFalaise, libelleFalaise, secteurDistinct } from './donnees.js';
 import { poserTailleMarqueur, dessinerFalaise } from './symboles.js';
 import { popupFalaise, popupParking, popupGite } from './popups.js';
 
-export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, bornesCotationParSite) {
+export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, bornesCotationParSite, estFicheReduite) {
   const p = feature.properties;
   const [lon, lat] = feature.geometry.coordinates;
   const cat = p.categorie;
@@ -75,6 +75,27 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
   popup.on('open', () => {
     if (suivrePopup) suivrePopup(popup, true);
     document.body.classList.add('fiche-ouverte');
+    // Synchronise CETTE popup sur l'état replié/déplié partagé (voir
+    // ficheReduite dans carte.js) : une fiche réduite pour voir plus de carte
+    // doit le rester en passant à une autre falaise/parking, jusqu'à ce que
+    // l'utilisateur la rouvre lui-même. classList.toggle(classe, force) plutôt
+    // qu'un simple add/remove conditionnel : le conteneur DOM de CE marqueur
+    // (réutilisé à chaque réouverture) peut porter un état périmé d'une fois
+    // précédente où il avait lui-même été réduit.
+    const elPopupOuverture = popup.getElement();
+    const contenuOuverture = elPopupOuverture && elPopupOuverture.querySelector('.maplibregl-popup-content');
+    const poigneeOuverture = elPopupOuverture && elPopupOuverture.querySelector('.poignee-fiche');
+    if (contenuOuverture) {
+      const reduire = Boolean(estFicheReduite && estFicheReduite());
+      contenuOuverture.classList.toggle('fiche-reduite', reduire);
+      if (poigneeOuverture) {
+        poigneeOuverture.setAttribute('aria-expanded', String(!reduire));
+        const texteOuverture = reduire ? 'Agrandir' : 'Réduire';
+        poigneeOuverture.setAttribute('aria-label', texteOuverture + ' la fiche');
+        const spanTexteOuverture = poigneeOuverture.querySelector('.poignee-texte');
+        if (spanTexteOuverture) spanTexteOuverture.textContent = texteOuverture;
+      }
+    }
     // Actions du contenu (poignée, copier, lien secteur) : gérées par un
     // écouteur délégué unique posé dans initCarte (voir document.addEventListener
     // 'click' plus bas) — pas de ré-attachement ici, insensible à un éventuel
@@ -106,14 +127,9 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     // à la dernière falaise choisie visible, plutôt que de tout re-masquer
     // aussitôt. Seuls "Tout voir" ou le choix d'une NOUVELLE falaise (voir
     // onSelectionFalaise à l'ouverture) réinitialisent la sélection.
-    // La feuille du bas mobile peut avoir été réduite (poignée) : repartir
-    // dépliée à la prochaine ouverture, sinon l'état fuiterait d'une fiche
-    // à l'autre (le conteneur DOM persiste entre ouvertures/fermetures).
-    // getElement() peut renvoyer undefined ici (conteneur déjà détruit par
-    // remove() au moment où 'close' se déclenche) — d'où la garde.
-    const elPopup = popup.getElement();
-    const contenu = elPopup && elPopup.querySelector('.maplibregl-popup-content');
-    if (contenu) contenu.classList.remove('fiche-reduite');
+    // L'état replié/déplié n'est PLUS réinitialisé ici (voir estFicheReduite
+    // à l'ouverture, plus haut) : il est désormais partagé entre toutes les
+    // popups et doit au contraire survivre à cette fermeture.
   });
 
   const cot5 = p.nb_voies_cot5 ?? 0;
