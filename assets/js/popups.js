@@ -71,15 +71,29 @@ function afficherLienMaps() {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
-function lienOuvrirMaps(lat, lon) {
-  return afficherLienMaps() ? `<a href="geo:${lat},${lon}">Ouvrir dans Maps</a>` : '';
+// geo:lat,lon NU (sans ?q=) marche très bien dans les applis qui suivent le
+// standard geo: au pied de la lettre (RFC 5870 — Organic Maps, OsmAnd...) :
+// elles posent un vrai repère à cette position. Google Maps, lui, se contente
+// alors de CENTRER la carte SANS poser de repère — sans repère, rien à quoi
+// rattacher un itinéraire (1re version de ce lien, corrigée après retour :
+// ce n'est pas geo: qui manque d'un paramètre "itinéraire", c'est l'absence
+// de repère qui empêche d'en demander un). Le paramètre q=lat,lon(nom) est la
+// convention Android/Google pour poser un repère NOMMÉ, cliquable pour lancer
+// un itinéraire depuis l'appli — répéter les coordonnées avant le "?" (plutôt
+// que le classique geo:0,0?q=...) garde la compatibilité RFC 5870 pour les
+// applis qui ignorent q= et ne lisent que la position brute.
+function lienOuvrirMaps(lat, lon, nom) {
+  if (!afficherLienMaps()) return '';
+  const coords = `${lat},${lon}`;
+  const libelle = nom ? `(${encodeURIComponent(nom)})` : '';
+  return `<a href="geo:${coords}?q=${coords}${libelle}">Ouvrir dans Maps</a>`;
 }
 
 // Assemble la rangée de liens secondaires (texte souligné, séparés par "·")
-// à partir d'une liste où certaines entrées peuvent être vides (Oblyk absent,
-// Ouvrir dans Maps masqué sur desktop...) — filtre les vides et joint
-// seulement ce qui reste, pour ne jamais laisser un séparateur orphelin en
-// tête/fin, et n'affiche rien du tout si la liste entière est vide.
+// à partir d'une liste où certaines entrées peuvent être vides (Oblyk
+// absent...) — filtre les vides et joint seulement ce qui reste, pour ne
+// jamais laisser un séparateur orphelin en tête/fin, et n'affiche rien du
+// tout si la liste entière est vide.
 function construireActionsSecondaires(liens) {
   const presents = liens.filter(Boolean);
   if (!presents.length) return '';
@@ -155,7 +169,7 @@ export function popupFalaise(p, lat, lon, cle, bornesSite) {
       <div class="actions">
         <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
         ${boutonGps(lat, lon)}
-        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon), lienOblyk])}
+        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon, p.nom), lienOblyk])}
       </div>
     </div>`;
 }
@@ -180,7 +194,7 @@ export function popupParking(p, lat, lon, parkingInfos, cle) {
       <div class="actions">
         <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
         ${boutonGps(lat, lon)}
-        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon)])}
+        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon, p.nom)])}
       </div>
     </div>`;
 }
@@ -194,7 +208,7 @@ export function popupGite(p, lat, lon, cle) {
       <div class="actions">
         <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
         ${boutonGps(lat, lon)}
-        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon)])}
+        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon, p.nom)])}
       </div>
     </div>`;
 }
