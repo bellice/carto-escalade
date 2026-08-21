@@ -905,6 +905,10 @@ a:visited { color: var(--forest); }
     position: relative !important;
     border-radius: 14px 14px 0 0 !important;
     max-width: 100% !important;
+    width: 100% !important; /* sans ce width explicite (repéré après test),
+      un contenu court (popup parking, souvent plus courte qu'une popup
+      falaise) restait en largeur naturelle au lieu de remplir la feuille —
+      max-width seul ne force pas la largeur à s'étendre. */
     max-height: min(45vh, 380px);
     overflow-y: auto;
     padding-top: 34px !important;
