@@ -61,32 +61,37 @@ function construireCoinInfos(orientation) {
   return `<div class="popup-coin">${roseDesVents(orientation)}</div>`;
 }
 
-// geo: n'ouvre l'appli Maps/Plans par défaut que sur un appareil qui en a
-// une — sur desktop, en général aucun gestionnaire n'est enregistré et le
-// lien ne fait rien. (pointer: coarse) cible le type d'entrée (tactile vs
-// souris/trackpad) plutôt qu'une largeur de fenêtre : un desktop avec une
-// fenêtre étroite n'a pas plus d'appli Maps pour autant, alors qu'une tablette
-// tactile en a une même en plein écran.
+// geo: n'ouvre une appli Maps/Plans que sur un appareil qui en a une — sur
+// desktop, en général aucun gestionnaire n'est enregistré et le lien ne fait
+// rien. (pointer: coarse) cible le type d'entrée (tactile vs souris/trackpad)
+// plutôt qu'une largeur de fenêtre : un desktop avec une fenêtre étroite n'a
+// pas plus d'appli Maps pour autant, alors qu'une tablette tactile en a une
+// même en plein écran.
 function afficherLienMaps() {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
-// geo:lat,lon NU (sans ?q=) marche très bien dans les applis qui suivent le
-// standard geo: au pied de la lettre (RFC 5870 — Organic Maps, OsmAnd...) :
-// elles posent un vrai repère à cette position. Google Maps, lui, se contente
-// alors de CENTRER la carte SANS poser de repère — sans repère, rien à quoi
-// rattacher un itinéraire (1re version de ce lien, corrigée après retour :
-// ce n'est pas geo: qui manque d'un paramètre "itinéraire", c'est l'absence
-// de repère qui empêche d'en demander un). Le paramètre q=lat,lon(nom) est la
-// convention Android/Google pour poser un repère NOMMÉ, cliquable pour lancer
-// un itinéraire depuis l'appli — répéter les coordonnées avant le "?" (plutôt
-// que le classique geo:0,0?q=...) garde la compatibilité RFC 5870 pour les
-// applis qui ignorent q= et ne lisent que la position brute.
-function lienOuvrirMaps(lat, lon, nom) {
-  if (!afficherLienMaps()) return '';
+// Un seul bouton "Itinéraire", pas deux (l'ancien "Ouvrir dans Maps" séparé
+// prenait une place en plus sur mobile pour un gain qui, une fois le lien
+// geo: corrigé, n'existait plus vraiment). Deux façons d'y arriver selon
+// l'appareil :
+// - mobile (afficherLienMaps) : un lien geo:lat,lon?q=lat,lon(nom) — laisse
+//   le téléphone proposer TOUTES les applis de nav installées (Organic Maps,
+//   Google Maps, Waze...), pas seulement Google Maps. q=lat,lon(nom) est la
+//   convention Android/Google pour poser un repère NOMMÉ dans Google Maps
+//   (sans lui, Google Maps centre la carte SANS repère — rien à quoi
+//   rattacher un itinéraire) ; répéter les coordonnées avant le "?" (plutôt
+//   que le classique geo:0,0?q=...) garde la compatibilité RFC 5870 pour les
+//   applis qui ignorent q= et ne lisent que la position brute.
+// - desktop : geo: n'ouvrant en général rien, on garde le lien direct vers
+//   Google Maps Itinéraire (seul choix qui marche vraiment là).
+function lienItineraire(lat, lon, nom) {
   const coords = `${lat},${lon}`;
-  const libelle = nom ? `(${encodeURIComponent(nom)})` : '';
-  return `<a href="geo:${coords}?q=${coords}${libelle}">Ouvrir dans Maps</a>`;
+  if (afficherLienMaps()) {
+    const libelle = nom ? `(${encodeURIComponent(nom)})` : '';
+    return `geo:${coords}?q=${coords}${libelle}`;
+  }
+  return `https://www.google.com/maps/dir/?api=1&destination=${coords}`;
 }
 
 // Assemble la rangée de liens secondaires (texte souligné, séparés par "·")
@@ -167,9 +172,9 @@ export function popupFalaise(p, lat, lon, cle, bornesSite) {
       </div>
       <div class="fiche-infos">${rows.join('')}</div>
       <div class="actions">
-        <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
+        <a class="btn-primary" href="${lienItineraire(lat, lon, p.nom)}" target="_blank" rel="noopener">Itinéraire</a>
         ${boutonGps(lat, lon)}
-        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon, p.nom), lienOblyk])}
+        ${construireActionsSecondaires([lienOblyk])}
       </div>
     </div>`;
 }
@@ -192,9 +197,8 @@ export function popupParking(p, lat, lon, parkingInfos, cle) {
       <h3>${escapeHtml(p.nom)}</h3>
       <div class="fiche-infos">${rows.join('')}</div>
       <div class="actions">
-        <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
+        <a class="btn-primary" href="${lienItineraire(lat, lon, p.nom)}" target="_blank" rel="noopener">Itinéraire</a>
         ${boutonGps(lat, lon)}
-        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon, p.nom)])}
       </div>
     </div>`;
 }
@@ -206,9 +210,8 @@ export function popupGite(p, lat, lon, cle) {
       <span class="cat-tag gite">Gîte</span>
       <h3>${escapeHtml(p.nom)}</h3>
       <div class="actions">
-        <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
+        <a class="btn-primary" href="${lienItineraire(lat, lon, p.nom)}" target="_blank" rel="noopener">Itinéraire</a>
         ${boutonGps(lat, lon)}
-        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon, p.nom)])}
       </div>
     </div>`;
 }

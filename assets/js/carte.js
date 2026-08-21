@@ -455,6 +455,15 @@ export function initCarte(dataUrl) {
   function centrerSurRecherche() {
     const q = filtres.recherche;
     if (!q) return;
+    // Sur mobile, le champ de recherche a encore le focus (clavier affiché)
+    // au moment de ce clic : le PROCHAIN tap ailleurs sur l'écran sert
+    // souvent à fermer le clavier plutôt qu'à activer sa cible réelle (bug
+    // constaté précisément dans ce cas : falaise trouvée par recherche, puis
+    // tap sur "voir sur la carte" pour son parking sans effet — le même
+    // enchaînement depuis un clic direct sur la falaise, sans recherche,
+    // fonctionnait). Fermer le clavier ICI, dès qu'on quitte la recherche,
+    // pour que le prochain tap arrive bien sur sa cible.
+    if (recherche) recherche.blur();
     const correspondances = entries.filter((e) => e.cat === 'falaise' && e.recherche.includes(q));
     if (!correspondances.length) return;
 
