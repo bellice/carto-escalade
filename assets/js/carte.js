@@ -2,14 +2,14 @@
    Chaque page sortie importe initCarte(dataUrl) et l'appelle avec le chemin
    vers son propre data.geojson. */
 
-import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.mjs';
+import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 import { escapeHtml } from './utils.js';
 import {
   indexerParkingInfos, calculerMaxima, calculerBornesCotationParSite,
   estFalaiseVideDansMode, falaiseVisible, libelleFalaise,
 } from './donnees.js';
 import { dessinerFalaise, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
-import { addMarker } from './marqueurs.js';
+import { addMarker, synchroniserPoignee } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
 import { MARGE_UI, margeAvantPopup, fitToMarkers, creerControleToutVoir, reinitialiserPadding } from './carte-utils.js';
 
@@ -205,11 +205,7 @@ export function initCarte(dataUrl) {
       const contenu = poignee.closest('.maplibregl-popup-content');
       if (!contenu) return;
       ficheReduite = contenu.classList.toggle('fiche-reduite');
-      poignee.setAttribute('aria-expanded', String(!ficheReduite));
-      const texte = ficheReduite ? 'Agrandir' : 'Réduire';
-      poignee.setAttribute('aria-label', texte + ' la fiche');
-      const spanTexte = poignee.querySelector('.poignee-texte');
-      if (spanTexte) spanTexte.textContent = texte;
+      synchroniserPoignee(poignee, ficheReduite);
       return;
     }
 

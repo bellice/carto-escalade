@@ -1,7 +1,7 @@
 // labels.js — libellés de site et de secteur affichés sur la carte
 // (marqueurs DOM non-figurés, indépendants des marqueurs falaise/parking/gîte).
 
-import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.mjs';
+import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 import { secteurDistinct } from './donnees.js';
 
 // Un point par "site" distinct (centroïde de ses falaises, pas la 1ʳᵉ

@@ -8,7 +8,10 @@ Site statique minimaliste : une carte par sortie (falaises + parkings), pas de b
 index.html          → page d'accueil, liste des sorties
 sw.js                → service worker (cache hors-ligne, voir plus bas)
 assets/
-  style.css          → styles partagés (palette, popups, impression)
+  style.css          → tokens (palette, polices) + page d'accueil uniquement
+  style-carte.css    → marqueurs, popups, légende, feuille mobile, impression
+                       (séparé de style.css : la page d'accueil n'en a jamais
+                       besoin, pas de raison de le lui faire charger)
   js/                → logique carte, en modules ES natifs (import/export,
                        aucun bundler) — chargés via <script type="module">
     carte.js         → point d'entrée : initCarte(dataUrl), orchestration

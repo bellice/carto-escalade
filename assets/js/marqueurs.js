@@ -1,10 +1,24 @@
 // marqueurs.js — création des marqueurs MapLibre (falaise/parking/gîte) :
 // DOM, accessibilité, popup attachée, gestion d'ouverture/fermeture.
 
-import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.mjs';
+import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 import { cleFalaise, libelleFalaise, secteurDistinct } from './donnees.js';
 import { poserTailleMarqueur, dessinerFalaise } from './symboles.js';
 import { popupFalaise, popupParking, popupGite } from './popups.js';
+
+// Met à jour l'état visuel/accessible de la poignée (aria-expanded,
+// aria-label, texte Réduire/Agrandir) à partir d'un booléen "réduit" —
+// factorisé ici pour éviter la duplication entre la synchronisation à
+// l'ouverture d'une popup (plus bas, popup.on('open', ...)) et le clic
+// utilisateur sur la poignée elle-même (écouteur délégué de carte.js) :
+// même logique, deux déclencheurs différents.
+export function synchroniserPoignee(poignee, reduire) {
+  poignee.setAttribute('aria-expanded', String(!reduire));
+  const texte = reduire ? 'Agrandir' : 'Réduire';
+  poignee.setAttribute('aria-label', texte + ' la fiche');
+  const spanTexte = poignee.querySelector('.poignee-texte');
+  if (spanTexte) spanTexte.textContent = texte;
+}
 
 export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, bornesCotationParSite, estFicheReduite) {
   const p = feature.properties;
@@ -98,13 +112,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
       contenuOuverture.classList.toggle('fiche-reduite', reduire);
       contenuOuverture.offsetHeight;
       contenuOuverture.style.transition = '';
-      if (poigneeOuverture) {
-        poigneeOuverture.setAttribute('aria-expanded', String(!reduire));
-        const texteOuverture = reduire ? 'Agrandir' : 'Réduire';
-        poigneeOuverture.setAttribute('aria-label', texteOuverture + ' la fiche');
-        const spanTexteOuverture = poigneeOuverture.querySelector('.poignee-texte');
-        if (spanTexteOuverture) spanTexteOuverture.textContent = texteOuverture;
-      }
+      if (poigneeOuverture) synchroniserPoignee(poigneeOuverture, reduire);
     }
     // Actions du contenu (poignée, copier, lien secteur) : gérées par un
     // écouteur délégué unique posé dans initCarte (voir document.addEventListener

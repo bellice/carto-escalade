@@ -65,7 +65,7 @@ export function calculerMaxima(geojson) {
   };
 }
 
-export function mediane(valeurs) {
+function mediane(valeurs) {
   const tri = [...valeurs].sort((a, b) => a - b);
   const n = tri.length;
   if (!n) return 0;
