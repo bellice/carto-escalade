@@ -162,7 +162,7 @@ export function popupFalaise(p, lat, lon, cle, bornesSite) {
 
   const secteur = secteurDistinct(p);
   const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
-  const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Voir sur Camp to Camp</a>` : '';
+  const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Voir sur Camptocamp</a>` : '';
 
   return `
     <div class="popup" data-cle="${escapeHtml(cle)}">
