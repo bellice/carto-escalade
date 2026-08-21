@@ -1,0 +1,5 @@
+{
+  "type": "module",
+  "private": true,
+  "description": "Marqueur pour les outils locaux (ex. node --check) : ces fichiers sont des modules ES. Aucune dépendance npm, aucune étape de build — le site reste servi tel quel par GitHub Pages."
+}
