@@ -11,15 +11,21 @@ export const MARGE_UI = { top: 120, bottom: 170, left: 70, right: 70 };
 // Variante de MARGE_UI pour un cadrage immédiatement suivi d'une ouverture de
 // popup (voir allerVers dans carte.js) : sur mobile, cette popup prend la
 // forme d'une feuille du bas jusqu'à ~45vh (cf. @media max-width:640px dans
-// le CSS) — bien plus haute que les 170px prévus pour la légende (qui, de
-// toute façon, se masque elle-même tant qu'une fiche est ouverte). Sans ce
+// le CSS) — bien plus haute que les 170px prévus pour la légende. Sans ce
 // correctif, un marqueur pouvait finir cadré pile là où la feuille allait le
 // recouvrir. Recalculée à chaque appel (pas une constante) : dépend de la
 // hauteur d'écran réelle, qui peut changer (rotation, redimensionnement).
+//
+// top réduit à 24 (pas les 120 de MARGE_UI) : ce top-là existe pour la barre
+// de recherche, qui SE MASQUE ELLE-MÊME tant qu'une fiche est ouverte sur
+// mobile (body.fiche-ouverte, voir le CSS) — puisqu'une popup va justement
+// s'ouvrir juste après cet appel, lui laisser 120px de trop en plus des ~300+
+// déjà réservés en bas resserrait l'espace utile bien plus que nécessaire
+// (repéré après test : cadrage peu visible, voire absent, sur petit écran).
 export function margeAvantPopup() {
   if (!window.matchMedia('(max-width: 640px)').matches) return MARGE_UI;
   const bas = Math.min(window.innerHeight * 0.45, 380) + 16;
-  return { ...MARGE_UI, bottom: bas };
+  return { ...MARGE_UI, top: 24, bottom: bas };
 }
 
 export function fitToMarkers(map, geojson) {
