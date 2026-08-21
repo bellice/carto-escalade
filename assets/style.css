@@ -141,7 +141,7 @@ a:visited { color: var(--forest); }
 .label-site {
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -157,6 +157,41 @@ a:visited { color: var(--forest); }
 .label-site:focus-visible {
   outline: 2px solid var(--forest);
   outline-offset: 1px;
+}
+
+/* Nom de secteur, affiché seulement à fort zoom (voir ZOOM_LABELS_SECTEUR /
+   ajouterLabelsSecteurs dans app.js). Non cliquable, contrairement à
+   .label-site : le marqueur falaise en dessous est déjà interactif à ce
+   niveau de zoom. Volontairement plus discret que .label-site (pas de
+   majuscules/letter-spacing, plus petit, fond moins opaque) : un secteur est
+   un niveau EN DESSOUS du site dans la hiérarchie des noms de lieux — même
+   logique qu'une carte topo où un toponyme secondaire est rendu plus petit
+   et plus léger qu'un toponyme principal, pas juste dans une autre couleur. */
+.label-secteur {
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 500;
+  color: #5a6058;
+  background: rgba(251, 250, 246, 0.65);
+  padding: 2px 5px;
+  border-radius: 2px;
+  /* Pas de nowrap : certains noms de secteur sont longs ("Champagne pour
+     tout le monde") — laissé à la coupure naturelle plutôt qu'un seul chip
+     très large. max-width fixe la largeur où ça coupe (indépendante de la
+     longueur du nom) ; appliquerAntiCollisionSecteurs mesure la vraie
+     hauteur (offsetHeight) à chaque fois, donc reste correct quel que soit
+     le nombre de lignes. line-clamp plafonne à 2 lignes PILE (repéré après
+     coup : sans plafond, un nom à 4 mots peut déborder sur 3 — "…" en fin de
+     2e ligne si jamais un nom encore plus long apparaît). */
+  max-width: 115px;
+  text-align: center;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ===== Map page ===== */
@@ -363,7 +398,7 @@ a:visited { color: var(--forest); }
   gap: 6px;
 }
 .legende-cats .note {
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   color: #8a9088;
 }
 
@@ -375,13 +410,13 @@ a:visited { color: var(--forest); }
 }
 .legende-titre {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: #5a6058;
 }
 .legende-note {
   display: block;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: #5a6058;
   margin-top: 2px;
 }
@@ -396,7 +431,7 @@ a:visited { color: var(--forest); }
   align-items: center;
   gap: 2px;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: #5a6058;
 }
 /* Contour seul, sans remplissage : ces cercles n'encodent que la TAILLE
@@ -457,10 +492,106 @@ a:visited { color: var(--forest); }
   max-width: 260px;
 }
 
+/* Sur mobile, une règle plus large (32px) prend le dessus dans le bloc
+   @media (max-width:640px) ci-dessous, par ordre de cascade — sans elle,
+   rien ne cadrait ce bouton sur desktop, où il pouvait chevaucher le bloc
+   roche/orientation ajouté en haut à droite (voir .popup-entete). */
+.maplibregl-popup-close-button {
+  width: 22px;
+  height: 22px;
+  font-size: 16px;
+  line-height: 22px;
+  top: 2px !important;
+  right: 2px !important;
+}
+
 .popup h3 {
   margin: 0 0 8px;
   font-size: 1rem;
   color: var(--forest);
+}
+
+/* En-tête falaise : bloc titre à gauche, orientation à droite (voir
+   construireCoinInfos dans app.js) — auparavant vide sur cette même ligne.
+   Le type de roche reste dans la fiche d'infos classique (popupFalaise) :
+   simple valeur texte, pas de widget dédié à caser ici. */
+.popup-entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding-right: 24px; /* réserve la place du bouton de fermeture */
+}
+.popup-titre-bloc {
+  min-width: 0;
+}
+.popup-coin {
+  flex-shrink: 0;
+  width: 60px; /* = largeur de .rose-vents */
+  display: flex;
+  justify-content: center;
+}
+
+/* Rose des vents miniature (voir roseDesVents dans app.js) : un anneau de
+   petites pastilles (une par direction), pas un disque plein — cohérent avec
+   le vocabulaire "dot" déjà utilisé dans la légende. Les pastilles ET les
+   libellés sont des <span> positionnés par un transform calculé en JS
+   (rotation + décalage + contre-rotation pour rester droit) ; top/left/margin
+   ci-dessous centrent chaque <span> sur l'anneau AVANT rotation, pour que le
+   pivot tombe bien au centre. Le conteneur (60px) est volontairement plus
+   grand que l'anneau visible (24px) : les libellés dépassent de l'anneau à
+   ~22px du centre, sans cette marge ils chevauchaient le texte "roche"
+   juste au-dessus (bug remonté après test).
+   */
+.rose-vents {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto;
+}
+.rose-vents-cercle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border-radius: 50%;
+  border: 1px solid var(--stone-dark);
+}
+.rose-vents-point {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--stone-dark);
+}
+.rose-vents-point-actif {
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  background: var(--ink);
+}
+.rose-vents-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  margin-left: -9px;
+  margin-top: -6px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: #8a9088;
+  line-height: 1;
+}
+.rose-vents-label-actif {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 0.66rem;
 }
 
 /* Poignée de la feuille du bas mobile — sans objet hors de ce contexte
@@ -504,32 +635,48 @@ a:visited { color: var(--forest); }
 .cat-tag.parking { background: var(--teal); }
 .cat-tag.gite { background: var(--ink); }
 
-.popup dl {
-  margin: 0;
+/* Fiche technique : libellé à gauche, valeur à droite sur la même ligne
+   (plutôt qu'un <dl> terme/description empilé verticalement — bien moins
+   scannable pour une liste de faits courts). Les champs avec un visuel
+   supplémentaire (jauge de cotation, grille de voies, liste de falaises)
+   ajoutent ce contenu en pleine largeur SOUS la ligne label/valeur, comme un
+   élément frère plutôt que niché dans .info-valeur — un visuel comme une
+   jauge a besoin de toute la largeur pour rester lisible. */
+.popup .fiche-infos {
   font-size: 0.85rem;
 }
-.popup dt {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: #5a6058;
+.popup .info-ligne {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
   margin-top: 6px;
 }
-.popup dd {
-  margin: 0 0 2px;
+.popup .info-label {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: #5a6058;
+  flex-shrink: 0;
 }
-
-.barre-cotations {
-  display: flex;
-  width: 100%;
-  height: 8px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--stone-dark);
-  margin-top: 2px;
+/* Sépare le groupe "à quoi ressemble l'escalade" (roche/cotation/voies) du
+   groupe "comment y aller" (parking/approche) dans popupFalaise — juste plus
+   d'espace qu'entre deux lignes du même groupe (6px, .info-ligne), rien
+   d'autre : le regroupement par proximité seul suffit à marquer "nouveau
+   sujet", pas besoin d'un trait ou d'un fond pour ça. */
+.popup .fiche-groupe-suivant {
+  margin-top: 16px;
 }
-.barre-cotations .segment-5 { background: var(--forest); }
-.barre-cotations .segment-6a { background: color-mix(in srgb, var(--forest) 55%, white); }
-.barre-cotations .segment-reste { background: var(--stone-dark); }
+/* Même famille, même taille que le libellé (voir .info-label) : la valeur
+   est l'info qui compte, mais pas au prix d'un déséquilibre visuel sur une
+   ligne — la hiérarchie passe par la couleur (encre pleine vs gris muet), pas
+   par la taille. Sans cette règle, .info-valeur héritait du corps de texte
+   du popup (police système, 0.85rem, plus grosse ET différente du libellé —
+   ça se voyait, notamment sur "Roche"/"Calcaire"). */
+.popup .info-valeur {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--ink);
+}
 
 .jauge-cotation {
   position: relative;
@@ -551,16 +698,56 @@ a:visited { color: var(--forest); }
   justify-content: space-between;
   margin-top: 2px;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   color: #8a9088;
 }
 
-.legende-barre {
-  display: block;
+/* Voies par grade (voir champVoies dans app.js) : une grille "1 case = 1
+   voie" (impression de quantité d'un coup d'œil, comparable d'une falaise à
+   l'autre) SUIVIE d'une légende qui réutilise EXACTEMENT les mêmes carrés
+   comme puces (.voies-case, pas une forme différente) — la puce et la case
+   sont littéralement la même marque, aucune couleur à décoder sans elle.
+   "Autres" (voies ni en 5 ni en 6a/6a+) reste un contour creux : pas de 3e
+   couleur pour une portion qu'on ne peut pas honnêtement qualifier de plus
+   facile ou plus dure. */
+.voies-grille {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 4px;
+  /* Pas de max-width : utilise toute la largeur de la popup (~228px de
+     contenu), comme le reste de la fiche d'infos (jauge-cotation, etc.) —
+     à 9px de côté + 2px d'écart, ~20 carrés tiennent par ligne. */
+}
+.voies-case {
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+/* 6a/6a+ est plus difficile que 5 : sémiologie graphique standard pour une
+   variable ordonnée (Bertin) — la valeur la plus élevée prend la teinte la
+   plus soutenue, pas l'inverse (erreur de la 1re version : le clair et le
+   foncé étaient inversés). */
+.voies-case-5 { background: color-mix(in srgb, var(--forest) 55%, white); }
+.voies-case-6a { background: var(--forest); }
+.voies-case-reste {
+  border: 1px solid var(--stone-dark);
+}
+
+.voies-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   margin-top: 4px;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   color: #5a6058;
+}
+.voies-groupe {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .popup .groupe-falaises {
@@ -589,41 +776,112 @@ a:visited { color: var(--forest); }
 }
 .popup .lien-secteur:hover { color: var(--clay); }
 
+/* Une seule action "forte" (bouton plein, l'itinéraire — la plus utilisée
+   sur le terrain) et le reste en discrets liens texte soulignés en dessous
+   (même traitement que .lien-secteur) : 4 boutons encadrés de même poids
+   étaient plus difficiles à scanner qu'à réellement départager. */
 .popup .actions {
   margin-top: 10px;
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.popup button, .popup a.btn {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  border: 1px solid var(--stone-dark);
-  background: var(--stone);
-  color: var(--ink);
-  padding: 5px 8px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  text-decoration: none;
-}
-.popup button:hover, .popup a.btn:hover {
-  background: var(--stone-dark);
-}
-.popup button.copied {
-  background: var(--forest);
-  color: white;
-  border-color: var(--forest);
-}
 .popup a.btn-primary {
+  display: block;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: var(--radius);
   background: var(--forest);
   color: white;
-  border-color: var(--forest);
-  font-weight: 600;
+  text-decoration: none;
 }
 .popup a.btn-primary:hover {
   background: var(--teal-dark);
-  border-color: var(--teal-dark);
+}
+
+/* Coordonnées GPS : affichées en clair plutôt que cachées derrière un
+   intitulé générique — copiables d'un tap (voir boutonGps dans app.js).
+   Traitement à part de .actions-secondaires (ci-dessous) : ce n'est ni une
+   navigation externe ni l'action principale, plutôt une donnée brute qu'on
+   peut aussi vouloir lire/noter sans rien coller ensuite. Le mot "Copier" à
+   droite est un texte réel, pas juste un aria-label — une case grisée seule
+   ne suffit pas à dire "on peut taper ici" (même leçon que .poignee-fiche). */
+.popup .gps-copie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font-family: var(--font-mono);
+  border: 1px solid var(--stone-dark);
+  background: var(--stone);
+  color: var(--ink);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.popup .gps-copie:hover {
+  background: var(--stone-dark);
+}
+.popup .gps-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.popup .gps-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5a6058;
+}
+.popup .gps-valeur {
+  font-size: 0.74rem;
+}
+.popup .gps-action {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+.popup .gps-copie.copied {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: white;
+}
+.popup .gps-copie.copied .gps-label {
+  color: white;
+}
+
+.popup .actions-secondaires {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+.popup .actions-secondaires a {
+  font: inherit;
+  color: var(--forest);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.popup .actions-secondaires a:hover {
+  color: var(--clay);
+}
+.popup .actions-secondaires .separateur {
+  color: var(--stone-dark);
 }
 
 /* ===== Fiche mobile : feuille du bas ===== */
@@ -647,38 +905,42 @@ a:visited { color: var(--forest); }
     position: relative !important;
     border-radius: 14px 14px 0 0 !important;
     max-width: 100% !important;
-    max-height: 58vh;
+    max-height: min(45vh, 380px);
     overflow-y: auto;
     padding-top: 34px !important;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25) !important;
     transition: max-height 0.2s ease;
   }
   .maplibregl-popup-content.fiche-reduite {
-    max-height: 30vh;
+    max-height: min(25vh, 220px);
   }
   .popup .poignee-fiche {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
     position: absolute;
-    top: 0;
+    top: 4px;
     left: 50%;
     transform: translateX(-50%);
-    width: 72px;
-    height: 32px;
-    padding: 0;
+    width: 90px;
+    height: 30px;
+    padding: 6px 0 0;
     border: none;
     background: none;
     cursor: pointer;
   }
-  .popup .poignee-fiche::after {
+  .popup .poignee-fiche::before {
     content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     width: 36px;
     height: 4px;
     border-radius: 2px;
     background: var(--stone-dark);
+  }
+  .popup .poignee-texte {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: #5a6058;
   }
   .popup .poignee-fiche:focus-visible {
     outline: 2px solid var(--forest);
@@ -690,6 +952,9 @@ a:visited { color: var(--forest); }
     font-size: 1.3rem;
     top: 6px !important;
     right: 6px !important;
+  }
+  .popup-entete {
+    padding-right: 38px; /* bouton de fermeture plus grand sur mobile (32px) */
   }
 
   /* Rien ne doit se superposer à la feuille : on cache le reste de l'UI
