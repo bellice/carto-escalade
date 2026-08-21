@@ -5,15 +5,24 @@ Site statique minimaliste : une carte par sortie (falaises + parkings), pas de b
 ## Structure
 
 ```
-index.html              → page d'accueil, liste des sorties
-sw.js                    → service worker (cache hors-ligne, voir plus bas)
+index.html          → page d'accueil, liste des sorties
+sw.js                → service worker (cache hors-ligne, voir plus bas)
 assets/
-  style.css              → styles partagés (palette, popups, impression)
-  app.js                 → logique carte (MapLibre, popups, recherche, filtres, copie GPS)
+  style.css          → styles partagés (palette, popups, impression)
+  js/                → logique carte, en modules ES natifs (import/export,
+                       aucun bundler) — chargés via <script type="module">
+    carte.js         → point d'entrée : initCarte(dataUrl), orchestration
+    carte-utils.js   → cadrage caméra, contrôle "Tout voir"
+    marqueurs.js     → création des marqueurs falaise/parking/gîte
+    popups.js        → HTML des popups (rose des vents, jauges, GPS...)
+    symboles.js      → cercles proportionnels (taille, remplissage, légende)
+    labels.js        → libellés de site/secteur sur la carte
+    donnees.js       → lecture GeoJSON, agrégats, prédicats de visibilité
+    utils.js         → escapeHtml
 sorties/
   2026-10-drome-saou/
-    index.html            → page carte de cette sortie
-    data.geojson          → falaises + parkings (généré depuis QGIS)
+    index.html       → page carte de cette sortie
+    data.geojson     → falaises + parkings (généré depuis QGIS)
 ```
 
 ## Déployer sur GitHub Pages
@@ -104,8 +113,8 @@ Pour un fond de carte 100% local :
    d'un extrait OpenStreetMap (via [Protomaps builds](https://maps.protomaps.com/builds/)
    par exemple).
 2. Déposer le fichier dans le dossier de la sortie (`sorties/.../tuiles.pmtiles`).
-3. Dans `assets/app.js`, remplacer la ligne `style:` de `initCarte()` par une
-   source PMTiles locale (ajouter le protocole `pmtiles://` via
+3. Dans `assets/js/carte.js`, remplacer la ligne `style:` de `initCarte()` par
+   une source PMTiles locale (ajouter le protocole `pmtiles://` via
    [`pmtiles-maplibre`](https://github.com/protomaps/PMTiles/tree/main/js)).
 
 Le reste du code (marqueurs, popups, filtres) ne change pas — seul le fond

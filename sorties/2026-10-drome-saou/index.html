@@ -11,16 +11,6 @@
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.css" />
-  <!-- v6 n'est distribué qu'en modules ES (plus de bundle UMD/<script src> classique,
-       cf. le guide de migration officiel maplibre-gl-js v5→v6) : ce petit script pont
-       expose window.maplibregl pour que assets/app.js (script classique, sans changement)
-       continue de fonctionner tel quel. Un script type="module" sans async s'exécute dans
-       l'ordre du document au même titre qu'un script defer, donc avant assets/app.js
-       ci-dessous — pas de "worker-src blob:" à ajouter, ce projet ne définit aucune CSP. -->
-  <script type="module">
-    import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.mjs';
-    window.maplibregl = maplibregl;
-  </script>
   <link rel="stylesheet" href="../../assets/style.css" />
 </head>
 <body>
@@ -64,15 +54,17 @@
     <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu">Masquer</button>
   </div>
 
-  <script src="../../assets/app.js" defer></script>
-  <script>
-    // Le script maplibregl (module) et assets/app.js (defer) s'exécutent tous
-    // deux dans l'ordre du document, avant DOMContentLoaded — ce code
-    // (synchrone, sans defer) doit donc attendre cet événement pour être sûr
-    // que initCarte/maplibregl existent déjà avant de s'en servir.
+  <!-- assets/js/carte.js et ses propres imports (maplibre-gl, puis les
+       modules internes qu'il importe) s'exécutent dans l'ordre du document,
+       avant DOMContentLoaded — donc initCarte est déjà résolu au moment où
+       ce code s'exécute. -->
+  <script type="module">
+    import { initCarte } from '../../assets/js/carte.js';
     document.addEventListener('DOMContentLoaded', () => {
       initCarte('data.geojson');
     });
+  </script>
+  <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('../../sw.js', { scope: '../../' });
     }
