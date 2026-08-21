@@ -87,7 +87,17 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     const poigneeOuverture = elPopupOuverture && elPopupOuverture.querySelector('.poignee-fiche');
     if (contenuOuverture) {
       const reduire = Boolean(estFicheReduite && estFicheReduite());
+      // Coupe la transition (max-height, prévue pour l'animation d'un VRAI
+      // clic sur la poignée) le temps d'appliquer l'état de départ : sans
+      // ça, une popup qui s'ouvre déjà réduite passait quand même par
+      // l'animation, ce qui donnait l'impression qu'elle s'ouvrait dépliée
+      // puis se repliait toute seule. Le forçage de reflow (lecture
+      // d'offsetHeight) entre les deux garantit que le navigateur applique
+      // bien "transition: none" AVANT le changement de classe, pas après.
+      contenuOuverture.style.transition = 'none';
       contenuOuverture.classList.toggle('fiche-reduite', reduire);
+      contenuOuverture.offsetHeight;
+      contenuOuverture.style.transition = '';
       if (poigneeOuverture) {
         poigneeOuverture.setAttribute('aria-expanded', String(!reduire));
         const texteOuverture = reduire ? 'Agrandir' : 'Réduire';
