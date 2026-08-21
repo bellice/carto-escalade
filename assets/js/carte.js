@@ -310,6 +310,16 @@ export function initCarte(dataUrl) {
       : null;
     appliquerFiltresEtSecteurs();
 
+    // Coupe toute animation de caméra en cours (flyTo/fitBounds précédent pas
+    // encore stabilisé) avant d'en lancer une nouvelle — cas concret : depuis
+    // la recherche, "Centrer" lance un flyTo vers la falaise (popup ouverte
+    // aussitôt) ; enchaîner tout de suite sur "voir sur la carte" pour son
+    // parking pouvait alors ne produire aucun mouvement visible, la 2e
+    // commande de caméra semblant se perdre pendant que la 1re tournait
+    // encore. map.stop() fige la caméra à sa position interpolée actuelle,
+    // point de départ propre pour la commande suivante.
+    map.stop();
+
     // margeAvantPopup() (pas MARGE_UI) : cible.marker.togglePopup() ouvre une
     // popup juste après ce cadrage — sur mobile, il faut lui laisser sa place.
     if (origine) {

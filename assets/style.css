@@ -720,8 +720,13 @@ a:visited { color: var(--forest); }
      à 9px de côté + 2px d'écart, ~20 carrés tiennent par ligne. */
 }
 .voies-case {
-  width: 9px;
-  height: 9px;
+  /* 10px, pas moins : la légende principale (.dot, Falaises/Parkings/Gîte)
+     fait déjà 11px — en dessous, ces carrés (dont certains ne sont qu'un
+     contour fin pour "autres", donc visuellement plus discrets qu'un rond
+     plein de même taille) devenaient plus petits que ce repère déjà en place
+     sur le site. */
+  width: 10px;
+  height: 10px;
   border-radius: 1px;
   flex-shrink: 0;
 }
@@ -959,6 +964,17 @@ a:visited { color: var(--forest); }
   }
   .popup-entete {
     padding-right: 38px; /* bouton de fermeture plus grand sur mobile (32px) */
+  }
+
+  /* La popup occupe toute la largeur du viewport sur mobile (pas les 260px
+     plafonnés du desktop, voir .maplibregl-popup-content plus haut) : il y a
+     objectivement plus de place, des carrés à la même taille qu'en desktop
+     paraissaient trop petits/épars dans cet espace élargi (repéré après
+     test). Grossis en conséquence — la légende (.voies-groupe) réutilise les
+     mêmes carrés, donc grossit pareil, cohérence gardée entre les deux. */
+  .voies-case {
+    width: 12px;
+    height: 12px;
   }
 
   /* Rien ne doit se superposer à la feuille : on cache le reste de l'UI
