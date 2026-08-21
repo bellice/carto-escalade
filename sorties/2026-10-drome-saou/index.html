@@ -10,8 +10,17 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.css" />
-  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.js" defer></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.css" />
+  <!-- v6 n'est distribué qu'en modules ES (plus de bundle UMD/<script src> classique,
+       cf. le guide de migration officiel maplibre-gl-js v5→v6) : ce petit script pont
+       expose window.maplibregl pour que assets/app.js (script classique, sans changement)
+       continue de fonctionner tel quel. Un script type="module" sans async s'exécute dans
+       l'ordre du document au même titre qu'un script defer, donc avant assets/app.js
+       ci-dessous — pas de "worker-src blob:" à ajouter, ce projet ne définit aucune CSP. -->
+  <script type="module">
+    import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.mjs';
+    window.maplibregl = maplibregl;
+  </script>
   <link rel="stylesheet" href="../../assets/style.css" />
 </head>
 <body>
@@ -57,8 +66,10 @@
 
   <script src="../../assets/app.js" defer></script>
   <script>
-    // defer sur les <script src> ci-dessus : ce code doit attendre qu'ils aient
-    // fini de s'exécuter (initCarte/maplibregl) avant de s'en servir.
+    // Le script maplibregl (module) et assets/app.js (defer) s'exécutent tous
+    // deux dans l'ordre du document, avant DOMContentLoaded — ce code
+    // (synchrone, sans defer) doit donc attendre cet événement pour être sûr
+    // que initCarte/maplibregl existent déjà avant de s'en servir.
     document.addEventListener('DOMContentLoaded', () => {
       initCarte('data.geojson');
     });

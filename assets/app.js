@@ -93,7 +93,7 @@ function initCarte(dataUrl) {
     // restreints, contradiction avec "tout voir".
     falaiseSelectionneeCle = null;
     reinitialiserRecherche();
-    appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+    appliquerFiltresEtSecteurs();
   }), 'top-right');
 
   // Le contrôle d'attribution démarre parfois "déplié" (classe posée avant que
@@ -106,6 +106,9 @@ function initCarte(dataUrl) {
 
   const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
+  let labelsSecteurs = []; // [{el, marker, nom}], peuplé une fois le geojson chargé
+  const entriesParSecteur = new Map(); // clé de regroupement secteur -> entrees falaise, pour appliquerAntiCollisionSecteurs
+  let secteursVisibles = null;
   const filtres = { recherche: '' };
   let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
   let falaiseSelectionneeCle = null; // falaise dont la popup est ouverte (ou origine/cible d'une navigation) — voir appliquerFiltres()
@@ -130,11 +133,29 @@ function initCarte(dataUrl) {
 
   // Ne garde en pleine opacité que les marqueurs de "cles" (estompe les
   // autres) ; cles=null remet tout le monde à l'opacité normale (popup fermée).
+  // IMPORTANT : passe par marker.setOpacity(), pas par
+  // marker.getElement().style.opacity — MapLibre gère lui-même l'opacité de
+  // l'élément (mécanisme prévu pour l'occlusion par le terrain/le globe,
+  // this._updateOpacity côté source) et la réapplique à CHAQUE 'move'/'render'
+  // à partir de sa propre valeur interne (this._opacity, par défaut '1'),
+  // écrasant silencieusement toute écriture directe de style.opacity dès le
+  // pan/zoom suivant. setOpacity() met à jour cette valeur interne, donc ses
+  // propres mises à jour restent cohérentes avec la nôtre.
   function enSurbrillance(cles) {
     const actifs = cles ? new Set(cles) : null;
     entries.forEach((e) => {
-      e.marker.getElement().style.opacity = (!actifs || actifs.has(e.cle)) ? '1' : '0.25';
+      e.marker.setOpacity((!actifs || actifs.has(e.cle)) ? '1' : '0.25');
     });
+  }
+
+  // Point de passage unique pour appliquerFiltres (recherche/mode/sélection) :
+  // recalcule dans la foulée quels libellés de secteur ont encore un figuré
+  // ponctuel visible en dessous (voir appliquerAntiCollisionSecteurs) — sinon
+  // un libellé peut rester affiché seul, sans plus aucun marqueur associé
+  // (ex. recherche qui ne laisse aucune falaise du secteur visible).
+  function appliquerFiltresEtSecteurs() {
+    appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+    appliquerAntiCollisionSecteurs();
   }
 
   // Change la falaise "active" (popup ouverte) : ses parkings associés
@@ -142,18 +163,113 @@ function initCarte(dataUrl) {
   // par défaut — on cherche d'abord le secteur, le parking en découle).
   function definirFalaiseSelectionnee(cle) {
     falaiseSelectionneeCle = cle;
-    appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+    appliquerFiltresEtSecteurs();
   }
 
-  // Garde la trace de la popup actuellement ouverte, uniquement pour la
-  // fermer via la touche Échap (au clavier, absence d'équivalent au clic
-  // ailleurs sur la carte que MapLibre gère déjà nativement).
+  // Bascule peu coûteuse (garde d'égalité, comme appliquerSimplificationZoom)
+  // pour rester réactive PENDANT un geste de zoom continu ; le calcul des
+  // recouvrements (plus coûteux : projection + mesure DOM de chaque libellé)
+  // attend que la caméra se stabilise (moveend/zoomend) — voir le câblage
+  // map.on(...) une fois le geojson chargé.
+  function appliquerVisibiliteSecteurs() {
+    const visible = map.getZoom() >= ZOOM_LABELS_SECTEUR;
+    if (visible === secteursVisibles) return;
+    secteursVisibles = visible;
+    if (!visible) {
+      labelsSecteurs.forEach(({ el }) => { el.style.visibility = 'hidden'; });
+    } else {
+      appliquerAntiCollisionSecteurs();
+    }
+  }
+
+  // Masque un libellé de secteur dans deux cas : (1) plus aucune falaise de ce
+  // secteur n'a de figuré ponctuel visible en ce moment (mode "Cercles" vidé,
+  // recherche qui l'exclut...) — un nom de secteur sans le moindre marqueur en
+  // dessous n'a aucun intérêt ; (2) son rectangle à l'écran chevauche celui
+  // d'un libellé déjà retenu (visibility, pas display : garde le DOM mesurable
+  // sans fausser le calcul). Priorité aux secteurs les plus fournis
+  // (labelsSecteurs déjà trié par nbVoies décroissant, voir
+  // construireGeojsonSecteurs) : à conflit égal, celui-là gagne.
+  function appliquerAntiCollisionSecteurs() {
+    if (!secteursVisibles) return;
+    const retenus = [];
+    labelsSecteurs.forEach(({ el, marker, nom }) => {
+      const falaisesDuSecteur = entriesParSecteur.get(nom) || [];
+      if (!falaisesDuSecteur.some(falaiseVisible)) {
+        el.style.visibility = 'hidden';
+        return;
+      }
+      const point = map.project(marker.getLngLat());
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const rect = { left: point.x - w / 2, right: point.x + w / 2, top: point.y, bottom: point.y + h };
+      const chevauche = retenus.some(r =>
+        rect.left < r.right + 4 && rect.right > r.left - 4 &&
+        rect.top < r.bottom + 2 && rect.bottom > r.top - 2
+      );
+      el.style.visibility = chevauche ? 'hidden' : 'visible';
+      if (!chevauche) retenus.push(rect);
+    });
+  }
+
+  // Garde la trace de la popup actuellement ouverte : ferme via la touche
+  // Échap, et permet à addMarker de savoir si une fermeture est "périmée"
+  // (une autre popup a déjà pris le relais entre-temps) avant de réinitialiser
+  // l'opacité des marqueurs.
   let popupOuverte = null;
   function suivrePopup(popup, ouverte) {
     popupOuverte = ouverte ? popup : (popupOuverte === popup ? null : popupOuverte);
+    return popupOuverte;
   }
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && popupOuverte) popupOuverte.remove();
+  });
+
+  // Actions du contenu de popup (poignée, copier, lien vers un secteur) :
+  // UN SEUL écouteur délégué, posé une fois ici, qui retrouve sa cible via
+  // closest() à chaque clic — plutôt que ré-attacher des écouteurs sur des
+  // nœuds DOM précis à chaque ouverture (ancien attachPopupActions). Robuste
+  // à toute réécriture ultérieure du contenu par MapLibre, quelle qu'en soit
+  // la cause exacte (bug observé : la poignée ne répondait plus après avoir
+  // déplacé la carte).
+  document.addEventListener('click', (e) => {
+    const poignee = e.target.closest('.poignee-fiche');
+    if (poignee) {
+      const contenu = poignee.closest('.maplibregl-popup-content');
+      if (!contenu) return;
+      const reduite = contenu.classList.toggle('fiche-reduite');
+      poignee.setAttribute('aria-expanded', String(!reduite));
+      const texte = reduite ? 'Agrandir' : 'Réduire';
+      poignee.setAttribute('aria-label', texte + ' la fiche');
+      const spanTexte = poignee.querySelector('.poignee-texte');
+      if (spanTexte) spanTexte.textContent = texte;
+      return;
+    }
+
+    const gpsBtn = e.target.closest('.gps-copie');
+    if (gpsBtn) {
+      // Bascule le mot d'action, jamais la valeur : la laisser affichée
+      // pendant la confirmation permet de relire ce qu'on vient de copier.
+      const action = gpsBtn.querySelector('.gps-action');
+      const coords = `${Number(gpsBtn.dataset.lat).toFixed(5)}, ${Number(gpsBtn.dataset.lon).toFixed(5)}`;
+      navigator.clipboard.writeText(coords).then(() => {
+        if (action) action.textContent = 'Copié !';
+        gpsBtn.classList.add('copied');
+        setTimeout(() => {
+          if (action) action.textContent = 'Copier';
+          gpsBtn.classList.remove('copied');
+        }, 1500);
+      });
+      return;
+    }
+
+    const lienSecteur = e.target.closest('.lien-secteur');
+    if (lienSecteur) {
+      const popupEl = lienSecteur.closest('.popup');
+      const origineCle = popupEl ? popupEl.dataset.cle : undefined;
+      if (popupOuverte) popupOuverte.remove();
+      allerVers(lienSecteur.dataset.nom, origineCle);
+    }
   });
 
   // Simplifie TOUS les marqueurs en petit point uniforme sous
@@ -196,6 +312,10 @@ function initCarte(dataUrl) {
       if (entree.cat === 'falaise') dessinerFalaise(entree, modeFigureActuel, maxima);
     });
     rafraichirLegendeFalaises();
+    // Un changement de mode peut vider un thème entier (ex. "Grande voie" sur
+    // un secteur 100% couenne) : le libellé de secteur n'a plus de figuré
+    // ponctuel sous lui, voir appliquerAntiCollisionSecteurs.
+    appliquerAntiCollisionSecteurs();
   }
 
   // Navigue vers le marqueur "cle" (falaise ou parking lié depuis une popup),
@@ -227,12 +347,12 @@ function initCarte(dataUrl) {
     // pertinents). Sinon (cible parking/gîte), on garde l'origine si c'est
     // une falaise (ex. lien "Parking" depuis une falaise) pour que son
     // parking reste visible ; sans ça le close de la popup d'origine (juste
-    // avant cet appel, voir attachPopupActions) masquerait la cible qu'on
-    // est justement en train de rejoindre.
+    // avant cet appel, voir le lien "lien-secteur" de l'écouteur délégué)
+    // masquerait la cible qu'on est justement en train de rejoindre.
     falaiseSelectionneeCle = cible.cat === 'falaise' ? cible.cle
       : (origine && origine.cat === 'falaise') ? origine.cle
       : null;
-    appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+    appliquerFiltresEtSecteurs();
 
     if (origine) {
       const bounds = new maplibregl.LngLatBounds();
@@ -254,11 +374,17 @@ function initCarte(dataUrl) {
     .then(geojson => {
       const parkingInfos = indexerParkingInfos(geojson);
       maxima = calculerMaxima(geojson);
+      const bornesCotationParSite = calculerBornesCotationParSite(geojson);
 
       geojson.features.forEach(f => {
-        const entree = addMarker(map, f, parkingInfos, maxima, allerVers, enSurbrillance, definirFalaiseSelectionnee, suivrePopup);
+        const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, bornesCotationParSite);
         entries.push(entree);
         index.set(entree.cle, entree);
+        if (entree.cat === 'falaise') {
+          const cleSecteur = entree.secteur || entree.nom;
+          if (!entriesParSecteur.has(cleSecteur)) entriesParSecteur.set(cleSecteur, []);
+          entriesParSecteur.get(cleSecteur).push(entree);
+        }
       });
 
       // Clic sur un label de site : cadre sur l'étendue de toutes ses
@@ -273,12 +399,25 @@ function initCarte(dataUrl) {
         );
         if (!falaisesDuSite.length) return;
         reinitialiserRecherche();
-        appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+        appliquerFiltresEtSecteurs();
         const bounds = new maplibregl.LngLatBounds();
         falaisesDuSite.forEach(f => bounds.extend(f.geometry.coordinates));
         map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 16 });
       });
       appliquerSimplificationZoom();
+
+      // Noms de secteur : masqués par défaut, affichés seulement à fort zoom
+      // (voir ZOOM_LABELS_SECTEUR) une fois que les cercles proportionnels
+      // sont assez espacés à l'écran pour rester lisibles. appliquerVisibiliteSecteurs/
+      // appliquerAntiCollisionSecteurs (déclarées plus haut, avant le fetch : elles
+      // doivent aussi être appelables depuis definirModeFigure/appliquerFiltresEtSecteurs)
+      // masquent en plus un libellé sans figuré ponctuel visible en dessous, ou en
+      // collision à l'écran avec un autre déjà affiché.
+      labelsSecteurs = ajouterLabelsSecteurs(map, geojson);
+      map.on('zoom', appliquerVisibiliteSecteurs);
+      map.on('moveend', appliquerAntiCollisionSecteurs);
+      map.on('zoomend', appliquerAntiCollisionSecteurs);
+      appliquerVisibiliteSecteurs();
 
       borneGlobale = fitToMarkers(map, geojson);
       remplirAutocompletion(geojson);
@@ -306,7 +445,7 @@ function initCarte(dataUrl) {
         if (legendeGite) legendeGite.remove();
       }
 
-      appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+      appliquerFiltresEtSecteurs();
       if (etatChargement) etatChargement.remove();
     })
     .catch(err => {
@@ -321,7 +460,7 @@ function initCarte(dataUrl) {
   if (recherche) {
     recherche.addEventListener('input', () => {
       filtres.recherche = recherche.value.trim().toLowerCase();
-      appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+      appliquerFiltresEtSecteurs();
       if (btnCentrer) btnCentrer.disabled = !filtres.recherche;
       if (btnEffacer) btnEffacer.hidden = !recherche.value;
     });
@@ -337,7 +476,7 @@ function initCarte(dataUrl) {
   if (btnEffacer) {
     btnEffacer.addEventListener('click', () => {
       reinitialiserRecherche();
-      appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+      appliquerFiltresEtSecteurs();
       if (recherche) recherche.focus();
     });
   }
@@ -386,7 +525,7 @@ function initCarte(dataUrl) {
       definirModeFigure(selectFigure.value);
       // Une falaise sans donnée pour ce thème disparaît (dessinerFalaise) —
       // son parking ne doit pas rester affiché seul, sans rien à proposer.
-      appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
+      appliquerFiltresEtSecteurs();
     });
   }
 }
@@ -541,7 +680,7 @@ function infosLegendePourMode(mode, maxima) {
   return { max: maxima.total, median: maxima.totalMedian, titre: 'Falaises (voies)', remplissage };
 }
 
-function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance, onSelectionFalaise, suivrePopup) {
+function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, bornesCotationParSite) {
   const p = feature.properties;
   const [lon, lat] = feature.geometry.coordinates;
   const cat = p.categorie;
@@ -584,9 +723,9 @@ function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance
   }
 
   const popupHtml =
-    cat === 'falaise' ? popupFalaise(p, lat, lon) :
-    cat === 'parking' ? popupParking(p, lat, lon, parkingInfos) :
-    popupGite(p, lat, lon);
+    cat === 'falaise' ? popupFalaise(p, lat, lon, cle, bornesCotationParSite.get(p.site)) :
+    cat === 'parking' ? popupParking(p, lat, lon, parkingInfos, cle) :
+    popupGite(p, lat, lon, cle);
 
   // closeOnClick (par défaut, true) : ferme la popup ouverte au clic
   // ailleurs sur la carte, y compris sur un autre marqueur — comportement
@@ -610,7 +749,10 @@ function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance
   popup.on('open', () => {
     if (suivrePopup) suivrePopup(popup, true);
     document.body.classList.add('fiche-ouverte');
-    attachPopupActions(popup, lat, lon, allerVers, cle);
+    // Actions du contenu (poignée, copier, lien secteur) : gérées par un
+    // écouteur délégué unique posé dans initCarte (voir document.addEventListener
+    // 'click' plus bas) — pas de ré-attachement ici, insensible à un éventuel
+    // nœud DOM périmé après un déplacement de la carte.
     // La mise en surbrillance suit la relation falaise<->parking dans les
     // deux sens : sélectionner l'un éclaire l'autre, cohérent et symétrique.
     if (cat === 'falaise') {
@@ -624,9 +766,15 @@ function addMarker(map, feature, parkingInfos, maxima, allerVers, enSurbrillance
     }
   });
   popup.on('close', () => {
-    if (suivrePopup) suivrePopup(popup, false);
-    document.body.classList.remove('fiche-ouverte');
-    enSurbrillance(null);
+    // Fermeture potentiellement "périmée" : si une AUTRE popup s'est déjà
+    // ouverte entre-temps (closeOnClick ferme celle-ci après coup), ne pas
+    // écraser l'opacité/la surbrillance qu'elle vient de poser (bug observé :
+    // clic falaise puis clic parking, tous les marqueurs repassaient à 100%).
+    const popupActive = suivrePopup ? suivrePopup(popup, false) : null;
+    if (!popupActive) {
+      document.body.classList.remove('fiche-ouverte');
+      enSurbrillance(null);
+    }
     // La sélection (falaiseSelectionneeCle) n'est PAS effacée ici : fermer
     // une fiche (× ou clic sur un autre marqueur) garde le parking associé
     // à la dernière falaise choisie visible, plutôt que de tout re-masquer
@@ -698,6 +846,17 @@ function estFalaiseVideDansMode(entree, mode) {
   if (mode === 'gv') return !entree.nbGrandeVoie;
   if (mode === 'faciles') return !entree.nbFaciles;
   return false;
+}
+
+// Lit l'état réel du DOM plutôt que de refaire le calcul (mode + recherche) :
+// deux mécanismes indépendants peuvent masquer un marqueur falaise — la
+// classe marqueur-invisible (dessinerFalaise, piloté par le mode "Cercles")
+// et le style.display (appliquerFiltres, piloté par la recherche/sélection).
+// Utilisée par appliquerAntiCollisionSecteurs pour ne garder un libellé de
+// secteur que s'il lui reste au moins un figuré ponctuel visible en dessous.
+function falaiseVisible(entree) {
+  const el = entree.marker.getElement();
+  return !el.classList.contains('marqueur-invisible') && el.style.display !== 'none';
 }
 
 function dessinerFalaise(entree, mode, maxima) {
@@ -781,43 +940,158 @@ function construireLegendeFalaises(max, median, titre, couleurs, remplissage, si
     </div>`;
 }
 
-function popupFalaise(p, lat, lon) {
-  const rows = [];
-  if (p.type_roche) rows.push(champ('Roche', p.type_roche));
-  if (p.orientation) rows.push(champ('Orientation', p.orientation.replaceAll('|', ' / ')));
+// Rose des vents miniature pour l'orientation d'une falaise. Un point (pastille)
+// par direction cardinale/intercardinale sur un anneau, plutôt qu'un
+// conic-gradient plein (1er jet, retiré : ça ressemblait à un camembert coloré
+// et pas à une rose des vents — mauvaise lecture ET peu élégant). Reprend le
+// vocabulaire visuel déjà utilisé pour la légende (petits ronds "dot"), plus
+// cohérent avec le reste du site qu'un dégradé. Les directions actives
+// ressortent (pastille plus grosse + lettre) ; les autres restent de
+// discrètes pastilles muettes qui donnent le contexte de l'anneau complet
+// (donc plus besoin de traiter N à part : sa position — en haut — suffit).
+const POINTS_ROSE = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+const ROSE_RAYON_POINTS = 12; // distance centre -> pastille, px
+const ROSE_RAYON_LABELS = 22; // distance centre -> libellé, px
+
+function roseDesVents(orientation) {
+  const actifs = new Set(orientation.split('|').map(s => s.trim()).filter(Boolean));
+
+  const points = POINTS_ROSE.map((point, i) => {
+    const angle = i * 45;
+    const classe = actifs.has(point) ? 'rose-vents-point rose-vents-point-actif' : 'rose-vents-point';
+    return `<span class="${classe}" style="transform: rotate(${angle}deg) translateY(-${ROSE_RAYON_POINTS}px);"></span>`;
+  }).join('');
+
+  // Réserve tout de même un repère "N" discret même hors zone orientée (sauf
+  // si N est déjà actif, pour ne pas doubler le libellé) : la position en
+  // haut de l'anneau ne suffit à elle seule que si on sait déjà que la carte
+  // est orientée nord en haut — un rappel textuel évite d'avoir à le savoir.
+  const labels = POINTS_ROSE
+    .filter(point => actifs.has(point) || point === 'N')
+    .map(point => {
+      const angle = POINTS_ROSE.indexOf(point) * 45;
+      const classe = actifs.has(point) ? 'rose-vents-label rose-vents-label-actif' : 'rose-vents-label';
+      return `<span class="${classe}" style="transform: rotate(${angle}deg) translateY(-${ROSE_RAYON_LABELS}px) rotate(${-angle}deg);">${escapeHtml(point)}</span>`;
+    }).join('');
+
+  return `
+    <div class="rose-vents" role="img" aria-label="Orientation : ${escapeHtml(Array.from(actifs).join(', '))}">
+      <div class="rose-vents-cercle"></div>
+      ${points}
+      ${labels}
+    </div>`;
+}
+
+// Orientation en haut à droite de l'en-tête falaise (voir popup-entete) : ce
+// champ sort de la fiche d'infos pour gagner de la place, donc doit rester
+// lisible par un lecteur d'écran via l'aria-label posé dans roseDesVents. Le
+// type de roche (lui, resté dans la fiche, voir popupFalaise) n'a pas ce
+// problème de place : pas de widget dédié à construire, juste une valeur texte.
+function construireCoinInfos(orientation) {
+  if (!orientation) return '';
+  return `<div class="popup-coin">${roseDesVents(orientation)}</div>`;
+}
+
+// geo: n'ouvre l'appli Maps/Plans par défaut que sur un appareil qui en a
+// une — sur desktop, en général aucun gestionnaire n'est enregistré et le
+// lien ne fait rien. (pointer: coarse) cible le type d'entrée (tactile vs
+// souris/trackpad) plutôt qu'une largeur de fenêtre : un desktop avec une
+// fenêtre étroite n'a pas plus d'appli Maps pour autant, alors qu'une tablette
+// tactile en a une même en plein écran.
+function afficherLienMaps() {
+  return window.matchMedia('(pointer: coarse)').matches;
+}
+
+function lienOuvrirMaps(lat, lon) {
+  return afficherLienMaps() ? `<a href="geo:${lat},${lon}">Ouvrir dans Maps</a>` : '';
+}
+
+// Assemble la rangée de liens secondaires (texte souligné, séparés par "·")
+// à partir d'une liste où certaines entrées peuvent être vides (Oblyk absent,
+// Ouvrir dans Maps masqué sur desktop...) — filtre les vides et joint
+// seulement ce qui reste, pour ne jamais laisser un séparateur orphelin en
+// tête/fin, et n'affiche rien du tout si la liste entière est vide.
+function construireActionsSecondaires(liens) {
+  const presents = liens.filter(Boolean);
+  if (!presents.length) return '';
+  return `<div class="actions-secondaires">${presents.join('<span class="separateur" aria-hidden="true">·</span>')}</div>`;
+}
+
+// Coordonnées GPS : affichées en clair (pas cachées derrière un intitulé
+// générique "Copier coordonnées") et copiables d'un tap. Utile même sans
+// rien coller ensuite : noter à la main, les rentrer dans un GPS de
+// randonnée dédié (souvent sans presse-papiers partagé avec le téléphone),
+// les dicter à quelqu'un. 5 décimales (~1 m de précision) : plus que
+// suffisant pour une approche, largement assez lisible. Le mot "Copier" est
+// affiché EN CLAIR (pas juste un aria-label) — même leçon que la poignée de
+// la fiche mobile : une affordance purement visuelle (case grisée) ne suffit
+// pas, il faut le dire. Il bascule seul en "Copié !" au clic, sans jamais
+// remplacer la valeur elle-même — contrairement à un 1er essai qui la
+// cachait pendant la confirmation, ce qui privait justement de la lire au
+// moment où on en a le plus besoin (double-vérifier ce qu'on vient de copier).
+function boutonGps(lat, lon) {
+  const valeur = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  return `<button type="button" class="gps-copie" data-lat="${lat}" data-lon="${lon}" aria-label="Copier les coordonnées GPS">
+    <span class="gps-info">
+      <span class="gps-label">GPS</span>
+      <span class="gps-valeur">${valeur}</span>
+    </span>
+    <span class="gps-action">Copier</span>
+  </button>`;
+}
+
+function popupFalaise(p, lat, lon, cle, bornesSite) {
+  // Deux groupes distincts, séparés par un espacement plus grand qu'entre
+  // deux lignes du même groupe (voir .fiche-groupe-suivant) — pas de trait ni
+  // de fond, juste plus de blanc : le regroupement par proximité (Gestalt)
+  // suffit à signaler "nouveau sujet" sans ajouter le moindre élément visuel.
+  const rowsCaractere = []; // à quoi ressemble l'escalade ici
+  const rowsLogistique = []; // comment y aller
+
+  if (p.type_roche) rowsCaractere.push(champ('Roche', p.type_roche));
   if (p.cotation_min || p.cotation_max) {
-    rows.push(champCotation(p.cotation_min, p.cotation_max));
+    rowsCaractere.push(champCotation(p.cotation_min, p.cotation_max, bornesSite));
   }
   if (p.nb_voies) {
     const cot5 = p.nb_voies_cot5 ?? 0;
     const cot6a = p.nb_voies_cot6a ?? 0;
-    rows.push(champVoies(p.nb_voies, cot5, cot6a));
+    rowsCaractere.push(champVoies(p.nb_voies, cot5, cot6a));
   }
   if (p.parking_associe) {
     const noms = p.parking_associe.split('|').map(s => s.trim()).filter(Boolean);
-    rows.push(champLiens('Parking', noms));
+    rowsLogistique.push(champParkingAssocie(noms));
   }
-  if (p.approche_min) rows.push(champ('Approche', `${p.approche_min} min` + (p.approche_metre ? ` (${p.approche_metre} m)` : '')));
+  if (p.approche_min) rowsLogistique.push(champ('Approche', `${p.approche_min} min` + (p.approche_metre ? ` (${p.approche_metre} m)` : '')));
+
+  const rows = [
+    rowsCaractere.join(''),
+    rowsLogistique.length ? `<div class="fiche-groupe-suivant">${rowsLogistique.join('')}</div>` : '',
+  ];
 
   const secteur = secteurDistinct(p);
+  const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
 
   return `
-    <div class="popup">
-      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"></button>
-      <span class="cat-tag falaise">Falaise</span>
-      <h3>${escapeHtml(p.nom)}</h3>
-      ${secteur ? `<p class="sous-titre">${escapeHtml(secteur)}</p>` : ''}
-      <dl>${rows.join('')}</dl>
+    <div class="popup" data-cle="${escapeHtml(cle)}">
+      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"><span class="poignee-texte">Réduire</span></button>
+      <div class="popup-entete">
+        <div class="popup-titre-bloc">
+          <span class="cat-tag falaise">Falaise</span>
+          <h3>${escapeHtml(p.nom)}</h3>
+          ${secteur ? `<p class="sous-titre">${escapeHtml(secteur)}</p>` : ''}
+        </div>
+        ${construireCoinInfos(p.orientation)}
+      </div>
+      <div class="fiche-infos">${rows.join('')}</div>
       <div class="actions">
-        <a class="btn btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
-        <button class="btn-copy" data-lat="${lat}" data-lon="${lon}">Copier coordonnées</button>
-        <a class="btn" href="geo:${lat},${lon}">Ouvrir dans Maps</a>
-        ${p.lien_oblyk ? `<a class="btn" href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : ''}
+        <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
+        ${boutonGps(lat, lon)}
+        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon), lienOblyk])}
       </div>
     </div>`;
 }
 
-function popupParking(p, lat, lon, parkingInfos) {
+function popupParking(p, lat, lon, parkingInfos, cle) {
   const rows = [];
   if (p.trajet_gite_min) rows.push(champ('Depuis le gîte', `${p.trajet_gite_min} min en voiture`));
 
@@ -828,47 +1102,52 @@ function popupParking(p, lat, lon, parkingInfos) {
   const site = info && info.sites.size ? Array.from(info.sites).join(' / ') : '';
 
   return `
-    <div class="popup">
-      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"></button>
+    <div class="popup" data-cle="${escapeHtml(cle)}">
+      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"><span class="poignee-texte">Réduire</span></button>
       <span class="cat-tag parking">Parking</span>
       ${site ? `<span class="badge-site">${escapeHtml(site)}</span>` : ''}
       <h3>${escapeHtml(p.nom)}</h3>
-      <dl>${rows.join('')}</dl>
+      <div class="fiche-infos">${rows.join('')}</div>
       <div class="actions">
-        <a class="btn btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
-        <button class="btn-copy" data-lat="${lat}" data-lon="${lon}">Copier coordonnées</button>
-        <a class="btn" href="geo:${lat},${lon}">Ouvrir dans Maps</a>
+        <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
+        ${boutonGps(lat, lon)}
+        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon)])}
       </div>
     </div>`;
 }
 
-function popupGite(p, lat, lon) {
+function popupGite(p, lat, lon, cle) {
   return `
-    <div class="popup">
-      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"></button>
+    <div class="popup" data-cle="${escapeHtml(cle)}">
+      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"><span class="poignee-texte">Réduire</span></button>
       <span class="cat-tag gite">Gîte</span>
       <h3>${escapeHtml(p.nom)}</h3>
       <div class="actions">
-        <a class="btn btn-primary" href="geo:${lat},${lon}">Ouvrir dans Maps</a>
-        <button class="btn-copy" data-lat="${lat}" data-lon="${lon}">Copier coordonnées</button>
+        <a class="btn-primary" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}" target="_blank" rel="noopener">Itinéraire</a>
+        ${boutonGps(lat, lon)}
+        ${construireActionsSecondaires([lienOuvrirMaps(lat, lon)])}
       </div>
     </div>`;
 }
 
 function champ(label, valeur) {
-  return `<dt>${label}</dt><dd>${escapeHtml(String(valeur))}</dd>`;
+  return `<div class="info-ligne"><span class="info-label">${label}</span><span class="info-valeur">${escapeHtml(String(valeur))}</span></div>`;
 }
 
-// Comme champ(), mais chaque valeur devient un bouton qui navigue vers le
-// marqueur correspondant (voir allerVers dans initCarte). Cas simple : une
-// liste de noms déjà uniques (les parkings référencés depuis une falaise —
-// une falaise n'a jamais qu'une poignée de parkings, pas de regroupement
-// nécessaire ici, contrairement à champLiensFalaises ci-dessous).
-function champLiens(label, noms) {
-  const liens = noms
-    .map(nom => `<button type="button" class="lien-secteur" data-nom="${escapeHtml(nom)}">${escapeHtml(nom)}</button>`)
-    .join(' · ');
-  return `<dt>${label}</dt><dd>${liens}</dd>`;
+// Parking(s) associé(s) à une falaise : le nom réel du parking (souvent une
+// description type "petit parking D136") n'aide pas à décider de cliquer —
+// seul le fait qu'il y en ait un compte. Cas courant (61 falaises/71, un
+// seul parking) : un verbe d'action plutôt qu'un nom — et surtout pas le mot
+// "parking" une 2e fois, déjà dit par le libellé juste à gauche (repéré après
+// coup : "Parking" suivi de "Voir le parking" faisait doublon). Plusieurs
+// parkings (toujours 3 ici dans les données, jamais 2) : impossible de rester
+// générique, il faut bien distinguer les destinations — un simple rang
+// (1/2/3) suffit, dans l'ordre où data.geojson les liste.
+function champParkingAssocie(noms) {
+  const valeur = noms.length === 1
+    ? `<button type="button" class="lien-secteur" data-nom="${escapeHtml(noms[0])}">Voir sur la carte</button>`
+    : noms.map((nom, i) => `<button type="button" class="lien-secteur" data-nom="${escapeHtml(nom)}">Parking ${i + 1}</button>`).join(' · ');
+  return `<div class="info-ligne"><span class="info-label">Parking</span><span class="info-valeur">${valeur}</span></div>`;
 }
 
 // Liste des falaises desservies par un parking, regroupées par sommet (nom).
@@ -896,28 +1175,52 @@ function champLiensFalaises(falaises) {
       : `<div class="groupe-falaises">${liens}</div>`;
   }).join('');
 
-  return `<dt>Falaises</dt><dd>${groupes}</dd>`;
+  // Pas de valeur simple à mettre à droite du libellé (c'est une liste, pas
+  // un fait unique) : le libellé reste seul sur sa ligne, la liste suit en
+  // pleine largeur en dessous.
+  return `<div class="info-ligne"><span class="info-label">Falaises</span></div>${groupes}`;
 }
 
-// nb_voies_cot5/cot6a ne couvrent que les grades 5 et 6a-6a+ : il peut y avoir
-// des voies encore plus faciles (3, 4) non comptées ailleurs. Le solde de la
-// barre n'est donc pas forcément "plus dur" — on le laisse muet, sans légende.
+// Grille "1 case = 1 voie" (isotype, pas un waffle chart classique — celui-là
+// représente des pourcentages sur 10×10, ici c'est un compte réel) ET
+// légende, les deux ensemble : la grille seule (1re version) n'avait pas de
+// légende, la légende seule (2e version) perdait l'intérêt visuel de "voir"
+// la quantité d'un coup d'œil et de comparer deux falaises entre elles rien
+// qu'à la taille du bloc — aucune des deux versions seules ne suffisait.
+// La légende réutilise EXACTEMENT les mêmes carrés que la grille (même
+// classe .voies-case) : la puce et la case sont littéralement la même
+// marque, pas juste la même couleur. nb_voies_cot5/cot6a ne couvrent que les
+// grades 5 et 6a-6a+ : il peut y avoir des voies encore plus faciles (3, 4 —
+// bien présentes dans les données, cf. cotation_min) non comptées ailleurs —
+// la case/puce "autres" reste un contour creux, sans prétendre dire si c'est
+// plus facile ou plus dur.
+// Le total va dans la valeur à droite du libellé (comme tous les autres
+// champs), la grille s'affiche TOUJOURS en dessous — même sans une seule
+// voie en 5 ou 6a/6a+, le total reste une info utile même sans détail par
+// grade.
 function champVoies(total, cot5, cot6a) {
-  const barre = (cot5 || cot6a) ? barreCotations(total, cot5, cot6a) : '';
-  return `<dt>Voies sportives</dt><dd>${total} au total${barre}</dd>`;
-}
+  if (!total) return '';
+  const reste = Math.max(0, total - cot5 - cot6a);
+  const case_ = (classe) => `<span class="voies-case ${classe}"></span>`;
 
-function barreCotations(total, cot5, cot6a) {
-  const pct = (n) => Math.round((n / total) * 1000) / 10;
-  const reste = Math.max(0, 100 - pct(cot5) - pct(cot6a));
+  const grille = `<div class="voies-grille" role="img" aria-label="${total} voies au total, dont ${cot5} en 5 et ${cot6a} en 6a/6a+">${[
+    ...Array(cot5).fill('voies-case-5'),
+    ...Array(cot6a).fill('voies-case-6a'),
+    ...Array(reste).fill('voies-case-reste'),
+  ].map(case_).join('')}</div>`;
 
-  return `
-    <div class="barre-cotations" role="img" aria-label="${cot5} voies en 5, ${cot6a} en 6a/6a+, sur ${total} voies au total">
-      <span class="segment segment-5" style="width:${pct(cot5)}%"></span>
-      <span class="segment segment-6a" style="width:${pct(cot6a)}%"></span>
-      <span class="segment segment-reste" style="width:${reste}%"></span>
-    </div>
-    <span class="legende-barre">dont ${cot5} en 5 · ${cot6a} en 6a/6a+</span>`;
+  // Pas de compte répété ici (pas de "4 en 5") : les carrés eux-mêmes portent
+  // déjà la quantité (il suffit de les compter/regrouper par couleur), la
+  // légende n'a plus qu'à dire CE QUE chaque couleur signifie. "5" et
+  // "6a/6a+" restent toujours affichés, même à 0 : une légende qui change de
+  // contenu d'une popup à l'autre s'apprend mal, et voir "5" sans le moindre
+  // carré de cette couleur EST l'information (aucune voie dans ce grade ici),
+  // pas une case à cacher.
+  const groupes = [['voies-case-5', '5'], ['voies-case-6a', '6a/6a+']];
+  if (reste) groupes.push(['voies-case-reste', 'autres']);
+  const legende = `<div class="voies-detail">${groupes.map(([classe, texte]) => `<span class="voies-groupe">${case_(classe)}${texte}</span>`).join('')}</div>`;
+
+  return `<div class="info-ligne"><span class="info-label">Voies sportives</span><span class="info-valeur">${total}</span></div>${grille}${legende}`;
 }
 
 // Cotation française -> position numérique continue sur une échelle 3a→9c+
@@ -933,72 +1236,60 @@ function cotationVersValeur(cotation) {
   return (chiffre - 3) * 3 + lettre + plus;
 }
 
-const COTATION_ECHELLE_MAX = 21; // couvre jusqu'à 9c+
-const COTATION_LABEL_MIN = '3a';
-const COTATION_LABEL_MAX = '9c+';
+// Regroupe les falaises par site (voir p.site — 10 sites distincts dans
+// cette sortie, de 1 à 24 falaises chacun, souvent à des dizaines de minutes
+// les uns des autres) et calcule, pour chacun, l'étendue RÉELLE des
+// cotations rencontrées. Sert d'échelle à jaugeCotation ci-dessous : une
+// échelle fixe 3a→9c+ (le spectre théorique du sport) tasse toutes les
+// falaises d'un même site dans une petite portion de la barre — ici, la
+// plupart des sites plafonnent bien avant 9c+, donc l'essentiel de la barre
+// ne servait jamais. Recalé sur les bornes réelles du site, la position
+// d'une falaise devient directement comparable à ses voisines du même site.
+function calculerBornesCotationParSite(geojson) {
+  const parSite = new Map();
+  geojson.features.forEach(f => {
+    const p = f.properties;
+    if (p.categorie !== 'falaise') return;
+    if (!parSite.has(p.site)) parSite.set(p.site, { min: Infinity, max: -Infinity, minLabel: null, maxLabel: null });
+    const bornes = parSite.get(p.site);
+    const vMin = cotationVersValeur(p.cotation_min);
+    const vMax = cotationVersValeur(p.cotation_max);
+    if (vMin != null && vMin < bornes.min) { bornes.min = vMin; bornes.minLabel = p.cotation_min; }
+    if (vMax != null && vMax > bornes.max) { bornes.max = vMax; bornes.maxLabel = p.cotation_max; }
+  });
+  return parSite;
+}
 
 // Bornes d'échelle affichées de part et d'autre de la jauge : sans elles, le
 // segment coloré n'a aucun repère et sa position/largeur n'est pas décodable.
-function jaugeCotation(min, max) {
+// bornesSite (voir calculerBornesCotationParSite) : omis si le site n'a
+// qu'une seule cotation connue au total (bornes.max === bornes.min, ex. site
+// à une seule falaise) — une échelle à largeur nulle n'a rien à montrer.
+function jaugeCotation(min, max, bornesSite) {
   const vMin = cotationVersValeur(min);
   const vMax = cotationVersValeur(max);
   if (vMin == null || vMax == null) return '';
-  const debut = (vMin / COTATION_ECHELLE_MAX) * 100;
-  const largeur = Math.max(((vMax - vMin) / COTATION_ECHELLE_MAX) * 100, 3);
+  if (!bornesSite || bornesSite.max <= bornesSite.min) return '';
+  const echelle = bornesSite.max - bornesSite.min;
+  const debut = ((vMin - bornesSite.min) / echelle) * 100;
+  const largeur = Math.max(((vMax - vMin) / echelle) * 100, 3);
   return `
-    <div class="jauge-cotation" role="img" aria-label="Cotation de ${escapeHtml(min)} à ${escapeHtml(max)} sur l'échelle ${COTATION_LABEL_MIN} à ${COTATION_LABEL_MAX}">
+    <div class="jauge-cotation" role="img" aria-label="Cotation de ${escapeHtml(min)} à ${escapeHtml(max)}, sur l'échelle des cotations du site (${escapeHtml(bornesSite.minLabel)} à ${escapeHtml(bornesSite.maxLabel)})">
       <span class="jauge-segment" style="left:${debut}%; width:${largeur}%"></span>
     </div>
-    <div class="jauge-echelle"><span>${COTATION_LABEL_MIN}</span><span>${COTATION_LABEL_MAX}</span></div>`;
+    <div class="jauge-echelle"><span>${escapeHtml(bornesSite.minLabel)}</span><span>${escapeHtml(bornesSite.maxLabel)}</span></div>`;
 }
 
-function champCotation(min, max) {
-  const jauge = jaugeCotation(min, max);
-  return `<dt>Cotation</dt><dd>${escapeHtml(min ?? '?')} → ${escapeHtml(max ?? '?')}${jauge}</dd>`;
+function champCotation(min, max, bornesSite) {
+  const jauge = jaugeCotation(min, max, bornesSite);
+  const valeur = `${escapeHtml(min ?? '?')} → ${escapeHtml(max ?? '?')}`;
+  return `<div class="info-ligne"><span class="info-label">Cotation</span><span class="info-valeur">${valeur}</span></div>${jauge}`;
 }
 
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
-}
-
-function attachPopupActions(popup, lat, lon, allerVers, origineCle) {
-  const el = popup.getElement();
-
-  // Poignée de la feuille du bas mobile : replie/déplie entre une hauteur
-  // "aperçu" et la hauteur normale (voir .fiche-reduite dans le CSS).
-  const poignee = el.querySelector('.poignee-fiche');
-  const contenu = el.querySelector('.maplibregl-popup-content');
-  if (poignee && contenu) {
-    poignee.addEventListener('click', () => {
-      const reduite = contenu.classList.toggle('fiche-reduite');
-      poignee.setAttribute('aria-expanded', String(!reduite));
-      poignee.setAttribute('aria-label', reduite ? 'Déplier la fiche' : 'Réduire la fiche');
-    });
-  }
-
-  const btnCopy = el.querySelector('.btn-copy');
-  if (btnCopy) {
-    btnCopy.addEventListener('click', () => {
-      const coords = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
-      navigator.clipboard.writeText(coords).then(() => {
-        btnCopy.textContent = 'Copié !';
-        btnCopy.classList.add('copied');
-        setTimeout(() => {
-          btnCopy.textContent = 'Copier coordonnées';
-          btnCopy.classList.remove('copied');
-        }, 1500);
-      });
-    });
-  }
-
-  el.querySelectorAll('.lien-secteur').forEach(btn => {
-    btn.addEventListener('click', () => {
-      popup.remove();
-      allerVers(btn.dataset.nom, origineCle);
-    });
-  });
 }
 
 // Un point par "site" distinct (centroïde de ses falaises, pas la 1ʳᵉ
@@ -1061,6 +1352,59 @@ function ajouterLabelsSites(map, geojson, onClicSite) {
     new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 2] })
       .setLngLat(f.geometry.coordinates)
       .addTo(map);
+  });
+}
+
+// Seuil de zoom à partir duquel les noms de secteur apparaissent : à cette
+// échelle, les cercles proportionnels affichent enfin leur taille réelle
+// (au-delà de ZOOM_SIMPLIFICATION) et les secteurs sont assez espacés à
+// l'écran pour rester lisibles — affichés systématiquement en-deçà, ils se
+// chevaucheraient sur une vue d'ensemble.
+const ZOOM_LABELS_SECTEUR = 15;
+
+// Un point par secteur DISTINCT (centroïde de ses falaises), même principe
+// que construireGeojsonSites — indispensable ici : un secteur peut regrouper
+// plusieurs falaises (plusieurs features), sans ce regroupement chaque
+// falaise posait sa propre étiquette avec le MÊME nom de secteur, quasiment
+// à la même position (chevauchement/doublons visibles constatés au test).
+// nbVoies sert de priorité d'affichage (voir appliquerAffichageSecteurs) :
+// en cas de conflit à l'écran, le secteur le plus fourni l'emporte.
+function construireGeojsonSecteurs(geojson) {
+  const groupes = new Map();
+  geojson.features.forEach(f => {
+    const p = f.properties;
+    if (p.categorie !== 'falaise') return;
+    const cle = secteurDistinct(p) || p.nom;
+    const [lon, lat] = f.geometry.coordinates;
+    if (!groupes.has(cle)) groupes.set(cle, { sumLon: 0, sumLat: 0, n: 0, nbVoies: 0 });
+    const g = groupes.get(cle);
+    g.sumLon += lon; g.sumLat += lat; g.n += 1;
+    g.nbVoies += p.nb_voies ?? 0;
+  });
+  return Array.from(groupes, ([nom, g]) => ({
+    nom,
+    nbVoies: g.nbVoies,
+    coordinates: [g.sumLon / g.n, g.sumLat / g.n],
+  })).sort((a, b) => b.nbVoies - a.nbVoies);
+}
+
+// Labels de secteur : même technique que ajouterLabelsSites (marqueurs DOM,
+// ajoutés après pour passer au-dessus dans l'empilement), mais NON
+// cliquables — contrairement aux labels de site, le marqueur falaise en
+// dessous est déjà cliquable à ce niveau de zoom, un second point
+// d'interaction si proche n'apporterait rien et risquerait d'intercepter des
+// clics destinés au marqueur. Renvoie {el, marker, nom} (pas juste l'élément)
+// : appliquerAffichageSecteurs a besoin de la position de chaque marqueur
+// pour son anti-collision à l'écran.
+function ajouterLabelsSecteurs(map, geojson) {
+  return construireGeojsonSecteurs(geojson).map((secteur) => {
+    const el = document.createElement('div');
+    el.className = 'label-secteur';
+    el.textContent = secteur.nom;
+    const marker = new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 14] })
+      .setLngLat(secteur.coordinates)
+      .addTo(map);
+    return { el, marker, nom: secteur.nom };
   });
 }
 
