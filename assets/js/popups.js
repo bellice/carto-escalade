@@ -147,9 +147,13 @@ export function popupFalaise(p, lat, lon, cle, bornesSite) {
   }
   if (p.parking_associe) {
     const noms = p.parking_associe.split('|').map(s => s.trim()).filter(Boolean);
-    rowsLogistique.push(champParkingAssocie(noms));
+    rowsLogistique.push(champParkingAssocie(noms, p.approche_min));
+    // Plusieurs parkings : le temps est déjà sur chaque bouton (voir
+    // champParkingAssocie), pas de ligne "Approche" séparée à dupliquer.
+    if (noms.length === 1 && p.approche_min) {
+      rowsLogistique.push(champ('Approche', `${p.approche_min} min` + (p.approche_metre ? ` (${p.approche_metre} m)` : '')));
+    }
   }
-  if (p.approche_min) rowsLogistique.push(champ('Approche', `${p.approche_min} min` + (p.approche_metre ? ` (${p.approche_metre} m)` : '')));
 
   const rows = [
     rowsCaractere.join(''),
@@ -158,6 +162,7 @@ export function popupFalaise(p, lat, lon, cle, bornesSite) {
 
   const secteur = secteurDistinct(p);
   const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
+  const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Voir sur Camp to Camp</a>` : '';
 
   return `
     <div class="popup" data-cle="${escapeHtml(cle)}">
@@ -174,7 +179,7 @@ export function popupFalaise(p, lat, lon, cle, bornesSite) {
       <div class="actions">
         <a class="btn-primary" href="${lienItineraire(lat, lon, p.nom)}" target="_blank" rel="noopener">Itinéraire</a>
         ${boutonGps(lat, lon)}
-        ${construireActionsSecondaires([lienOblyk])}
+        ${construireActionsSecondaires([lienOblyk, lienC2C])}
       </div>
     </div>`;
 }
@@ -229,10 +234,16 @@ function champ(label, valeur) {
 // parkings (toujours 3 ici dans les données, jamais 2) : impossible de rester
 // générique, il faut bien distinguer les destinations — un simple rang
 // (1/2/3) suffit, dans l'ordre où data.geojson les liste.
-function champParkingAssocie(noms) {
+function champParkingAssocie(noms, approcheMin) {
+  const approches = noms.length > 1 && approcheMin
+    ? approcheMin.split('|').map(s => s.trim())
+    : null;
   const valeur = noms.length === 1
     ? `<button type="button" class="lien-secteur" data-nom="${escapeHtml(noms[0])}">Voir sur la carte</button>`
-    : noms.map((nom, i) => `<button type="button" class="lien-secteur" data-nom="${escapeHtml(nom)}">Parking ${i + 1}</button>`).join(' · ');
+    : noms.map((nom, i) => {
+        const duree = approches && approches[i] ? ` (${approches[i]} min)` : '';
+        return `<button type="button" class="lien-secteur" data-nom="${escapeHtml(nom)}">Parking ${i + 1}${duree}</button>`;
+      }).join(' · ');
   return `<div class="info-ligne"><span class="info-label">Parking</span><span class="info-valeur">${valeur}</span></div>`;
 }
 
@@ -257,14 +268,15 @@ function champLiensFalaises(falaises) {
     const seulSecteurEtSansNomDistinct = items.length === 1 && !items[0].secteur;
     const afficherEntete = !seulUnSommet && !seulSecteurEtSansNomDistinct;
     return afficherEntete
-      ? `<div class="groupe-falaises"><span class="nom-falaise">${escapeHtml(nom)}</span>${liens}</div>`
-      : `<div class="groupe-falaises">${liens}</div>`;
+      ? `<span class="groupe-falaises"><span class="nom-falaise">${escapeHtml(nom)} :</span> ${liens}</span>`
+      : `<span class="groupe-falaises">${liens}</span>`;
   }).join('');
 
   // Pas de valeur simple à mettre à droite du libellé (c'est une liste, pas
   // un fait unique) : le libellé reste seul sur sa ligne, la liste suit en
-  // pleine largeur en dessous.
-  return `<div class="info-ligne"><span class="info-label">Falaises</span></div>${groupes}`;
+  // pleine largeur en dessous, en flux (plusieurs sommets courts peuvent
+  // partager une ligne plutôt que d'en forcer chacun une).
+  return `<div class="info-ligne"><span class="info-label">Falaises</span></div><div class="falaises-detail">${groupes}</div>`;
 }
 
 // Grille "1 case = 1 voie" (isotype, pas un waffle chart classique — celui-là

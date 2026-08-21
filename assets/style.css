@@ -755,19 +755,17 @@ a:visited { color: var(--forest); }
   gap: 4px;
 }
 
-.popup .groupe-falaises {
-  margin-bottom: 4px;
-}
-.popup .groupe-falaises:last-child {
-  margin-bottom: 0;
+.popup .falaises-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
 }
 .popup .nom-falaise {
-  display: block;
   font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--forest);
-  margin-bottom: 2px;
 }
 
 .popup .lien-secteur {
