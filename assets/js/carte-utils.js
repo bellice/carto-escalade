@@ -28,10 +28,28 @@ export function margeAvantPopup() {
   return { ...MARGE_UI, top: 24, bottom: bas };
 }
 
+// MapLibre garde le padding d'un fitBounds/flyTo/easeTo de façon PERSISTANTE
+// sur la transform (tr.padding), et le calcul d'un futur cadrage l'ADDITIONNE
+// au nouveau padding demandé plutôt que de le remplacer (vérifié dans le code
+// source réel de MapLibre v6 — cameraForBoxAndBearing somme edgePadding,
+// hérité de tr.padding, et le padding de l'appel en cours). Deux cadrages
+// avec padding enchaînés (ex. recherche -> falaise puis, juste après,
+// falaise -> parking) voyaient donc leur padding s'additionner, jusqu'à
+// dépasser la hauteur réelle du conteneur sur un petit écran mobile —
+// cameraForBoxAndBearing renvoie alors undefined et fitBounds ne fait plus
+// RIEN (bug observé : une 2e navigation enchaînée restait sans effet sur
+// mobile, jamais sur desktop où le padding, même doublé, restait sous la
+// hauteur de fenêtre). À appeler juste avant CHAQUE fitBounds/flyTo qui
+// passe son propre padding, pour repartir d'une base à zéro à chaque fois.
+export function reinitialiserPadding(map) {
+  map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
+}
+
 export function fitToMarkers(map, geojson) {
   if (!geojson.features.length) return null;
   const bounds = new maplibregl.LngLatBounds();
   geojson.features.forEach(f => bounds.extend(f.geometry.coordinates));
+  reinitialiserPadding(map);
   map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 15 });
   limiterZoneCarte(map, bounds);
   return bounds;

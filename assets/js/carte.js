@@ -11,7 +11,7 @@ import {
 import { dessinerFalaise, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
 import { addMarker } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
-import { MARGE_UI, margeAvantPopup, fitToMarkers, creerControleToutVoir } from './carte-utils.js';
+import { MARGE_UI, margeAvantPopup, fitToMarkers, creerControleToutVoir, reinitialiserPadding } from './carte-utils.js';
 
 // Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
 // point uniforme (voir appliquerSimplificationZoom dans initCarte) — à
@@ -43,6 +43,7 @@ export function initCarte(dataUrl) {
   // possible avec NavigationControl au-dessus, quelle que soit sa hauteur
   // réelle (icônes zoom+boussole, variable selon les options).
   map.addControl(creerControleToutVoir(() => {
+    reinitialiserPadding(map);
     if (borneGlobale) map.fitBounds(borneGlobale, { padding: MARGE_UI, maxZoom: 15 });
     // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
     // recherche active — sinon la caméra revient mais les marqueurs restent
@@ -310,15 +311,19 @@ export function initCarte(dataUrl) {
       : null;
     appliquerFiltresEtSecteurs();
 
-    // Coupe toute animation de caméra en cours (flyTo/fitBounds précédent pas
-    // encore stabilisé) avant d'en lancer une nouvelle — cas concret : depuis
-    // la recherche, "Centrer" lance un flyTo vers la falaise (popup ouverte
-    // aussitôt) ; enchaîner tout de suite sur "voir sur la carte" pour son
-    // parking pouvait alors ne produire aucun mouvement visible, la 2e
-    // commande de caméra semblant se perdre pendant que la 1re tournait
-    // encore. map.stop() fige la caméra à sa position interpolée actuelle,
-    // point de départ propre pour la commande suivante.
+    // Cause réelle (vérifiée dans le code source de MapLibre) du cadrage qui
+    // restait sans effet après une 2e navigation enchaînée (ex. recherche ->
+    // falaise, puis tout de suite falaise -> parking) : le padding d'un
+    // fitBounds/flyTo PERSISTE sur la carte, et le calcul du cadrage SUIVANT
+    // l'ADDITIONNE à son propre padding plutôt que de le remplacer — sur
+    // mobile, où margeAvantPopup() est déjà généreux, la somme dépassait la
+    // hauteur réelle du conteneur et MapLibre abandonnait le cadrage
+    // silencieusement (jamais sur desktop, où même doublé le padding restait
+    // sous la hauteur de fenêtre). reinitialiserPadding() repart d'une base à
+    // zéro à chaque fois ; map.stop() coupe aussi une éventuelle animation
+    // encore en cours, par prudence.
     map.stop();
+    reinitialiserPadding(map);
 
     // margeAvantPopup() (pas MARGE_UI) : cible.marker.togglePopup() ouvre une
     // popup juste après ce cadrage — sur mobile, il faut lui laisser sa place.
@@ -370,6 +375,7 @@ export function initCarte(dataUrl) {
         appliquerFiltresEtSecteurs();
         const bounds = new maplibregl.LngLatBounds();
         falaisesDuSite.forEach(f => bounds.extend(f.geometry.coordinates));
+        reinitialiserPadding(map);
         map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 16 });
       });
       appliquerSimplificationZoom();
@@ -473,6 +479,7 @@ export function initCarte(dataUrl) {
     }
     const bounds = new maplibregl.LngLatBounds();
     correspondances.forEach((e) => bounds.extend(e.marker.getLngLat()));
+    reinitialiserPadding(map);
     map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 16 });
   }
 
