@@ -1,7 +1,7 @@
 // carte-utils.js — utilitaires de cadrage caméra et de contrôle carte,
 // indépendants des marqueurs/popups.
 
-import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.mjs';
+import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 
 // Réserve la place occupée par le header + la recherche (haut) et la légende
 // (bas), pour qu'un marqueur centré ou un cadrage ajusté ne finisse pas

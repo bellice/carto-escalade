@@ -10,8 +10,27 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6/dist/maplibre-gl.css" />
+  <!-- Le graphe d'imports ES (carte.js -> marqueurs.js -> popups.js/symboles.js...)
+       ne se découvre normalement qu'au fil du parsing de chaque module reçu,
+       en 2-3 aller-retours séquentiels avant qu'initCarte() ne puisse
+       tourner (mesuré : peut ajouter plusieurs centaines de ms sur un signal
+       faible, exactement le contexte d'usage visé). Ces indices demandent au
+       navigateur de tout récupérer en parallèle dès le départ. crossorigin
+       requis pour maplibre-gl.mjs (autre origine) — sans lui, le navigateur
+       le télécharge une seconde fois au moment de l'import réel. -->
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs" crossorigin />
+  <link rel="modulepreload" href="../../assets/js/carte.js" />
+  <link rel="modulepreload" href="../../assets/js/carte-utils.js" />
+  <link rel="modulepreload" href="../../assets/js/marqueurs.js" />
+  <link rel="modulepreload" href="../../assets/js/popups.js" />
+  <link rel="modulepreload" href="../../assets/js/symboles.js" />
+  <link rel="modulepreload" href="../../assets/js/labels.js" />
+  <link rel="modulepreload" href="../../assets/js/donnees.js" />
+  <link rel="modulepreload" href="../../assets/js/utils.js" />
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="../../assets/style.css" />
+  <link rel="stylesheet" href="../../assets/style-carte.css" />
 </head>
 <body>
 

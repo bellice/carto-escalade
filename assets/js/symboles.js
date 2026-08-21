@@ -12,13 +12,13 @@ import { estFalaiseVideDansMode } from './donnees.js';
 // contrasté que l'ancien 24px → 52px (ratio ~2, ~4.7x), hérité d'une époque
 // où RAYON_MIN devait lui-même garantir une cible tactile correcte — ce
 // n'est plus le cas depuis poserTailleMarqueur().
-export const RAYON_MIN = 7;
-export const RAYON_MAX = 26;
+const RAYON_MIN = 7;
+const RAYON_MAX = 26;
 
 // Cible tactile minimale (repère Apple/Google), indépendante de la taille
 // visuelle du marqueur (cercle proportionnel, losange gîte, rond parking) —
 // un petit cercle proportionnel doit rester facile à taper du doigt.
-export const CIBLE_TACTILE_MIN = 44;
+const CIBLE_TACTILE_MIN = 44;
 
 // Pose la taille d'un marqueur : la zone tactile (el, l'élément externe posé
 // par MapLibre) fait au moins CIBLE_TACTILE_MIN, le disque/losange visuel
@@ -41,7 +41,7 @@ export function poserTailleMarqueur(el, visuel, diametre) {
 // correspondre à la perception réelle.
 const EXPOSANT_FLANNERY = 0.5716;
 
-export function calculerRayon(valeur, max) {
+function calculerRayon(valeur, max) {
   if (!max) return RAYON_MIN;
   return RAYON_MIN + (RAYON_MAX - RAYON_MIN) * Math.pow((valeur || 0) / max, EXPOSANT_FLANNERY);
 }
@@ -52,7 +52,7 @@ export function calculerRayon(valeur, max) {
 // vrais marqueurs ET par construireLegendeFalaises() pour les cercles de
 // référence : une seule source de vérité, sinon la légende peut afficher une
 // couleur différente de ce qui est réellement sur la carte.
-export function remplissagePourMode(mode) {
+function remplissagePourMode(mode) {
   if (mode === 'couenne') return 'var(--couenne)';
   if (mode === 'gv') return 'var(--gv)';
   if (mode === 'faciles') return 'var(--forest)'; // vert = facile, convention courante en sports outdoor
