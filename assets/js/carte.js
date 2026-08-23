@@ -5,7 +5,7 @@
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 import { escapeHtml } from './utils.js';
 import {
-  indexerParkingInfos, calculerMaxima,
+  indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite,
   estFalaiseVideDansMode, falaiseVisible, libelleFalaise,
 } from './donnees.js';
 import { dessinerFalaise, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
@@ -50,6 +50,7 @@ export function initCarte(dataUrl) {
     // restreints, contradiction avec "tout voir".
     falaiseSelectionneeCle = null;
     reinitialiserRecherche();
+    reinitialiserFiltreTemps();
     appliquerFiltresEtSecteurs();
   }), 'top-right');
 
@@ -61,14 +62,19 @@ export function initCarte(dataUrl) {
     if (attrib) attrib.classList.remove('maplibregl-compact-show');
   });
 
-  const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne }
+  const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne, tempsGite }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
   let labelsSecteurs = []; // [{el, marker, nom}], peuplé une fois le geojson chargé
   let labelsSites = []; // [{el, site}], peuplé une fois le geojson chargé — voir appliquerVisibiliteSites
   const entriesParSecteur = new Map(); // clé de regroupement secteur -> entrees falaise, pour appliquerAntiCollisionSecteurs
   const entriesParSite = new Map(); // site -> entrees falaise, pour appliquerVisibiliteSites
   let secteursVisibles = null;
-  const filtres = { recherche: '' };
+  // tempsMaxGite/tempsGitePlafond : Infinity tant que le slider n'est pas
+  // configuré (pas de falaise sans filtre actif avant que les vraies bornes
+  // ne soient connues, voir configurerFiltreTemps) — tempsGitePlafond sert
+  // de référence "aucun filtre actif" (voir appliquerFiltres/reinitialiserFiltreTemps),
+  // pas de sentinelle séparée à garder synchronisée ailleurs.
+  const filtres = { recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity };
   let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
   let falaiseSelectionneeCle = null; // falaise dont la popup est ouverte (ou origine/cible d'une navigation) — voir appliquerFiltres()
 
@@ -77,6 +83,9 @@ export function initCarte(dataUrl) {
   const recherche = document.querySelector('.recherche input');
   const btnCentrer = document.querySelector('.btn-centrer');
   const btnEffacer = document.querySelector('.btn-effacer');
+  const filtreTemps = document.getElementById('filtre-temps');
+  const filtreTempsValeur = document.getElementById('filtre-temps-valeur');
+  const legendeTemps = document.getElementById('legende-temps');
 
   // Remet la recherche à zéro (texte, filtre, boutons dépendants) — utilisé
   // par allerVers() et par "Tout voir", qui doivent tous les deux repartir
@@ -86,6 +95,17 @@ export function initCarte(dataUrl) {
     if (recherche) recherche.value = '';
     if (btnCentrer) btnCentrer.disabled = true;
     if (btnEffacer) btnEffacer.hidden = true;
+  }
+
+  // Remet le seuil "Depuis le gîte" à son plafond (= aucune falaise
+  // exclue) — utilisé par "Tout voir" et par allerVers() quand la cible
+  // d'une navigation serait autrement masquée par ce filtre.
+  function reinitialiserFiltreTemps() {
+    filtres.tempsMaxGite = filtres.tempsGitePlafond;
+    if (filtreTemps) filtreTemps.value = String(filtres.tempsGitePlafond);
+    if (filtreTempsValeur && Number.isFinite(filtres.tempsGitePlafond)) {
+      filtreTempsValeur.textContent = `≤ ${filtres.tempsGitePlafond} min`;
+    }
   }
   let borneGlobale = null; // étendue de tous les marqueurs, pour le bouton "Tout voir"
   let maxima = { total: 0, couenne: 0, gv: 0 }; // pour la taille des cercles proportionnels
@@ -320,9 +340,16 @@ export function initCarte(dataUrl) {
     // estFalaiseVideDansMode), on repasse sur "Voies" plutôt que de laisser
     // une popup s'ouvrir sans aucun figuré en dessous. Même vérification
     // pour l'origine d'un lien croisé (cas plus rare, mais même risque).
-    const cibleSeraitMasquee = cible.cat === 'falaise' && estFalaiseVideDansMode(cible, modeFigureActuel);
-    const origineSeraitMasquee = origine && origine.cat === 'falaise' && estFalaiseVideDansMode(origine, modeFigureActuel);
-    if (cibleSeraitMasquee || origineSeraitMasquee) definirModeFigure('aucun');
+    // Même logique pour le filtre "Depuis le gîte" : une falaise au-delà du
+    // seuil actuel ne doit pas non plus rester masquée quand on navigue
+    // explicitement vers elle.
+    const tempsGiteEmpecheVisibilite = (entree) => entree.tempsGite != null && entree.tempsGite > filtres.tempsMaxGite;
+    const cibleSeraitMasquee = cible.cat === 'falaise' && (estFalaiseVideDansMode(cible, modeFigureActuel) || tempsGiteEmpecheVisibilite(cible));
+    const origineSeraitMasquee = origine && origine.cat === 'falaise' && (estFalaiseVideDansMode(origine, modeFigureActuel) || tempsGiteEmpecheVisibilite(origine));
+    if (cibleSeraitMasquee || origineSeraitMasquee) {
+      definirModeFigure('aucun');
+      reinitialiserFiltreTemps();
+    }
 
     // Cible falaise -> elle devient la sélection (ses parkings deviennent
     // pertinents). Sinon (cible parking/gîte), on garde l'origine si c'est
@@ -371,11 +398,14 @@ export function initCarte(dataUrl) {
     .then(geojson => {
       const parkingInfos = indexerParkingInfos(geojson);
       maxima = calculerMaxima(geojson);
+      const tempsDepuisGite = calculerTempsDepuisGite(geojson);
       geojson.features.forEach(f => {
         const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, () => ficheReduite);
         entries.push(entree);
         index.set(entree.cle, entree);
         if (entree.cat === 'falaise') {
+          entree.tempsGite = tempsDepuisGite.get(entree.cle) ?? null;
+
           const cleSecteur = entree.secteur || entree.nom;
           if (!entriesParSecteur.has(cleSecteur)) entriesParSecteur.set(cleSecteur, []);
           entriesParSecteur.get(cleSecteur).push(entree);
@@ -448,6 +478,31 @@ export function initCarte(dataUrl) {
       if (!aGite) {
         const legendeGite = document.getElementById('legende-gite');
         if (legendeGite) legendeGite.remove();
+      }
+
+      // Filtre "Depuis le gîte" : masqué par défaut (voir HTML, attribut
+      // hidden) tant qu'on n'a pas confirmé qu'au moins une falaise a un
+      // temps calculable — un slider sans borne réelle n'aurait rien à
+      // montrer. Bornes arrondies au multiple de 5 le plus proche (13→10,
+      // 147→150) pour un pas de slider net plutôt que des valeurs à la minute
+      // près, qui n'apportent rien de plus utile ici.
+      const tempsValeurs = Array.from(tempsDepuisGite.values());
+      if (tempsValeurs.length && filtreTemps && filtreTempsValeur && legendeTemps) {
+        const plancher = Math.floor(Math.min(...tempsValeurs) / 5) * 5;
+        const plafond = Math.ceil(Math.max(...tempsValeurs) / 5) * 5;
+        filtres.tempsGitePlafond = plafond;
+        filtres.tempsMaxGite = plafond;
+        filtreTemps.min = String(plancher);
+        filtreTemps.max = String(plafond);
+        filtreTemps.step = '5';
+        filtreTemps.value = String(plafond);
+        filtreTempsValeur.textContent = `≤ ${plafond} min`;
+        legendeTemps.hidden = false;
+        filtreTemps.addEventListener('input', () => {
+          filtres.tempsMaxGite = Number(filtreTemps.value);
+          filtreTempsValeur.textContent = `≤ ${filtreTemps.value} min`;
+          appliquerFiltresEtSecteurs();
+        });
       }
 
       appliquerFiltresEtSecteurs();
@@ -546,29 +601,34 @@ export function initCarte(dataUrl) {
 }
 
 function appliquerFiltres(entries, filtres, mode, falaiseSelectionneeCle) {
-  // Le mode "Cercles" masque les falaises vides pour ce thème
-  // (estFalaiseVideDansMode) mais n'autorise PAS à lui seul l'affichage de
-  // leurs parkings — sinon changer de thème réafficherait tous les parkings
-  // d'un coup (le mode est un figuré, pas une recherche). Seuls deux
-  // déclencheurs positifs autorisent des parkings :
-  // - une recherche active (choix explicite) -> tous les parkings des
-  //   falaises qui la passent ;
+  // Le mode "Cercles" ET le filtre "Depuis le gîte" masquent des falaises
+  // (estFalaiseVideDansMode / seuil de temps) mais n'autorisent PAS à eux
+  // seuls l'affichage de leurs parkings — sinon déplacer le slider ou
+  // changer de thème réafficherait potentiellement des dizaines de parkings
+  // d'un coup (l'un comme l'autre peuvent laisser beaucoup de falaises
+  // visibles à la fois, contrairement à une recherche, quasi toujours
+  // ciblée sur une poignée de résultats). Deux déclencheurs positifs
+  // autorisent des parkings :
+  // - une recherche active (choix explicite ET ciblé) -> tous les parkings
+  //   des falaises qui la passent ;
   // - la falaise sélectionnée (popup ouverte / cible d'une navigation), si
-  //   elle reste effectivement visible sous le mode/la recherche courants.
+  //   elle reste effectivement visible sous le mode/la recherche/le temps
+  //   courants.
   const parkingsAutorises = new Set();
 
   entries.forEach((entree) => {
     if (entree.cat !== 'falaise') return;
     const visible =
       (!filtres.recherche || entree.recherche.includes(filtres.recherche)) &&
-      !estFalaiseVideDansMode(entree, mode);
+      !estFalaiseVideDansMode(entree, mode) &&
+      (entree.tempsGite == null || entree.tempsGite <= filtres.tempsMaxGite);
     entree.marker.getElement().style.display = visible ? '' : 'none';
     if (visible && filtres.recherche) entree.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));
   });
 
   // La falaise sélectionnée ne compte que si elle est toujours effectivement
-  // visible (recherche/mode compris, cf. display posé juste au-dessus) —
-  // sinon son parking ne doit pas rester affiché seul, sans qu'aucune
+  // visible (recherche/mode/temps compris, cf. display posé juste au-dessus)
+  // — sinon son parking ne doit pas rester affiché seul, sans qu'aucune
   // falaise visible ne le justifie.
   if (falaiseSelectionneeCle) {
     const falaise = entries.find((e) => e.cat === 'falaise' && e.cle === falaiseSelectionneeCle);

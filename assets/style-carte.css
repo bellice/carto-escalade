@@ -387,6 +387,40 @@
   color: var(--ink);
 }
 
+/* Filtre "Depuis le gîte" — slider à un seul seuil (voir carte.js) : montre
+   tout par défaut (poignée au maximum), glisser vers la gauche resserre
+   progressivement aux falaises les plus proches. label+input+valeur sur une
+   seule ligne pour rester compact dans le panneau légende, déjà dense. */
+.legende-temps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--stone-dark);
+  padding-top: 8px;
+  font-size: 0.78rem;
+}
+/* display:flex ci-dessus l'emporterait sur le style natif de [hidden]
+   (spécificité plus forte) sans cette règle — même piège déjà couvert pour
+   .legende-contenu[hidden] un peu plus haut dans ce fichier. */
+.legende-temps[hidden] { display: none; }
+.legende-temps label {
+  flex-shrink: 0;
+}
+.legende-temps input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--forest);
+}
+.filtre-temps-valeur {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #5a6058;
+  white-space: nowrap;
+  min-width: 3.5em;
+  text-align: right;
+}
+
 .legende .dot {
   width: 11px; height: 11px;
   border-radius: 50%;
@@ -930,6 +964,23 @@
   }
   .popup-entete {
     padding-right: 38px; /* bouton de fermeture plus grand sur mobile (32px) */
+  }
+
+  /* La popup occupe toute la largeur du viewport sur mobile (pas les 260px
+     plafonnés du desktop) : il y a objectivement plus de place, l'histogramme
+     de voies (carrés + étiquettes de cotation) paraissait trop petit dans cet
+     espace élargi (repéré après test) — même raisonnement déjà appliqué
+     ailleurs sur ce fichier (ex. .voies-case avant refonte). histo-cases
+     élargi en conséquence (2 cases de 13px + marge, au lieu de 10px). */
+  .histo-case {
+    width: 13px;
+    height: 13px;
+  }
+  .histo-cases {
+    width: 28px;
+  }
+  .histo-label {
+    font-size: 0.68rem;
   }
 
   /* Rien ne doit se superposer à la feuille : on cache le reste de l'UI

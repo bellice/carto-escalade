@@ -2,7 +2,7 @@
 // (marqueurs DOM non-figurés, indépendants des marqueurs falaise/parking/gîte).
 
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
-import { secteurDistinct } from './donnees.js';
+import { secteurDistinct, cleFalaise } from './donnees.js';
 
 // Un point par "site" distinct (centroïde de ses falaises, pas la 1ʳᵉ
 // feature — certains sites s'étalent sur ~2km, un centroïde est nettement
@@ -90,20 +90,28 @@ export const ZOOM_LABELS_SECTEUR = 15;
 // nbVoies sert de priorité d'affichage (voir appliquerAntiCollisionSecteurs
 // dans carte.js) : en cas de conflit à l'écran, le secteur le plus fourni
 // l'emporte.
+//
+// La clé de regroupement est cleFalaise(p) (nom+secteur), PAS le nom du
+// secteur seul (bug constaté en réel) : des noms de secteur génériques
+// comme "Principal" sont réutilisés par plusieurs sommets différents (ex.
+// "Le Devès" ET "Valcroissant" ont chacun un secteur "Principal") — les
+// fusionner sous une même clé plaçait une seule étiquette au centroïde des
+// deux, loin de chacun des deux vrais emplacements.
 function construireGeojsonSecteurs(geojson) {
   const groupes = new Map();
   geojson.features.forEach(f => {
     const p = f.properties;
     if (p.categorie !== 'falaise') return;
-    const cle = secteurDistinct(p) || p.nom;
+    const cle = cleFalaise(p);
+    const label = secteurDistinct(p) || p.nom;
     const [lon, lat] = f.geometry.coordinates;
-    if (!groupes.has(cle)) groupes.set(cle, { sumLon: 0, sumLat: 0, n: 0, nbVoies: 0 });
+    if (!groupes.has(cle)) groupes.set(cle, { sumLon: 0, sumLat: 0, n: 0, nbVoies: 0, label });
     const g = groupes.get(cle);
     g.sumLon += lon; g.sumLat += lat; g.n += 1;
     g.nbVoies += p.nb_voie_total ?? 0;
   });
-  return Array.from(groupes, ([nom, g]) => ({
-    nom,
+  return Array.from(groupes.values(), (g) => ({
+    nom: g.label,
     nbVoies: g.nbVoies,
     coordinates: [g.sumLon / g.n, g.sumLat / g.n],
   })).sort((a, b) => b.nbVoies - a.nbVoies);
