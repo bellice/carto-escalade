@@ -43,9 +43,16 @@ function construireGeojsonSites(geojson) {
 // intercepter un clic destiné à un marqueur juste en dessous s'ils se
 // chevauchent pile — accepté pour la même raison que ci-dessus (peu de
 // sites, chevauchement pile au pixel près improbable en pratique).
+//
+// Renvoie {el, site} par site (pas juste les éléments) : appliquerVisibiliteSites
+// (carte.js) en a besoin pour masquer l'étiquette d'un site qui n'a plus
+// aucune falaise visible sous le mode "Cercles"/la recherche courants — sans
+// ça, un thème vidant entièrement un site (ex. "Grande voie" sur un site
+// 100% couenne) laissait son nom affiché seul, sans plus aucun marqueur en
+// dessous à quoi il puisse renvoyer.
 export function ajouterLabelsSites(map, geojson, onClicSite) {
   const sitesGeojson = construireGeojsonSites(geojson);
-  sitesGeojson.features.forEach((f) => {
+  return sitesGeojson.features.map((f) => {
     const site = f.properties.site;
     const el = document.createElement('div');
     el.className = 'label-site';
@@ -64,6 +71,7 @@ export function ajouterLabelsSites(map, geojson, onClicSite) {
     new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 2] })
       .setLngLat(f.geometry.coordinates)
       .addTo(map);
+    return { el, site };
   });
 }
 
@@ -92,7 +100,7 @@ function construireGeojsonSecteurs(geojson) {
     if (!groupes.has(cle)) groupes.set(cle, { sumLon: 0, sumLat: 0, n: 0, nbVoies: 0 });
     const g = groupes.get(cle);
     g.sumLon += lon; g.sumLat += lat; g.n += 1;
-    g.nbVoies += p.nb_voies ?? 0;
+    g.nbVoies += p.nb_voie_total ?? 0;
   });
   return Array.from(groupes, ([nom, g]) => ({
     nom,

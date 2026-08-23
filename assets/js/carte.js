@@ -5,7 +5,7 @@
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 import { escapeHtml } from './utils.js';
 import {
-  indexerParkingInfos, calculerMaxima, calculerBornesCotationParSite,
+  indexerParkingInfos, calculerMaxima,
   estFalaiseVideDansMode, falaiseVisible, libelleFalaise,
 } from './donnees.js';
 import { dessinerFalaise, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
@@ -64,7 +64,9 @@ export function initCarte(dataUrl) {
   const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
   let labelsSecteurs = []; // [{el, marker, nom}], peuplé une fois le geojson chargé
+  let labelsSites = []; // [{el, site}], peuplé une fois le geojson chargé — voir appliquerVisibiliteSites
   const entriesParSecteur = new Map(); // clé de regroupement secteur -> entrees falaise, pour appliquerAntiCollisionSecteurs
+  const entriesParSite = new Map(); // site -> entrees falaise, pour appliquerVisibiliteSites
   let secteursVisibles = null;
   const filtres = { recherche: '' };
   let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
@@ -105,14 +107,30 @@ export function initCarte(dataUrl) {
     });
   }
 
+  // Même principe que appliquerAntiCollisionSecteurs (voir plus bas) mais
+  // pour les libellés de SITE : pas de collision à gérer ici (peu de sites,
+  // déjà espacés — voir ajouterLabelsSites dans labels.js), juste la
+  // présence d'au moins une falaise visible en dessous. Sans ça, un mode
+  // "Cercles" qui vide entièrement un site (ex. "Grande voie" sur un site
+  // 100% couenne, comme le Vallon de Baïn) laissait son nom affiché seul,
+  // sans plus aucun marqueur à quoi il puisse renvoyer.
+  function appliquerVisibiliteSites() {
+    labelsSites.forEach(({ el, site }) => {
+      const falaisesDuSite = entriesParSite.get(site) || [];
+      el.style.display = falaisesDuSite.some(falaiseVisible) ? '' : 'none';
+    });
+  }
+
   // Point de passage unique pour appliquerFiltres (recherche/mode/sélection) :
-  // recalcule dans la foulée quels libellés de secteur ont encore un figuré
-  // ponctuel visible en dessous (voir appliquerAntiCollisionSecteurs) — sinon
-  // un libellé peut rester affiché seul, sans plus aucun marqueur associé
-  // (ex. recherche qui ne laisse aucune falaise du secteur visible).
+  // recalcule dans la foulée quels libellés de secteur ET de site ont encore
+  // un figuré ponctuel visible en dessous (voir appliquerAntiCollisionSecteurs/
+  // appliquerVisibiliteSites) — sinon un libellé peut rester affiché seul,
+  // sans plus aucun marqueur associé (ex. recherche qui ne laisse aucune
+  // falaise du secteur/site visible).
   function appliquerFiltresEtSecteurs() {
     appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
     appliquerAntiCollisionSecteurs();
+    appliquerVisibiliteSites();
   }
 
   // Change la falaise "active" (popup ouverte) : ses parkings associés
@@ -353,16 +371,20 @@ export function initCarte(dataUrl) {
     .then(geojson => {
       const parkingInfos = indexerParkingInfos(geojson);
       maxima = calculerMaxima(geojson);
-      const bornesCotationParSite = calculerBornesCotationParSite(geojson);
-
       geojson.features.forEach(f => {
-        const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, bornesCotationParSite, () => ficheReduite);
+        const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, () => ficheReduite);
         entries.push(entree);
         index.set(entree.cle, entree);
         if (entree.cat === 'falaise') {
           const cleSecteur = entree.secteur || entree.nom;
           if (!entriesParSecteur.has(cleSecteur)) entriesParSecteur.set(cleSecteur, []);
           entriesParSecteur.get(cleSecteur).push(entree);
+
+          const site = f.properties.site;
+          if (site) {
+            if (!entriesParSite.has(site)) entriesParSite.set(site, []);
+            entriesParSite.get(site).push(entree);
+          }
         }
       });
 
@@ -372,7 +394,7 @@ export function initCarte(dataUrl) {
       // une recherche active pourrait sinon masquer des falaises du site
       // qu'on vient justement de rejoindre) ; la sélection courante n'a pas
       // besoin d'être touchée, elle ne cache rien ici.
-      ajouterLabelsSites(map, geojson, (site) => {
+      labelsSites = ajouterLabelsSites(map, geojson, (site) => {
         const falaisesDuSite = geojson.features.filter(f =>
           f.properties.categorie === 'falaise' && f.properties.site === site
         );
@@ -384,6 +406,7 @@ export function initCarte(dataUrl) {
         reinitialiserPadding(map);
         map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 16 });
       });
+      appliquerVisibiliteSites();
       appliquerSimplificationZoom();
 
       // Noms de secteur : masqués par défaut, affichés seulement à fort zoom
@@ -405,11 +428,13 @@ export function initCarte(dataUrl) {
       // ci-dessus (state changed depuis null au premier appel).
 
       // Les modes liés au type de voie (couenne / grande voie / répartition)
-      // n'ont de sens que si au moins une falaise a nb_gv/nb_couenne
-      // renseignés — sinon ces options restent masquées.
-      const auMoinsUneAvecType = geojson.features.some(f =>
-        f.properties.categorie === 'falaise' &&
-        ((f.properties.nb_gv ?? 0) > 0 || (f.properties.nb_couenne ?? 0) > 0)
+      // n'ont de sens que si au moins une falaise a des voies_sportives
+      // typées couenne/grande voie — sinon ces options restent masquées.
+      // Relit les "entries" déjà construites (nbGrandeVoie/nbCouenne y sont
+      // déjà dérivées de voies_sportives, voir compterVoiesSportivesParType
+      // dans donnees.js) plutôt que de rescanner le geojson brut une 2e fois.
+      const auMoinsUneAvecType = entries.some(e =>
+        e.cat === 'falaise' && (e.nbGrandeVoie > 0 || e.nbCouenne > 0)
       );
       if (!auMoinsUneAvecType) {
         ['option-couenne', 'option-gv', 'option-type'].forEach((id) => {
@@ -419,7 +444,7 @@ export function initCarte(dataUrl) {
       }
 
       // La clé "Gîte" de la légende n'a de sens que si la sortie en a un.
-      const aGite = geojson.features.some(f => f.properties.categorie === 'hébergement');
+      const aGite = geojson.features.some(f => f.properties.categorie === 'hebergement');
       if (!aGite) {
         const legendeGite = document.getElementById('legende-gite');
         if (legendeGite) legendeGite.remove();

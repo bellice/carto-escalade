@@ -34,10 +34,10 @@ export function indexerParkingInfos(geojson) {
   const infos = new Map();
   geojson.features.forEach(f => {
     const p = f.properties;
-    if (p.categorie !== 'falaise' || !p.parking_associe) return;
+    if (p.categorie !== 'falaise' || !p.parking_associe || !p.parking_associe.length) return;
     const cle = cleFalaise(p);
     const secteur = secteurDistinct(p);
-    p.parking_associe.split('|').map(s => s.trim()).filter(Boolean).forEach(nomParking => {
+    p.parking_associe.forEach(nomParking => {
       if (!infos.has(nomParking)) infos.set(nomParking, { falaises: [], sites: new Set() });
       const info = infos.get(nomParking);
       info.falaises.push({ cle, nom: p.nom, secteur });
@@ -47,15 +47,38 @@ export function indexerParkingInfos(geojson) {
   return infos;
 }
 
+// "Voies faciles" (≤ 6a+) : depuis la disparition de nb_voies_cot5/cot6a
+// (couvraient uniquement les grades 5 et 6a/6a+, angle mort documenté sur
+// les voies encore plus faciles en 3/4), dérivé directement de la cotation
+// réelle de chaque voie — corrige cet angle mort au passage.
+const SEUIL_FACILE = cotationVersValeur('6a+');
+
+// nb_couenne/nb_gv n'existent plus comme champs source : reconstruits à
+// partir du détail voies_sportives (type_voie ne prend que "couenne" ou
+// "grande voie" dans les vraies données). Source unique, réutilisée par
+// calculerMaxima ci-dessous ET par la construction de "entree" dans
+// marqueurs.js — pas de logique dupliquée entre les deux.
+export function compterVoiesSportivesParType(voiesSportives) {
+  let couenne = 0, grandeVoie = 0, faciles = 0;
+  (voiesSportives || []).forEach(v => {
+    if (v.type_voie === 'couenne') couenne++;
+    else if (v.type_voie === 'grande voie') grandeVoie++;
+    const val = cotationVersValeur(v.cotation);
+    if (val != null && val <= SEUIL_FACILE) faciles++;
+  });
+  return { couenne, grandeVoie, faciles };
+}
+
 export function calculerMaxima(geojson) {
   const totaux = [], couennes = [], gvs = [], faciles = [];
   geojson.features.forEach(f => {
     if (f.properties.categorie !== 'falaise') return;
     const p = f.properties;
-    totaux.push(p.nb_voies || 0);
-    couennes.push(p.nb_couenne || 0);
-    gvs.push(p.nb_gv || 0);
-    faciles.push((p.nb_voies_cot5 || 0) + (p.nb_voies_cot6a || 0));
+    totaux.push(p.nb_voie_total || 0);
+    const compte = compterVoiesSportivesParType(p.voies_sportives);
+    couennes.push(compte.couenne);
+    gvs.push(compte.grandeVoie);
+    faciles.push(compte.faciles);
   });
   return {
     total: Math.max(0, ...totaux), totalMedian: mediane(totaux),
@@ -84,30 +107,6 @@ export function cotationVersValeur(cotation) {
   const lettre = { a: 0, b: 1, c: 2 }[m[2]];
   const plus = m[3] ? 0.5 : 0;
   return (chiffre - 3) * 3 + lettre + plus;
-}
-
-// Regroupe les falaises par site (voir p.site — 10 sites distincts dans
-// cette sortie, de 1 à 24 falaises chacun, souvent à des dizaines de minutes
-// les uns des autres) et calcule, pour chacun, l'étendue RÉELLE des
-// cotations rencontrées. Sert d'échelle à jaugeCotation (popups.js) : une
-// échelle fixe 3a→9c+ (le spectre théorique du sport) tasse toutes les
-// falaises d'un même site dans une petite portion de la barre — ici, la
-// plupart des sites plafonnent bien avant 9c+, donc l'essentiel de la barre
-// ne servait jamais. Recalé sur les bornes réelles du site, la position
-// d'une falaise devient directement comparable à ses voisines du même site.
-export function calculerBornesCotationParSite(geojson) {
-  const parSite = new Map();
-  geojson.features.forEach(f => {
-    const p = f.properties;
-    if (p.categorie !== 'falaise') return;
-    if (!parSite.has(p.site)) parSite.set(p.site, { min: Infinity, max: -Infinity, minLabel: null, maxLabel: null });
-    const bornes = parSite.get(p.site);
-    const vMin = cotationVersValeur(p.cotation_min);
-    const vMax = cotationVersValeur(p.cotation_max);
-    if (vMin != null && vMin < bornes.min) { bornes.min = vMin; bornes.minLabel = p.cotation_min; }
-    if (vMax != null && vMax > bornes.max) { bornes.max = vMax; bornes.maxLabel = p.cotation_max; }
-  });
-  return parSite;
 }
 
 // En mode thématique (tout sauf "aucun"), une falaise sans donnée pour la
