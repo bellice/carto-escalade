@@ -67,22 +67,31 @@ export function fitToMarkers(map, geojson) {
   geojson.features.forEach(f => bounds.extend(f.geometry.coordinates));
   reinitialiserPadding(map);
   map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 15 });
-  limiterZoneCarte(map, bounds);
+  // Attend la fin de l'animation (moveend) plutôt que de calculer la limite
+  // tout de suite : voir limiterZoneCarte ci-dessous, qui a besoin de la vue
+  // RÉELLEMENT obtenue après cadrage (zoom compris), pas de l'étendue brute
+  // des marqueurs seule.
+  map.once('moveend', () => limiterZoneCarte(map));
   return bounds;
 }
 
 // Empêche de dériver la carte loin de la sortie (Allemagne, Asie...) en
-// glissant/zoomant : verrouille le pan/zoom à une marge autour des marqueurs.
-function limiterZoneCarte(map, bounds) {
-  // Doit rester nettement plus large que ce que fitBounds+margeToutVoir()
-  // affiche réellement à l'écran (le padding en pixels "mange" une plus
-  // grande part d'un viewport mobile étroit, donc la zone visible dépasse
-  // vite une marge trop serrée) — sinon setMaxBounds force un zoom arrière...
-  // ou avant, au-delà de ce que le cadrage avait calculé.
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  const margeLng = (ne.lng - sw.lng) * 1.5 || 0.8;
-  const margeLat = (ne.lat - sw.lat) * 1.5 || 0.8;
+// glissant/zoomant : verrouille le pan/zoom à une marge autour de la vue
+// obtenue par fitToMarkers. Calculée à partir de map.getBounds() (la vue
+// RÉELLEMENT visible une fois le cadrage terminé, padding+zoom déjà
+// appliqués) plutôt que de l'étendue brute des marqueurs avec un facteur
+// fixe — un facteur fixe doit deviner à l'avance de combien fitBounds va
+// zoomer en arrière pour compenser le padding demandé (voir margeToutVoir),
+// et peut devenir trop serré si ce padding grandit (ex. légende qui
+// s'allonge) sans que quiconque pense à le remonter ; en partant de la vue
+// déjà obtenue, la marge reste toujours cohérente avec ce qui est
+// effectivement affiché, quel que soit le padding utilisé.
+function limiterZoneCarte(map) {
+  const vue = map.getBounds();
+  const sw = vue.getSouthWest();
+  const ne = vue.getNorthEast();
+  const margeLng = (ne.lng - sw.lng) * 0.5 || 0.8;
+  const margeLat = (ne.lat - sw.lat) * 0.5 || 0.8;
   map.setMaxBounds([
     [sw.lng - margeLng, sw.lat - margeLat],
     [ne.lng + margeLng, ne.lat + margeLat],
