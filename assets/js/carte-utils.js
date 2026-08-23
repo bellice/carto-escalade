@@ -28,6 +28,22 @@ export function margeAvantPopup() {
   return { ...MARGE_UI, top: 24, bottom: bas };
 }
 
+// Variante de MARGE_UI pour un cadrage "vue d'ensemble" (chargement initial,
+// bouton "Tout voir", clic sur un nom de site, recherche à résultats
+// multiples) : mesure la VRAIE hauteur occupée à l'écran par le panneau
+// légende plutôt que de deviner un chiffre fixe. MARGE_UI.bottom (170) avait
+// été réglé pour une légende plus courte qu'aujourd'hui, et redeviendrait
+// obsolète à chaque futur ajout dans ce panneau sans cette mesure — d'autant
+// que la légende est DÉPLIÉE par défaut (pas repliée), donc son encombrement
+// réel dépasse largement la seule hauteur du bouton "Masquer". Recalculée à
+// chaque appel : la légende peut être repliée/dépliée entre deux appels, la
+// hauteur d'écran peut changer (rotation).
+export function margeToutVoir() {
+  const legende = document.querySelector('.legende');
+  const bas = legende ? Math.round(window.innerHeight - legende.getBoundingClientRect().top) + 10 : MARGE_UI.bottom;
+  return { ...MARGE_UI, bottom: Math.max(bas, 40) };
+}
+
 // MapLibre garde le padding d'un fitBounds/flyTo/easeTo de façon PERSISTANTE
 // sur la transform (tr.padding), et le calcul d'un futur cadrage l'ADDITIONNE
 // au nouveau padding demandé plutôt que de le remplacer (vérifié dans le code
@@ -50,7 +66,7 @@ export function fitToMarkers(map, geojson) {
   const bounds = new maplibregl.LngLatBounds();
   geojson.features.forEach(f => bounds.extend(f.geometry.coordinates));
   reinitialiserPadding(map);
-  map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 15 });
+  map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 15 });
   limiterZoneCarte(map, bounds);
   return bounds;
 }
@@ -58,11 +74,11 @@ export function fitToMarkers(map, geojson) {
 // Empêche de dériver la carte loin de la sortie (Allemagne, Asie...) en
 // glissant/zoomant : verrouille le pan/zoom à une marge autour des marqueurs.
 function limiterZoneCarte(map, bounds) {
-  // Doit rester nettement plus large que ce que fitBounds+MARGE_UI affiche
-  // réellement à l'écran (le padding en pixels "mange" une plus grande part
-  // d'un viewport mobile étroit, donc la zone visible dépasse vite une marge
-  // trop serrée) — sinon setMaxBounds force un zoom arrière... ou avant,
-  // au-delà de ce que le cadrage avait calculé.
+  // Doit rester nettement plus large que ce que fitBounds+margeToutVoir()
+  // affiche réellement à l'écran (le padding en pixels "mange" une plus
+  // grande part d'un viewport mobile étroit, donc la zone visible dépasse
+  // vite une marge trop serrée) — sinon setMaxBounds force un zoom arrière...
+  // ou avant, au-delà de ce que le cadrage avait calculé.
   const sw = bounds.getSouthWest();
   const ne = bounds.getNorthEast();
   const margeLng = (ne.lng - sw.lng) * 1.5 || 0.8;

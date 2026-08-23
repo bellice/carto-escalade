@@ -11,7 +11,7 @@ import {
 import { dessinerFalaise, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
 import { addMarker, synchroniserPoignee } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
-import { MARGE_UI, margeAvantPopup, fitToMarkers, creerControleToutVoir, reinitialiserPadding } from './carte-utils.js';
+import { margeAvantPopup, margeToutVoir, fitToMarkers, creerControleToutVoir, reinitialiserPadding } from './carte-utils.js';
 
 // Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
 // point uniforme (voir appliquerSimplificationZoom dans initCarte) — à
@@ -44,7 +44,7 @@ export function initCarte(dataUrl) {
   // réelle (icônes zoom+boussole, variable selon les options).
   map.addControl(creerControleToutVoir(() => {
     reinitialiserPadding(map);
-    if (borneGlobale) map.fitBounds(borneGlobale, { padding: MARGE_UI, maxZoom: 15 });
+    if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: 15 });
     // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
     // recherche active — sinon la caméra revient mais les marqueurs restent
     // restreints, contradiction avec "tout voir".
@@ -434,7 +434,7 @@ export function initCarte(dataUrl) {
         const bounds = new maplibregl.LngLatBounds();
         falaisesDuSite.forEach(f => bounds.extend(f.geometry.coordinates));
         reinitialiserPadding(map);
-        map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 16 });
+        map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
       });
       appliquerVisibiliteSites();
       appliquerSimplificationZoom();
@@ -566,7 +566,7 @@ export function initCarte(dataUrl) {
     const bounds = new maplibregl.LngLatBounds();
     correspondances.forEach((e) => bounds.extend(e.marker.getLngLat()));
     reinitialiserPadding(map);
-    map.fitBounds(bounds, { padding: MARGE_UI, maxZoom: 16 });
+    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
   }
 
   if (btnCentrer) {
