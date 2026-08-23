@@ -69,6 +69,11 @@
           <option value="type" id="option-type">Type de voie</option>
         </select>
       </div>
+      <div class="legende-temps" id="legende-temps" hidden>
+        <label for="filtre-temps">Depuis le gîte</label>
+        <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
+        <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
+      </div>
     </div>
     <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu">Masquer</button>
   </div>

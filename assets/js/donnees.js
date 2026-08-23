@@ -69,6 +69,42 @@ export function compterVoiesSportivesParType(voiesSportives) {
   return { couenne, grandeVoie, faciles };
 }
 
+// Temps total estimé gîte -> falaise, par le meilleur parking associé :
+// trajet_gite_min (routier, sur la feature parking) + approche_min (à pied,
+// sur la falaise) pour ce même parking, minimum sur tous les parkings
+// associés (un grimpeur choisirait le plus rapide, pas une moyenne). null si
+// aucun parking associé n'a les deux temps renseignés — utilisé par le
+// filtre "Depuis le gîte" (carte.js) pour masquer les falaises trop
+// éloignées, une falaise sans temps calculable reste affichée par défaut
+// (on ne peut pas prouver qu'elle est hors plage).
+export function calculerTempsDepuisGite(geojson) {
+  const trajetParParking = new Map();
+  geojson.features.forEach(f => {
+    const p = f.properties;
+    if (p.categorie === 'parking' && p.trajet_gite_min != null) {
+      trajetParParking.set(p.nom, p.trajet_gite_min);
+    }
+  });
+
+  const temps = new Map(); // cleFalaise -> minutes
+  geojson.features.forEach(f => {
+    const p = f.properties;
+    if (p.categorie !== 'falaise') return;
+    const noms = p.parking_associe || [];
+    const approches = p.approche_min || [];
+    let meilleur = null;
+    noms.forEach((nom, i) => {
+      const gite = trajetParParking.get(nom);
+      const approche = approches[i];
+      if (gite == null || approche == null) return;
+      const total = gite + approche;
+      if (meilleur == null || total < meilleur) meilleur = total;
+    });
+    if (meilleur != null) temps.set(cleFalaise(p), meilleur);
+  });
+  return temps;
+}
+
 export function calculerMaxima(geojson) {
   const totaux = [], couennes = [], gvs = [], faciles = [];
   geojson.features.forEach(f => {
