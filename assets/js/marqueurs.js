@@ -2,7 +2,7 @@
 // DOM, accessibilité, popup attachée, gestion d'ouverture/fermeture.
 
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
-import { cleFalaise, libelleFalaise, secteurDistinct } from './donnees.js';
+import { cleFalaise, libelleFalaise, secteurDistinct, compterVoiesSportivesParType } from './donnees.js';
 import { poserTailleMarqueur, dessinerFalaise } from './symboles.js';
 import { popupFalaise, popupParking, popupGite } from './popups.js';
 
@@ -20,14 +20,12 @@ export function synchroniserPoignee(poignee, reduire) {
   if (spanTexte) spanTexte.textContent = texte;
 }
 
-export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, bornesCotationParSite, estFicheReduite) {
+export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, estFicheReduite) {
   const p = feature.properties;
   const [lon, lat] = feature.geometry.coordinates;
   const cat = p.categorie;
   const cle = cat === 'falaise' ? cleFalaise(p) : p.nom;
-  const parkingAssocie = cat === 'falaise'
-    ? (p.parking_associe || '').split('|').map(s => s.trim()).filter(Boolean)
-    : [];
+  const parkingAssocie = cat === 'falaise' ? (p.parking_associe || []) : [];
 
   // "el" est la zone tactile (taille garantie par poserTailleMarqueur, voir
   // plus bas) — MapLibre réécrit intégralement son style.transform à chaque
@@ -50,7 +48,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
   visuel.className = 'marqueur-visuel';
   el.appendChild(visuel);
 
-  if (cat === 'hébergement') {
+  if (cat === 'hebergement') {
     poserTailleMarqueur(el, visuel, 16);
     visuel.style.background = 'var(--ink)';
     visuel.style.transform = 'rotate(45deg)'; // losange : se distingue des ronds falaise/parking
@@ -63,7 +61,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
   }
 
   const popupHtml =
-    cat === 'falaise' ? popupFalaise(p, lat, lon, cle, bornesCotationParSite.get(p.site)) :
+    cat === 'falaise' ? popupFalaise(p, lat, lon, cle) :
     cat === 'parking' ? popupParking(p, lat, lon, parkingInfos, cle) :
     popupGite(p, lat, lon, cle);
 
@@ -150,18 +148,17 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     // popups et doit au contraire survivre à cette fermeture.
   });
 
-  const cot5 = p.nb_voies_cot5 ?? 0;
-  const cot6a = p.nb_voies_cot6a ?? 0;
+  const { couenne, grandeVoie, faciles } = compterVoiesSportivesParType(p.voies_sportives);
   const secteur = cat === 'falaise' ? secteurDistinct(p) : null;
   const rechercheTexte = cat === 'falaise' ? libelleFalaise(p).toLowerCase() : p.nom.toLowerCase();
 
   const entree = {
     marker, cat, nom: p.nom, secteur, cle, recherche: rechercheTexte,
     parkingAssocie,
-    nbVoies: p.nb_voies ?? 0,
-    nbFaciles: cot5 + cot6a,
-    nbGrandeVoie: p.nb_gv ?? 0,
-    nbCouenne: p.nb_couenne ?? 0,
+    nbVoies: p.nb_voie_total ?? 0,
+    nbFaciles: faciles,
+    nbGrandeVoie: grandeVoie,
+    nbCouenne: couenne,
   };
 
   if (cat === 'falaise') dessinerFalaise(entree, 'aucun', maxima);

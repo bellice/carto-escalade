@@ -23,7 +23,7 @@ const ROSE_RAYON_POINTS = 12; // distance centre -> pastille, px
 const ROSE_RAYON_LABELS = 22; // distance centre -> libellé, px
 
 function roseDesVents(orientation) {
-  const actifs = new Set(orientation.split('|').map(s => s.trim()).filter(Boolean));
+  const actifs = new Set(orientation.map(s => s.trim()).filter(Boolean));
 
   const points = POINTS_ROSE.map((point, i) => {
     const angle = i * 45;
@@ -57,7 +57,7 @@ function roseDesVents(orientation) {
 // type de roche (lui, resté dans la fiche, voir popupFalaise) n'a pas ce
 // problème de place : pas de widget dédié à construire, juste une valeur texte.
 function construireCoinInfos(orientation) {
-  if (!orientation) return '';
+  if (!orientation || !orientation.length) return '';
   return `<div class="popup-coin">${roseDesVents(orientation)}</div>`;
 }
 
@@ -128,7 +128,7 @@ function boutonGps(lat, lon) {
   </button>`;
 }
 
-export function popupFalaise(p, lat, lon, cle, bornesSite) {
+export function popupFalaise(p, lat, lon, cle) {
   // Deux groupes distincts, séparés par un espacement plus grand qu'entre
   // deux lignes du même groupe (voir .fiche-groupe-suivant) — pas de trait ni
   // de fond, juste plus de blanc : le regroupement par proximité (Gestalt)
@@ -137,21 +137,18 @@ export function popupFalaise(p, lat, lon, cle, bornesSite) {
   const rowsLogistique = []; // comment y aller
 
   if (p.type_roche) rowsCaractere.push(champ('Roche', p.type_roche));
-  if (p.cotation_min || p.cotation_max) {
-    rowsCaractere.push(champCotation(p.cotation_min, p.cotation_max, bornesSite));
+  if (p.nb_voie_total) {
+    rowsCaractere.push(champVoiesBeeswarm(p.voies_sportives || [], p.nb_voie_total, p.nb_voie_sportive ?? 0, p.nb_voie_autres ?? 0));
   }
-  if (p.nb_voies) {
-    const cot5 = p.nb_voies_cot5 ?? 0;
-    const cot6a = p.nb_voies_cot6a ?? 0;
-    rowsCaractere.push(champVoies(p.nb_voies, cot5, cot6a));
-  }
-  if (p.parking_associe) {
-    const noms = p.parking_associe.split('|').map(s => s.trim()).filter(Boolean);
-    rowsLogistique.push(champParkingAssocie(noms, p.approche_min));
+  if (p.parking_associe && p.parking_associe.length) {
+    const noms = p.parking_associe;
+    const approches = p.approche_min || [];
+    const metres = p.approche_metre || [];
+    rowsLogistique.push(champParkingAssocie(noms, approches));
     // Plusieurs parkings : le temps est déjà sur chaque bouton (voir
     // champParkingAssocie), pas de ligne "Approche" séparée à dupliquer.
-    if (noms.length === 1 && p.approche_min) {
-      rowsLogistique.push(champ('Approche', `${p.approche_min} min` + (p.approche_metre ? ` (${p.approche_metre} m)` : '')));
+    if (noms.length === 1 && approches[0]) {
+      rowsLogistique.push(champ('Approche', `${approches[0]} min` + (metres[0] ? ` (${metres[0]} m)` : '')));
     }
   }
 
@@ -234,14 +231,11 @@ function champ(label, valeur) {
 // parkings (toujours 3 ici dans les données, jamais 2) : impossible de rester
 // générique, il faut bien distinguer les destinations — un simple rang
 // (1/2/3) suffit, dans l'ordre où data.geojson les liste.
-function champParkingAssocie(noms, approcheMin) {
-  const approches = noms.length > 1 && approcheMin
-    ? approcheMin.split('|').map(s => s.trim())
-    : null;
+function champParkingAssocie(noms, approches) {
   const valeur = noms.length === 1
     ? `<button type="button" class="lien-secteur" data-nom="${escapeHtml(noms[0])}">Voir sur la carte</button>`
     : noms.map((nom, i) => {
-        const duree = approches && approches[i] ? ` (${approches[i]} min)` : '';
+        const duree = approches[i] ? ` (${approches[i]} min)` : '';
         return `<button type="button" class="lien-secteur" data-nom="${escapeHtml(nom)}">Parking ${i + 1}${duree}</button>`;
       }).join(' · ');
   return `<div class="info-ligne"><span class="info-label">Parking</span><span class="info-valeur">${valeur}</span></div>`;
@@ -279,71 +273,126 @@ function champLiensFalaises(falaises) {
   return `<div class="info-ligne"><span class="info-label">Falaises</span></div><div class="falaises-detail">${groupes}</div>`;
 }
 
-// Grille "1 case = 1 voie" (isotype, pas un waffle chart classique — celui-là
-// représente des pourcentages sur 10×10, ici c'est un compte réel) ET
-// légende, les deux ensemble : la grille seule (1re version) n'avait pas de
-// légende, la légende seule (2e version) perdait l'intérêt visuel de "voir"
-// la quantité d'un coup d'œil et de comparer deux falaises entre elles rien
-// qu'à la taille du bloc — aucune des deux versions seules ne suffisait.
-// La légende réutilise EXACTEMENT les mêmes carrés que la grille (même
-// classe .voies-case) : la puce et la case sont littéralement la même
-// marque, pas juste la même couleur. nb_voies_cot5/cot6a ne couvrent que les
-// grades 5 et 6a-6a+ : il peut y avoir des voies encore plus faciles (3, 4 —
-// bien présentes dans les données, cf. cotation_min) non comptées ailleurs —
-// la case/puce "autres" reste un contour creux, sans prétendre dire si c'est
-// plus facile ou plus dur.
-// Le total va dans la valeur à droite du libellé (comme tous les autres
-// champs), la grille s'affiche TOUJOURS en dessous — même sans une seule
-// voie en 5 ou 6a/6a+, le total reste une info utile même sans détail par
-// grade.
-function champVoies(total, cot5, cot6a) {
+// Histogramme "1 case = 1 voie" par cotation. Remplace le 1er jet (nuage en
+// miroir sur une échelle 3a→9b fixe et globale) : testé en vrai, une falaise
+// typique ne couvre que 2-3 crans sur les ~39 possibles, donc l'échelle
+// globale compressait ses points dans une toute petite tranche du popup —
+// des cotations voisines finissaient à quelques pixels les unes des autres,
+// illisible (confirmé sur capture d'écran réelle, pas en théorie).
+//
+// Ici, une colonne par cotation RÉELLEMENT présente sur CETTE falaise (pas
+// les ~39 crans possibles) : la largeur du popup reste toujours bien
+// utilisée, quelle que soit l'étendue de la falaise, aucun risque de
+// chevauchement (positions de grille, pas de pixels calculés en continu).
+// Contrepartie assumée : la position d'une colonne n'est plus comparable
+// d'une fiche à l'autre — priorité donnée à la lisibilité individuelle.
+// Best-effort de placement pour 3 formes de cotation non standard mais
+// raisonnablement déductibles — UNIQUEMENT pour positionner une voie sur ce
+// graphique, jamais pour une valeur affichée ailleurs (cotationVersValeur,
+// donnees.js, reste strict — utilisée entre autres pour le mode "Voies
+// faciles" du sélecteur "Cercles", où une estimation n'a pas sa place). Les
+// cases qui en résultent ne sont PAS distinguées visuellement des cotations
+// exactes (essayé, puis retiré : un marquage pour un cas aussi marginal
+// faisait plus de bruit qu'autre chose) — une fois la règle posée, elle
+// s'applique sans réserve affichée.
+function approximerCotation(cotation) {
+  if (!cotation) return null;
+  const texte = String(cotation).trim();
+  // Lettrée + "-" (ex. "6a-") : le "-" est ignoré plutôt que de basculer
+  // vers le cran précédent (6a- rejoint la colonne 6a, pas 5c+ — reste dans
+  // SA lettre, pas dans une colonne qui semblerait être une autre cotation
+  // réelle).
+  let m = /^(\d)([abc])-$/.exec(texte);
+  if (m) return { label: `${m[1]}${m[2]}` };
+  // Chiffre seul + "-" (ex. "4-", ancienne cotation) : bas de fourchette.
+  m = /^(\d)-$/.exec(texte);
+  if (m) return { label: `${m[1]}a` };
+  // Chiffre seul (ex. "4", ancienne cotation) : milieu de fourchette.
+  m = /^(\d)$/.exec(texte);
+  if (m) return { label: `${m[1]}b` };
+  return null;
+}
+
+function champVoiesBeeswarm(voiesSportives, total, sportive, autres) {
   if (!total) return '';
-  const reste = Math.max(0, total - cot5 - cot6a);
-  const case_ = (classe) => `<span class="voies-case ${classe}"></span>`;
 
-  const grille = `<div class="voies-grille" role="img" aria-label="${total} voies au total, dont ${cot5} en 5 et ${cot6a} en 6a/6a+">${[
-    ...Array(cot5).fill('voies-case-5'),
-    ...Array(cot6a).fill('voies-case-6a'),
-    ...Array(reste).fill('voies-case-reste'),
-  ].map(case_).join('')}</div>`;
-
-  // Pas de compte répété ici (pas de "4 en 5") : les carrés eux-mêmes portent
-  // déjà la quantité (il suffit de les compter/regrouper par couleur), la
-  // légende n'a plus qu'à dire CE QUE chaque couleur signifie. "5" et
-  // "6a/6a+" restent toujours affichés, même à 0 : une légende qui change de
-  // contenu d'une popup à l'autre s'apprend mal, et voir "5" sans le moindre
-  // carré de cette couleur EST l'information (aucune voie dans ce grade ici),
-  // pas une case à cacher.
-  const groupes = [['voies-case-5', '5'], ['voies-case-6a', '6a/6a+']];
-  if (reste) groupes.push(['voies-case-reste', 'autres']);
-  const legende = `<div class="voies-detail">${groupes.map(([classe, texte]) => `<span class="voies-groupe">${case_(classe)}${texte}</span>`).join('')}</div>`;
-
-  return `<div class="info-ligne"><span class="info-label">Voies sportives</span><span class="info-valeur">${total}</span></div>${grille}${legende}`;
-}
-
-// Bornes d'échelle affichées de part et d'autre de la jauge : sans elles, le
-// segment coloré n'a aucun repère et sa position/largeur n'est pas décodable.
-// bornesSite (voir calculerBornesCotationParSite dans donnees.js) : omis si
-// le site n'a qu'une seule cotation connue au total (bornes.max ===
-// bornes.min, ex. site à une seule falaise) — une échelle à largeur nulle
-// n'a rien à montrer.
-function jaugeCotation(min, max, bornesSite) {
-  const vMin = cotationVersValeur(min);
-  const vMax = cotationVersValeur(max);
-  if (vMin == null || vMax == null) return '';
-  if (!bornesSite || bornesSite.max <= bornesSite.min) return '';
-  const echelle = bornesSite.max - bornesSite.min;
-  const debut = ((vMin - bornesSite.min) / echelle) * 100;
-  const largeur = Math.max(((vMax - vMin) / echelle) * 100, 3);
-  return `
-    <div class="jauge-cotation" role="img" aria-label="Cotation de ${escapeHtml(min)} à ${escapeHtml(max)}, sur l'échelle des cotations du site (${escapeHtml(bornesSite.minLabel)} à ${escapeHtml(bornesSite.maxLabel)})">
-      <span class="jauge-segment" style="left:${debut}%; width:${largeur}%"></span>
+  // --- Synthèse : total + répartition sportives/autres ---
+  // "autres" (trad/artificielle) n'est pas détaillé par voie (seul le compte
+  // existe dans les données) — pas d'histogramme pour cette part, seulement
+  // ce compteur global.
+  const pctSportive = Math.round((sportive / total) * 100);
+  const synthese = `
+    <div class="info-ligne"><span class="info-label">Voies</span><span class="info-valeur voies-total-valeur">${total}</span></div>
+    <div class="voies-repartition-barre" role="img" aria-label="${sportive} voies sportives et ${autres} autres sur ${total} au total">
+      <span class="voies-repartition-segment sportive" style="width:${pctSportive}%"></span>
+      <span class="voies-repartition-segment autres" style="width:${100 - pctSportive}%"></span>
     </div>
-    <div class="jauge-echelle"><span>${escapeHtml(bornesSite.minLabel)}</span><span>${escapeHtml(bornesSite.maxLabel)}</span></div>`;
-}
+    <div class="voies-repartition-texte">${sportive} sportives · ${autres} autres</div>`;
 
-function champCotation(min, max, bornesSite) {
-  const jauge = jaugeCotation(min, max, bornesSite);
-  const valeur = `${escapeHtml(min ?? '?')} → ${escapeHtml(max ?? '?')}`;
-  return `<div class="info-ligne"><span class="info-label">Cotation</span><span class="info-valeur">${valeur}</span></div>${jauge}`;
+  // Regroupe par cotation EXACTE (6a et 6a+ n'ont jamais la même colonne).
+  // Les voies à cotation non standard (~2,5% des cas réels — anciennes
+  // cotations sans lettre, ex. certaines voies "Les Roches" à Crest, issues
+  // d'une brochure plus ancienne que le reste des données) rejoignent leur
+  // colonne via approximerCotation quand c'est raisonnablement déductible
+  // (voir cette fonction pour le détail des règles retenues) ; les cases qui
+  // en résultent ne sont pas distinguées visuellement des cotations exactes
+  // — un choix assumé une fois la règle posée, pas une approximation à
+  // signaler à chaque fois. Ce qui reste incalculable récolte sa propre
+  // colonne "non côté" en fin de graphique — le compte de cases affiché
+  // correspond alors bien au total sportif annoncé plus haut.
+  const parCotation = new Map();
+  const nonCotees = [];
+  voiesSportives.forEach(v => {
+    let val = cotationVersValeur(v.cotation);
+    let label = v.cotation;
+    if (val == null) {
+      const estimee = approximerCotation(v.cotation);
+      if (estimee) {
+        val = cotationVersValeur(estimee.label);
+        label = estimee.label;
+      }
+    }
+    if (val == null) { nonCotees.push(v); return; }
+    if (!parCotation.has(label)) parCotation.set(label, { val, voies: [] });
+    parCotation.get(label).voies.push(v);
+  });
+  // Pas de voie sportive à afficher du tout (falaise 100% trad) : la
+  // synthèse suffit.
+  if (!parCotation.size && !nonCotees.length) return synthese;
+
+  const colonnes = Array.from(parCotation.entries())
+    .map(([cotation, { val, voies }]) => ({ cotation, val, voies, nonCote: false }))
+    .sort((a, b) => a.val - b.val);
+  if (nonCotees.length) colonnes.push({ cotation: 'non côté', voies: nonCotees, nonCote: true });
+
+  const case_ = (v, nonCote) => {
+    const classe = nonCote ? 'non-cote' : (v.type_voie === 'couenne' ? 'couenne' : 'gv');
+    return `<span class="histo-case ${classe}"></span>`;
+  };
+  const colonnesHtml = colonnes.map(c => `
+    <div class="histo-colonne">
+      <div class="histo-cases">${c.voies.map(v => case_(v, c.nonCote)).join('')}</div>
+      <span class="histo-label">${escapeHtml(c.cotation)}</span>
+    </div>`).join('');
+
+  // Pas d'entrée de légende pour "non côté" : contrairement à couenne/grande
+  // voie (mélangées à l'intérieur d'une même colonne, indécodables sans
+  // légende), la colonne non côté porte déjà sa propre étiquette explicite
+  // — une légende redondante n'ajouterait rien.
+  const legende = [
+    '<span class="histo-cle"><span class="histo-swatch couenne"></span>couenne</span>',
+    '<span class="histo-cle"><span class="histo-swatch gv"></span>grande voie</span>',
+  ];
+
+  // role="img" + un seul aria-label résumé sur l'histogramme entier (pas un
+  // par case) : le détail au tap sur une voie est reporté à une itération
+  // future, annoncer individuellement jusqu'à plusieurs dizaines de cases
+  // n'aiderait personne pour l'instant.
+  const histo = `
+    <div class="voies-histo" role="img" aria-label="Répartition des ${voiesSportives.length} voies sportives par cotation${nonCotees.length ? `, dont ${nonCotees.length} non côtées` : ''}">
+      ${colonnesHtml}
+    </div>
+    <div class="histo-legende">${legende.join('')}</div>`;
+
+  return `${synthese}${histo}`;
 }
