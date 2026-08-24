@@ -11,7 +11,7 @@ import {
 import { dessinerFalaise, valeurPourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
 import { addMarker, synchroniserPoignee } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
-import { margeAvantPopup, margeToutVoir, fitToMarkers, creerControleToutVoir, reinitialiserPadding } from './carte-utils.js';
+import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte } from './carte-utils.js';
 
 // Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
 // point uniforme (voir appliquerSimplificationZoom dans initCarte) — à
@@ -19,48 +19,20 @@ import { margeAvantPopup, margeToutVoir, fitToMarkers, creerControleToutVoir, re
 const ZOOM_SIMPLIFICATION = 13;
 
 export function initCarte(dataUrl) {
-  // --- Style de fond : OpenFreeMap (vecteur, libre, gratuit, sans clé) ---
-  // Pour passer en offline total : générer un fichier .pmtiles pour la zone
-  // (voir README) puis remplacer l'URL du style ci-dessous par une source
-  // "raster"/"vector" pointant vers pmtiles://./tuiles.pmtiles
-  const map = new maplibregl.Map({
-    container: 'map',
-    // "positron" (fond neutre, peu de POI/labels) plutôt que "liberty" (style
-    // généraliste chargé) : le fond doit rester discret pour que les
-    // marqueurs falaise/parking/gîte restent la figure dominante (principe
-    // figure-fond) — et un style plus simple charge/peint aussi plus vite.
-    style: 'https://tiles.openfreemap.org/styles/positron',
-    center: [5.03, 44.74],
-    zoom: 12,
-    attributionControl: false,
-  });
-
-  map.addControl(new maplibregl.NavigationControl(), 'top-right');
-  map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
-  // Contrôle "Tout voir" ajouté via l'API de contrôles MapLibre (pas un
-  // bouton positionné en absolu à la main) : la carte gère elle-même
-  // l'empilement des contrôles partageant un coin, donc pas de collision
-  // possible avec NavigationControl au-dessus, quelle que soit sa hauteur
-  // réelle (icônes zoom+boussole, variable selon les options).
-  map.addControl(creerControleToutVoir(() => {
-    reinitialiserPadding(map);
-    if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: 15 });
-    // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
-    // recherche active — sinon la caméra revient mais les marqueurs restent
-    // restreints, contradiction avec "tout voir".
-    falaiseSelectionneeCle = null;
-    reinitialiserRecherche();
-    reinitialiserFiltreTemps();
-    appliquerFiltresEtSecteurs();
-  }), 'top-right');
-
-  // Le contrôle d'attribution démarre parfois "déplié" (classe posée avant que
-  // notre config compact ne s'applique pleinement) — on force l'état replié
-  // une fois la carte chargée, sans empêcher l'utilisateur de le rouvrir ensuite.
-  map.on('load', () => {
-    const attrib = document.querySelector('.maplibregl-ctrl-attrib');
-    if (attrib) attrib.classList.remove('maplibregl-compact-show');
-  });
+  // La carte est créée APRÈS le chargement de data.geojson (voir la chaîne
+  // .then plus bas) : on calcule alors les bounds réelles des marqueurs et on
+  // les passe au CONSTRUCTEUR (bounds + fitBoundsOptions) plutôt qu'à un
+  // fitBounds() animé après coup. La carte naît donc directement dans la
+  // bonne vue :
+  //  - aucune animation de zoom au chargement, aucun flash ;
+  //  - aucune tuile téléchargée pour un centre/zoom provisoire en dur (gain
+  //    réseau direct — c'est l'objectif premier ici) ;
+  //  - le centre/zoom en dur [5.03, 44.74] / 12 disparaît.
+  // "map" est déclarée ici (let) car toutes les fonctions plus bas
+  // (appliquerSimplificationZoom, appliquerAntiCollision, allerVers...)
+  // l'utilisent via la closure ; elle est assignée une seule fois dans le
+  // .then, juste avant les contrôles/écouteurs qui en dépendent.
+  let map;
 
   const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne, tempsGite }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
@@ -68,7 +40,8 @@ export function initCarte(dataUrl) {
   let labelsSites = []; // [{el, marker, site}], peuplé une fois le geojson chargé — voir appliquerAntiCollisionSites
   const entriesParSecteur = new Map(); // clé de regroupement secteur -> entrees falaise, pour appliquerAntiCollisionSecteurs
   const entriesParSite = new Map(); // site -> entrees falaise, pour appliquerAntiCollisionSites
-  let secteursVisibles = null;
+  let secteursVisibles = null; // vrai quand les noms de secteur sont affichés (zoom >= ZOOM_LABELS_SECTEUR)
+  let sitesVisibles = null; // vrai quand les noms de site sont affichés (zoom < ZOOM_LABELS_SECTEUR) — miroir de secteursVisibles, voir appliquerVisibiliteSites
   // tempsMaxGite/tempsGitePlafond : Infinity tant que le slider n'est pas
   // configuré (pas de falaise sans filtre actif avant que les vraies bornes
   // ne soient connues, voir configurerFiltreTemps) — tempsGitePlafond sert
@@ -164,6 +137,25 @@ export function initCarte(dataUrl) {
     }
   }
 
+  // Même mécanisme que appliquerVisibiliteSecteurs, en miroir : un nom de
+  // site ne s'affiche QUE tant que les noms de secteur ne sont pas affichés
+  // (zoom < ZOOM_LABELS_SECTEUR). À fort zoom, le nom du secteur suffit à
+  // s'orienter — afficher les deux empilés SOUS le point (labels site et
+  // secteur tous deux ancrés en 'top', offsets [0,2] et [0,14]) les faisait
+  // se chevaucher entre eux ET chevaucher le cercle proportionnel centré sur
+  // le point. Cas typique : un site à une seule falaise, où centroïde site
+  // == centroïde secteur == position de la falaise (ex. Rocher des Amayères).
+  function appliquerVisibiliteSites() {
+    const visible = map.getZoom() < ZOOM_LABELS_SECTEUR;
+    if (visible === sitesVisibles) return;
+    sitesVisibles = visible;
+    if (!visible) {
+      labelsSites.forEach(({ el }) => { el.style.visibility = 'hidden'; });
+    } else {
+      appliquerAntiCollisionSites();
+    }
+  }
+
   // Décollision au pixel générique, partagée entre libellés de secteur et de
   // site (même algorithme, seule la source des libellés/du regroupement
   // change) : pour chaque libellé, dans l'ordre de priorité déjà décidé par
@@ -204,6 +196,9 @@ export function initCarte(dataUrl) {
   }
 
   function appliquerAntiCollisionSites() {
+    // Règle de zoom (voir appliquerVisibiliteSites) : pas de nom de site à
+    // décollisionner au-delà du seuil des secteurs — ils sont tous masqués.
+    if (sitesVisibles === false) return;
     appliquerAntiCollision(labelsSites, entriesParSite, (l) => l.site);
   }
 
@@ -291,7 +286,9 @@ export function initCarte(dataUrl) {
     });
     rafraichirLegendeFalaises();
   }
-  map.on('zoom', appliquerSimplificationZoom);
+  // map.on('zoom', appliquerSimplificationZoom) est enregistré après la
+  // création de la carte, dans le .then (voir plus bas) — map n'existe pas
+  // encore à ce stade du code.
 
   // Reconstruit la mini-légende falaises selon le mode "Cercles" courant ET
   // l'état de simplification par zoom — sinon la légende continuerait de
@@ -427,6 +424,61 @@ export function initCarte(dataUrl) {
   fetch(dataUrl)
     .then(r => r.json())
     .then(geojson => {
+      // Cadrage initial AVANT de créer la carte : les bounds réelles des
+      // marqueurs sont connues ici (data.geojson est préchargé via
+      // <link rel="preload">, l'attente est quasi nulle — le parse de
+      // maplibre-gl.mjs prend plus longtemps que ce fetch). Passées au
+      // constructeur via bounds + fitBoundsOptions (padding/maxZoom inclus,
+      // doc MapLibre v6) : la carte démarre directement dans la bonne vue,
+      // sans fitBounds() animé après coup.
+      borneGlobale = new maplibregl.LngLatBounds();
+      geojson.features.forEach(f => borneGlobale.extend(f.geometry.coordinates));
+      map = new maplibregl.Map({
+        container: 'map',
+        // "positron" (fond neutre, peu de POI/labels) plutôt que "liberty"
+        // (style généraliste chargé) : le fond doit rester discret pour que
+        // les marqueurs falaise/parking/gîte restent la figure dominante
+        // (principe figure-fond) — et un style plus simple charge/peint
+        // aussi plus vite.
+        style: 'https://tiles.openfreemap.org/styles/positron',
+        bounds: borneGlobale,
+        fitBoundsOptions: { padding: margeToutVoir(), maxZoom: 15 },
+        attributionControl: false,
+      });
+      // La vue initiale est déjà la bonne (pas d'animation au chargement) :
+      // on peut poser immédiatement les limites de dérive, sans attendre un
+      // moveend (ex- fitToMarkers).
+      limiterZoneCarte(map);
+
+      map.addControl(new maplibregl.NavigationControl(), 'top-right');
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+      // Contrôle "Tout voir" ajouté via l'API de contrôles MapLibre (pas un
+      // bouton positionné en absolu à la main) : la carte gère elle-même
+      // l'empilement des contrôles partageant un coin, donc pas de collision
+      // possible avec NavigationControl au-dessus, quelle que soit sa hauteur
+      // réelle (icônes zoom+boussole, variable selon les options).
+      map.addControl(creerControleToutVoir(() => {
+        reinitialiserPadding(map);
+        if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: 15 });
+        // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
+        // recherche active — sinon la caméra revient mais les marqueurs
+        // restent restreints, contradiction avec "tout voir".
+        falaiseSelectionneeCle = null;
+        reinitialiserRecherche();
+        reinitialiserFiltreTemps();
+        appliquerFiltresEtSecteurs();
+      }), 'top-right');
+
+      // Le contrôle d'attribution démarre parfois "déplié" (classe posée
+      // avant que notre config compact ne s'applique pleinement) — on force
+      // l'état replié une fois la carte chargée, sans empêcher l'utilisateur
+      // de le rouvrir ensuite.
+      map.on('load', () => {
+        const attrib = document.querySelector('.maplibregl-ctrl-attrib');
+        if (attrib) attrib.classList.remove('maplibregl-compact-show');
+      });
+      map.on('zoom', appliquerSimplificationZoom);
+
       const parkingInfos = indexerParkingInfos(geojson);
       maxima = calculerMaxima(geojson);
       const tempsDepuisGite = calculerTempsDepuisGite(geojson);
@@ -470,7 +522,13 @@ export function initCarte(dataUrl) {
         reinitialiserPadding(map);
         map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
       });
-      appliquerAntiCollisionSites();
+      // Règle de hiérarchie des libellés : les noms de site ne s'affichent
+      // que sous le seuil d'apparition des noms de secteur (zoom <
+      // ZOOM_LABELS_SECTEUR), voir appliquerVisibiliteSites. À trancher dès
+      // maintenant (le cadrage initial peut déjà être au seuil) puis à
+      // chaque zoom.
+      map.on('zoom', appliquerVisibiliteSites);
+      appliquerVisibiliteSites();
       map.on('moveend', appliquerAntiCollisionSites);
       map.on('zoomend', appliquerAntiCollisionSites);
       appliquerSimplificationZoom();
@@ -488,7 +546,8 @@ export function initCarte(dataUrl) {
       map.on('zoomend', appliquerAntiCollisionSecteurs);
       appliquerVisibiliteSecteurs();
 
-      borneGlobale = fitToMarkers(map, geojson);
+      // borneGlobale a déjà été calculé au début du .then (bounds passées au
+      // constructeur) ; limiterZoneCarte a été posée juste après la création.
       remplirAutocompletion(geojson);
       // La légende initiale est déjà construite par appliquerSimplificationZoom()
       // ci-dessus (state changed depuis null au premier appel).
