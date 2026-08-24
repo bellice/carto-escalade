@@ -1,45 +1,112 @@
 // carte-utils.js — utilitaires de cadrage caméra et de contrôle carte,
 // indépendants des marqueurs/popups.
 
-// Réserve la place occupée par le header + la recherche (haut) et la légende
-// (bas), pour qu'un marqueur centré ou un cadrage ajusté ne finisse pas
-// caché dessous. Padding asymétrique passé à flyTo/fitBounds.
-export const MARGE_UI = { top: 120, bottom: 170, left: 70, right: 70 };
+// Marges mobile : recherche/légende flottantes (haut/bas), colonnes latérales
+// réservées pour tout autre usage UI. Padding asymétrique passé à
+// flyTo/fitBounds. Utilisées UNIQUEMENT sur mobile depuis la fusion de la
+// recherche/légende/fiche falaise en une colonne latérale desktop (voir
+// margeDesktop ci-dessous) — ex-MARGE_UI, valeurs inchangées.
+const MARGE_MOBILE = { top: 120, bottom: 170, left: 70, right: 70 };
 
-// Variante de MARGE_UI pour un cadrage immédiatement suivi d'une ouverture de
-// popup (voir allerVers dans carte.js) : sur mobile, cette popup prend la
-// forme d'une feuille du bas jusqu'à ~45vh (cf. @media max-width:640px dans
-// le CSS) — bien plus haute que les 170px prévus pour la légende. Sans ce
-// correctif, un marqueur pouvait finir cadré pile là où la feuille allait le
-// recouvrir. Recalculée à chaque appel (pas une constante) : dépend de la
-// hauteur d'écran réelle, qui peut changer (rotation, redimensionnement).
-//
-// top réduit à 24 (pas les 120 de MARGE_UI) : ce top-là existe pour la barre
-// de recherche, qui SE MASQUE ELLE-MÊME tant qu'une fiche est ouverte sur
-// mobile (body.fiche-ouverte, voir le CSS) — puisqu'une popup va justement
-// s'ouvrir juste après cet appel, lui laisser 120px de trop en plus des ~300+
-// déjà réservés en bas resserrait l'espace utile bien plus que nécessaire
-// (repéré après test : cadrage peu visible, voire absent, sur petit écran).
-export function margeAvantPopup() {
-  if (!window.matchMedia('(max-width: 640px)').matches) return MARGE_UI;
-  const bas = Math.min(window.innerHeight * 0.45, 380) + 16;
-  return { ...MARGE_UI, top: 24, bottom: bas };
+// Seuil desktop/mobile — même valeur que le CSS (@media max-width:640px,
+// style-carte.css). Centralisé ici : avant, chaque appelant refaisait son
+// propre window.matchMedia(...).
+export function estDesktop() {
+  return !window.matchMedia('(max-width: 640px)').matches;
 }
 
-// Variante de MARGE_UI pour un cadrage "vue d'ensemble" (chargement initial,
-// bouton "Tout voir", clic sur un nom de site, recherche à résultats
-// multiples) : mesure la VRAIE hauteur occupée à l'écran par le panneau
-// légende plutôt que de deviner un chiffre fixe. MARGE_UI.bottom (170) avait
-// été réglé pour une légende plus courte qu'aujourd'hui, et redeviendrait
-// obsolète à chaque futur ajout dans ce panneau sans cette mesure — d'autant
-// que la légende est DÉPLIÉE par défaut (pas repliée), donc son encombrement
-// réel dépasse largement la seule hauteur du bouton "Masquer". Recalculée à
-// chaque appel : la légende peut être repliée/dépliée entre deux appels, la
-// hauteur d'écran peut changer (rotation).
+// Largeur réelle des deux panneaux desktop, lue depuis leurs tokens CSS
+// (--largeur-panneau-gauche/-droit, style.css) plutôt que dupliquée en dur
+// ici — une seule source de vérité entre CSS et JS, comme
+// couleurCss/COULEUR_ELOIGNE dans carte.js pour --clay.
+function largeurToken(nom, repli) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(nom);
+  return parseInt(v, 10) || repli;
+}
+export function largeurPanneauGauche() {
+  return largeurToken('--largeur-panneau-gauche', 300);
+}
+export function largeurPanneauDroit() {
+  return largeurToken('--largeur-panneau-droit', 380);
+}
+
+// Marge de confort desktop générique (haut/bas/droite hors fiche ouverte) —
+// reprend la même valeur que l'ex-MARGE_UI.left/right (70) : rien ne
+// justifie qu'elle change maintenant que plus rien ne flotte en haut/bas de
+// la carte sur desktop (recherche et légende vivent dans le panneau gauche
+// compact, pas en overlay top/bottom comme sur mobile).
+const CONFORT_DESKTOP = 70;
+
+// Marge desktop de base : le panneau GAUCHE (recherche+légende) est
+// PERMANENT — sa largeur est donc réservée pour TOUT cadrage desktop, y
+// compris vers un parking/gîte (pas seulement une falaise) : sans ça, un
+// marqueur pourrait finir caché dessous. Le panneau DROIT (fiche falaise),
+// lui, reste CONTEXTUEL — sa largeur n'est réservée qu'à l'ouverture d'une
+// fiche (voir margeAvantPopup(pourFalaiseDesktop) ci-dessous), pas en
+// permanence.
+function margeDesktop() {
+  return { top: CONFORT_DESKTOP, bottom: CONFORT_DESKTOP, right: CONFORT_DESKTOP, left: largeurPanneauGauche() + CONFORT_DESKTOP };
+}
+
+// Variante de marge pour un cadrage immédiatement suivi d'une ouverture de
+// fiche (voir allerVers/ouvrirFalaise dans carte.js) :
+// - Mobile : la popup prend la forme d'une feuille du bas jusqu'à ~45vh (cf.
+//   @media max-width:640px dans le CSS) — bien plus haute que les 170px
+//   prévus pour la légende. Sans ce correctif, un marqueur pouvait finir
+//   cadré pile là où la feuille allait le recouvrir. Recalculée à chaque
+//   appel (pas une constante) : dépend de la hauteur d'écran réelle, qui peut
+//   changer (rotation, redimensionnement).
+//   top réduit à 24 (pas les 120 de MARGE_MOBILE) : ce top-là existe pour la
+//   barre de recherche, qui SE MASQUE ELLE-MÊME tant qu'une fiche est ouverte
+//   sur mobile (body.fiche-ouverte, voir le CSS) — puisqu'une popup va
+//   justement s'ouvrir juste après cet appel, lui laisser 120px de trop en
+//   plus des ~300+ déjà réservés en bas resserrait l'espace utile bien plus
+//   que nécessaire (repéré après test : cadrage peu visible, voire absent,
+//   sur petit écran).
+// - Desktop : margeDesktop() (panneau gauche réservé), PLUS la largeur du
+//   panneau droit ajoutée au right si pourFalaiseDesktop=true — c'est-à-dire
+//   quand cette fiche va être une FALAISE (elle seule ouvre le panneau
+//   droit ; parking/gîte restent en popup flottante classique, aucune
+//   réservation supplémentaire nécessaire pour eux).
+export function margeAvantPopup(pourFalaiseDesktop = false) {
+  if (estDesktop()) {
+    const base = margeDesktop();
+    return pourFalaiseDesktop ? { ...base, right: largeurPanneauDroit() + CONFORT_DESKTOP } : base;
+  }
+  const bas = Math.min(window.innerHeight * 0.45, 380) + 16;
+  return { ...MARGE_MOBILE, top: 24, bottom: bas };
+}
+
+// Un point (lon/lat) est-il dans la zone non couverte par le padding courant
+// (marge de confort en plus, par défaut 24px) ? Utilisée pour décider si le
+// panneau falaise desktop doit repositionner la caméra à l'ouverture, ou si
+// la falaise cliquée est déjà visible dans l'espace restant (évite un
+// easeTo de recentrage superflu quand allerVers a déjà cadré la cible avant
+// d'ouvrir la fiche).
+export function estPointVisible(map, lon, lat, padding, marge = 24) {
+  const rect = map.getContainer().getBoundingClientRect();
+  const point = map.project([lon, lat]);
+  return point.x >= padding.left + marge && point.x <= rect.width - padding.right - marge &&
+    point.y >= padding.top + marge && point.y <= rect.height - padding.bottom - marge;
+}
+
+// Marge pour un cadrage "vue d'ensemble" (chargement initial, bouton "Tout
+// voir", clic sur un nom de site, recherche à résultats multiples) :
+// - Desktop : margeDesktop() — seul le panneau gauche (permanent) est
+//   réservé ; une "vue d'ensemble" n'ouvre jamais le panneau droit
+//   (contextuel, réservé uniquement par margeAvantPopup(true)).
+// - Mobile : mesure la VRAIE hauteur occupée à l'écran par le panneau
+//   légende (flottant en bas, inchangé sur mobile) plutôt que de deviner un
+//   chiffre fixe — MARGE_MOBILE.bottom (170) avait été réglé pour une légende
+//   plus courte qu'aujourd'hui, et redeviendrait obsolète à chaque futur
+//   ajout dans ce panneau sans cette mesure. Recalculée à chaque appel : la
+//   légende peut être repliée/dépliée entre deux appels, la hauteur d'écran
+//   peut changer (rotation).
 export function margeToutVoir() {
+  if (estDesktop()) return margeDesktop();
   const legende = document.querySelector('.legende');
-  const bas = legende ? Math.round(window.innerHeight - legende.getBoundingClientRect().top) + 10 : MARGE_UI.bottom;
-  return { ...MARGE_UI, bottom: Math.max(bas, 40) };
+  const bas = legende ? Math.round(window.innerHeight - legende.getBoundingClientRect().top) + 10 : MARGE_MOBILE.bottom;
+  return { ...MARGE_MOBILE, bottom: Math.max(bas, 40) };
 }
 
 // MapLibre garde le padding d'un fitBounds/flyTo/easeTo de façon PERSISTANTE

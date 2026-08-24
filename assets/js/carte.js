@@ -9,9 +9,9 @@ import {
   estFalaiseVideDansMode, libelleFalaise,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
-import { addMarker, ouvrirPopupFalaise, synchroniserPoignee } from './marqueurs.js';
+import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
-import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte } from './carte-utils.js';
+import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop } from './carte-utils.js';
 
 // Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
 // point uniforme (voir appliquerSimplificationZoom dans initCarte) — à
@@ -54,6 +54,28 @@ export function initCarte(dataUrl) {
     estFicheReduite: () => ficheReduite,
     urlRoute: (id) => baseRoutes + id + '.json',
   };
+
+  // Contexte pour ouvrirPanneauFalaise (panneau latéral desktop) : pas
+  // estFicheReduite (concept mobile uniquement, sans objet pour un panneau
+  // desktop). onFermeturePanneau vide la sélection à la fermeture — carte.js
+  // reste seul propriétaire de falaiseSelectionneeCle, voir le commentaire
+  // dans fermerPanneauFalaise (marqueurs.js) sur pourquoi ce comportement
+  // diverge délibérément de la fermeture d'une popup mobile.
+  const ctxPanneau = {
+    enSurbrillance,
+    onSelectionFalaise: definirFalaiseSelectionnee,
+    suivrePopup,
+    urlRoute: (id) => baseRoutes + id + '.json',
+    onFermeturePanneau: () => { falaiseSelectionneeCle = null; appliquerFiltresEtSecteurs(); },
+  };
+
+  // Le panneau falaise desktop est-il ouvert ? État réel porté par le DOM
+  // (classe .ouvert sur #panneau-falaise), PAS par popupOuverte : ouvrir une
+  // popup parking/gîte pendant que le panneau est ouvert écrase popupOuverte
+  // (qui n'est alors plus le panneau) sans fermer le panneau — toute logique
+  // de fermeture (clic hors falaise, Échap) doit donc lire le DOM, pas
+  // popupOuverte.estPanneauFalaise.
+  const panneauFalaiseOuvert = () => estDesktop() && document.getElementById('panneau-falaise')?.classList.contains('ouvert');
 
   const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne, tempsGite }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
@@ -266,7 +288,19 @@ export function initCarte(dataUrl) {
   // chaque ouverture de popup pour synchroniser SON contenu sur cet état.
   let ficheReduite = false;
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && popupOuverte) popupOuverte.remove();
+    if (e.key === 'Escape') {
+      // Ferme d'abord une éventuelle popup flottante (parking/gîte), puis le
+      // panneau falaise s'il reste ouvert. L'état du panneau est lu dans le
+      // DOM (panneauFalaiseOuvert), pas dans popupOuverte : une popup
+      // parking/gîte ouverte par-dessus le panneau écrase popupOuverte sans
+      // fermer le panneau, qui resterait sinon fermable seulement par son
+      // bouton ×.
+      if (popupOuverte && !(estDesktop() && popupOuverte.estPanneauFalaise)) {
+        popupOuverte.remove();
+      } else if (panneauFalaiseOuvert()) {
+        fermerPanneauFalaise(map, ctxPanneau);
+      }
+    }
   });
 
   // Actions du contenu de popup (poignée, copier, lien vers un secteur) :
@@ -307,7 +341,15 @@ export function initCarte(dataUrl) {
     if (lienSecteur) {
       const popupEl = lienSecteur.closest('.popup');
       const origineCle = popupEl ? popupEl.dataset.cle : undefined;
-      if (popupOuverte) popupOuverte.remove();
+      // Même garde que ouvrirFalaise : sur desktop, si c'est le panneau droit
+      // (fiche falaise) qui est ouvert, on le LAISSE en place — les panneaux
+      // gauche et droit sont indépendants, garder la card ouverte conserve le
+      // contexte pendant qu'on affiche le parking associé (lien "Voir sur la
+      // carte"). Sinon (popup parking/gîte flottante, ou mobile) comportement
+      // inchangé : une seule fiche à la fois.
+      if (popupOuverte && !(estDesktop() && popupOuverte.estPanneauFalaise)) {
+        popupOuverte.remove();
+      }
       allerVers(lienSecteur.dataset.nom, origineCle);
     }
   });
@@ -343,8 +385,8 @@ export function initCarte(dataUrl) {
   // montrer des cercles de référence à une échelle où seuls des points
   // uniformes sont réellement affichés (trompeur).
   function rafraichirLegendeFalaises() {
-    const { max, median, titre, remplissage } = infosLegendePourMode(modeFigureActuel, maxima);
-    construireLegendeFalaises(max, median, titre, remplissage, modeSimplifieActuel, maxima.total);
+    const { max, median, remplissage } = infosLegendePourMode(modeFigureActuel, maxima);
+    construireLegendeFalaises(max, median, remplissage, modeSimplifieActuel, maxima.total);
   }
 
   // Couche native "falaises" (rendu GPU) : un seul canvas au lieu d'un
@@ -384,23 +426,93 @@ export function initCarte(dataUrl) {
     });
     map.on('mouseenter', 'falaises', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'falaises', () => { map.getCanvas().style.cursor = ''; });
-    map.on('click', 'falaises', (e) => {
-      const cle = e.features && e.features[0] && e.features[0].properties.cle;
-      if (cle) ouvrirFalaise(cle);
+    // UN SEUL écouteur de clic générique (pas un map.on('click','falaises',...)
+    // séparé + un map.on('click',...) séparé) : les deux se déclenchent sur le
+    // MÊME clic, et un map.on('click','falaises',...) qui ouvre le panneau
+    // change le padding caméra de façon SYNCHRONE (reinitialiserPadding +
+    // easeTo dans ouvrirPanneauFalaise) avant que le second écouteur n'ait pu
+    // s'exécuter — bug constaté en test réel : queryRenderedFeatures(e.point)
+    // dans le second écouteur renvoyait 0 résultat alors que le clic venait
+    // justement de toucher une falaise l'instant d'avant (même pixel, mais le
+    // rendu avait déjà changé sous ce pixel entre les deux écouteurs), fermant
+    // aussitôt le panneau qu'on venait d'ouvrir — plus aucun clic sur un
+    // cercle n'avait d'effet visible après une 1re fermeture. Une seule
+    // requête, un seul écouteur, plus de risque de désynchronisation.
+    map.on('click', (e) => {
+      // Un clic parti d'un marqueur ou d'une popup (éléments DOM de
+      // .maplibregl-canvas-container) REMONTE jusqu'à la carte et déclenche
+      // aussi cet écouteur — c'est d'ailleurs le mécanisme officiel de
+      // MapLibre pour ouvrir la popup d'un marqueur (Marker._onMapClick est
+      // branché sur map 'click', voir src/ui/marker.ts). Notre logique de
+      // fermeture (popup flottante / panneau) ne doit PAS s'appliquer à ces
+      // clics-là : sans ce garde-fou, cliquer sur l'icône P ouvrait la popup
+      // parking via MapLibre puis la refermait aussitôt ici (popupOuverte
+      // venait d'être écrasée par la popup qu'on ouvrait) → « je ne peux
+      // plus cliquer sur le parking » après avoir ouvert une falaise. On
+      // n'agit que sur un clic réel du canvas.
+      const cible = e.originalEvent && e.originalEvent.target;
+      if (cible && typeof cible.closest === 'function' &&
+          (cible.closest('.maplibregl-marker') || cible.closest('.maplibregl-popup'))) {
+        return;
+      }
+
+      const features = map.queryRenderedFeatures(e.point, { layers: ['falaises'] });
+      const cle = features[0] && features[0].properties.cle;
+      if (cle) {
+        ouvrirFalaise(cle);
+      } else if (popupOuverte && !(estDesktop() && popupOuverte.estPanneauFalaise)) {
+        // Une popup FLOTTANTE (parking/gîte, ou fiche falaise mobile) est
+        // ouverte : on ne ferme QUE celle-là. Les popups sont créées avec
+        // closeOnClick:false (voir marqueurs.js) précisément pour reprendre
+        // la main ici : sur desktop, une popup parking peut être affichée
+        // PAR-DESSUS le panneau falaise resté ouvert — la fermer ne doit PAS
+        // fermer le panneau (sur mobile, même résultat qu'avant — le
+        // closeOnClick natif — mais centralisé).
+        popupOuverte.remove();
+        // Le 'close' de la popup a remis toutes les falaises en pleine
+        // opacité (enSurbrillance(null)). Si le panneau falaise est resté
+        // ouvert (desktop), on restaure la surbrillance de la falaise
+        // sélectionnée (+ ses parkings) : la relation parking -> falaises
+        // qu'on vient de refermer reste ainsi visible à l'écran, la card
+        // falaise restant ouverte.
+        if (estDesktop() && panneauFalaiseOuvert() && falaiseSelectionneeCle) {
+          const entree = index.get(falaiseSelectionneeCle);
+          if (entree) enSurbrillance([falaiseSelectionneeCle, ...entree.parkingAssocie]);
+        }
+      } else if (panneauFalaiseOuvert()) {
+        // Aucune popup flottante, mais le panneau desktop est ouvert : le
+        // clic sur le vide le ferme (équivalent du closeOnClick natif d'une
+        // vraie maplibregl.Popup, à recréer explicitement puisque le panneau
+        // n'en est pas une). État du panneau lu dans le DOM
+        // (panneauFalaiseOuvert), pas dans popupOuverte.estPanneauFalaise.
+        fermerPanneauFalaise(map, ctxPanneau);
+      }
     });
   }
 
-  // Ouvre la fiche (popup) d'une falaise de la couche native, au clic ou via
-  // la navigation. Ferme d'abord toute popup déjà ouverte (falaise OU
-  // parking/gîte) — le comportement miroir de cible.marker.togglePopup() des
-  // marqueurs DOM, qui est ici délégué à suivrePopup (tracking dans
-  // popupOuverte).
-  function ouvrirFalaise(cle) {
+  // Ouvre la fiche d'une falaise de la couche native, au clic ou via la
+  // navigation — popup flottante sur mobile, panneau latéral dédié sur
+  // desktop (voir estDesktop, carte-utils.js). Ferme d'abord toute fiche déjà
+  // ouverte (falaise OU parking/gîte), SAUF si le panneau desktop est déjà
+  // ouvert : dans ce cas on le laisse en place et ouvrirPanneauFalaise se
+  // contente d'en remplacer le contenu (pas de collapse/reopen de la section
+  // en changeant de falaise pendant qu'elle reste affichée). Sur mobile,
+  // estDesktop() est faux et cette garde se réduit exactement au comportement
+  // d'avant (popupOuverte.remove() inconditionnel).
+  // cameraDejaEncadree (facultatif) : à true quand allerVers a DÉJÀ lancé son
+  // propre fitBounds/flyTo juste avant cet appel — évite que
+  // ouvrirPanneauFalaise ne coupe cette animation avec son propre map.stop()
+  // (voir le commentaire détaillé dans marqueurs.js).
+  function ouvrirFalaise(cle, cameraDejaEncadree = false) {
     const entree = index.get(cle);
     if (!entree) return;
-    if (popupOuverte) popupOuverte.remove();
+    if (popupOuverte && !(estDesktop() && popupOuverte.estPanneauFalaise)) {
+      popupOuverte.remove();
+    }
     definirFalaiseSelectionnee(cle);
-    popupOuverte = ouvrirPopupFalaise(map, entree, ctxPopup);
+    popupOuverte = estDesktop()
+      ? ouvrirPanneauFalaise(map, entree, ctxPanneau, cameraDejaEncadree)
+      : ouvrirPopupFalaise(map, entree, ctxPopup);
   }
 
   // Change le mode "Cercles" et redessine tout ce qui en dépend — utilisé
@@ -489,20 +601,32 @@ export function initCarte(dataUrl) {
     // coordonnées directes (falaise en couche native — plus de marqueur).
     const pointDe = (e) => (e.marker ? e.marker.getLngLat() : [e.lon, e.lat]);
 
-    // margeAvantPopup() (pas MARGE_UI) : la popup de la cible s'ouvre juste
-    // après ce cadrage (falaise native ou marqueur DOM) — sur mobile, il faut
-    // lui laisser sa place.
+    // margeAvantPopup(...) : la fiche de la cible s'ouvre juste après ce
+    // cadrage — sur mobile, feuille du bas, il faut lui laisser sa place
+    // quelle que soit la catégorie. Sur desktop, le panneau gauche est déjà
+    // réservé en permanence (margeDesktop()) ; le panneau DROIT, lui, ne
+    // s'ouvre QUE pour une falaise (parking/gîte restent en popup flottante
+    // classique) — sa largeur n'est donc réservée en plus que quand une fiche
+    // falaise sera ouverte au moment du cadrage : soit la cible EST une
+    // falaise, soit le panneau droit est DÉJÀ ouvert (cas du lien parking
+    // depuis une fiche falaise, voir l'écouteur .lien-secteur — on garde la
+    // card ouverte et on cadre le parking sans le cacher derrière le panneau).
+    const reserverPanneauDroit = cible.cat === 'falaise' || (estDesktop() && popupOuverte && popupOuverte.estPanneauFalaise);
     if (origine) {
       const bounds = new maplibregl.LngLatBounds();
       bounds.extend(pointDe(origine));
       bounds.extend(pointDe(cible));
-      map.fitBounds(bounds, { padding: margeAvantPopup(), maxZoom: 16 });
+      map.fitBounds(bounds, { padding: margeAvantPopup(reserverPanneauDroit), maxZoom: 16 });
     } else {
-      map.flyTo({ center: pointDe(cible), zoom: Math.max(map.getZoom(), 15), padding: margeAvantPopup() });
+      map.flyTo({ center: pointDe(cible), zoom: Math.max(map.getZoom(), 15), padding: margeAvantPopup(reserverPanneauDroit) });
     }
 
     if (cible.cat === 'falaise') {
-      ouvrirFalaise(cible.cle);
+      // cameraDejaEncadree=true : le fitBounds/flyTo ci-dessus vient déjà de
+      // lancer la bonne animation caméra (bon padding, bon zoom) — voir le
+      // commentaire de ouvrirFalaise/ouvrirPanneauFalaise sur pourquoi ne
+      // pas la court-circuiter avec un 2e cadrage ici serait un bug.
+      ouvrirFalaise(cible.cle, true);
     } else {
       cible.marker.togglePopup();
     }
@@ -539,6 +663,9 @@ export function initCarte(dataUrl) {
       // on peut poser immédiatement les limites de dérive, sans attendre un
       // moveend (ex- fitToMarkers).
       limiterZoneCarte(map);
+      // Câble le bouton fermer (×) du panneau falaise desktop — sans effet
+      // sur mobile, le panneau reste display:none hors media query.
+      cablerFermetureManuellePanneau(map, ctxPanneau);
 
       map.addControl(new maplibregl.NavigationControl(), 'top-right');
       map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
@@ -548,6 +675,16 @@ export function initCarte(dataUrl) {
       // possible avec NavigationControl au-dessus, quelle que soit sa hauteur
       // réelle (icônes zoom+boussole, variable selon les options).
       map.addControl(creerControleToutVoir(() => {
+        // Ferme la fiche ouverte (popup mobile ou panneau desktop) AVANT de
+        // recadrer : "Tout voir" remet falaiseSelectionneeCle à null juste
+        // en dessous, la fiche ouverte doit suivre — sinon le panneau
+        // desktop resterait affiché avec un contenu périmé pendant que la
+        // caméra dézoome sur toute la sortie, en contradiction avec la règle
+        // "panneau ouvert <=> une falaise est sélectionnée". Redondant mais
+        // inoffensif avec les lignes qui suivent (popupOuverte.remove() sur
+        // le panneau réapplique déjà falaiseSelectionneeCle=null +
+        // appliquerFiltresEtSecteurs() via onFermeturePanneau, idempotent).
+        if (popupOuverte) popupOuverte.remove();
         reinitialiserPadding(map);
         if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: 15 });
         // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
@@ -786,9 +923,10 @@ export function initCarte(dataUrl) {
       const vaOuvrir = legendeContenu.hidden;
       legendeContenu.hidden = !vaOuvrir;
       legendeToggle.setAttribute('aria-expanded', String(vaOuvrir));
-      // Le texte porte l'état (repli/déploiement) — pas d'icône/chevron,
-      // cohérent avec le reste du site (contrôles en texte mono sobre).
-      legendeToggle.textContent = vaOuvrir ? 'Masquer' : 'Légende';
+      // L'état visuel est porté par l'icône (rotation CSS via aria-expanded,
+      // voir .legende-toggle-icone) — le aria-label reste explicite pour le
+      // lecteur d'écran (une icône seule ne l'est pas).
+      legendeToggle.setAttribute('aria-label', vaOuvrir ? 'Réduire la légende' : 'Déplier la légende');
     });
   }
 

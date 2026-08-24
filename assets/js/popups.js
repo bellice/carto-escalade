@@ -193,7 +193,7 @@ export function popupFalaise(p, lat, lon, cle) {
 
 export function popupParking(p, lat, lon, parkingInfos, cle) {
   const rows = [];
-  if (p.trajet_gite_min) rows.push(champ('Depuis le gîte', `${p.trajet_gite_min} min en voiture`));
+  if (p.trajet_gite_min) rows.push(champ('Trajet depuis le gîte', `${p.trajet_gite_min} min en voiture`));
 
   const info = parkingInfos.get(p.nom);
   if (info && info.falaises.length) {
@@ -451,7 +451,12 @@ export function construireHistogramme(voiesSportives) {
   // communautaire (seul lien_oblyk/lien_camptocamp existe, au niveau
   // falaise — voir donnees.js), le popup resterait pauvre. Ne pas
   // implémenter tant que ce calcul valeur/coût n'a pas été retranché.
+  // La synthèse "X sportives · Y autres" (plus haut) et la légende couenne/
+  // grande voie sous l'histogramme sont deux classifications différentes qui
+  // s'enchaînent sans signal de rupture : un micro-libellé (même vocabulaire
+  // que .legende-titre de la légende) annonce explicitement le changement.
   const histo = `
+    <span class="legende-titre">Détail par cotation</span>
     <div class="voies-histo" role="img" aria-label="Répartition des ${voiesSportives.length} voies sportives par cotation${nonCotees.length ? `, dont ${nonCotees.length} non côtées` : ''}">
       ${colonnesHtml}
     </div>

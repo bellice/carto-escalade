@@ -53,45 +53,65 @@
     <span class="titre">Drôme - forêt de Saoû</span>
   </header>
 
-  <div class="recherche">
-    <div class="recherche-champ">
-      <input type="search" list="falaises-liste" placeholder="Chercher une falaise…" aria-label="Rechercher une falaise" />
-      <button type="button" class="btn-effacer" aria-label="Effacer la recherche" hidden>×</button>
+  <div id="panneau-lateral" role="region" aria-label="Recherche et légende de la carte">
+    <div class="recherche">
+      <div class="recherche-champ">
+        <input type="search" list="falaises-liste" placeholder="Chercher une falaise…" aria-label="Rechercher une falaise" />
+        <button type="button" class="btn-effacer" aria-label="Effacer la recherche" hidden>×</button>
+      </div>
+      <datalist id="falaises-liste"></datalist>
+      <button type="button" class="btn-centrer" aria-label="Centrer la carte sur le résultat">Centrer</button>
     </div>
-    <datalist id="falaises-liste"></datalist>
-    <button type="button" class="btn-centrer" aria-label="Centrer la carte sur le résultat">Centrer</button>
+
+    <div class="legende">
+      <div class="legende-entete">
+        <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu" aria-label="Réduire la légende">
+          <span class="legende-toggle-icone" aria-hidden="true">▾</span>
+        </button>
+      </div>
+      <div class="legende-contenu" id="legende-contenu">
+        <div class="legende-cats">
+          <span id="cle-falaises-zone"><span class="cle"><span class="dot"></span> Falaises</span></span>
+          <span class="cle"><span class="dot parking"></span> Parkings <span class="note">(via une falaise)</span></span>
+          <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
+        </div>
+        <!-- Le sélecteur est le TITRE des cercles proportionnels : placé au-dessus
+             de #legende-falaises (les cercles de référence, ou le message
+             "Zoomez pour voir..." quand on est dézoomé). -->
+        <div class="legende-figure">
+          <select id="mode-figure" aria-label="Grandeur utilisée pour la taille des cercles">
+            <option value="aucun">Nombre de voies</option>
+            <option value="faciles">Nombre de voies 5-6a+</option>
+            <option value="couenne" id="option-couenne">Nombre de couennes</option>
+            <option value="gv" id="option-gv">Nombre de grandes voies</option>
+          </select>
+        </div>
+        <div class="legende-falaises" id="legende-falaises"></div>
+        <div class="legende-temps" id="legende-temps" hidden>
+          <div class="legende-temps-ligne1">
+            <label for="filtre-temps">Trajet depuis le gîte</label>
+            <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
+          </div>
+          <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Panneau droit (fiche falaise) : sibling de #panneau-lateral, PAS
+       imbriqué dedans — il s'ancre à droite de l'écran, indépendant du
+       panneau gauche (recherche/légende), qui reste stable pendant que
+       celui-ci s'ouvre/se ferme. Voir style-carte.css @media min-width:641px. -->
+  <aside id="panneau-falaise" aria-label="Détails de la falaise" inert>
+    <div class="panneau-falaise-interieur">
+      <button type="button" class="panneau-falaise-fermer" aria-label="Fermer le panneau">×</button>
+      <div class="panneau-falaise-contenu"></div>
+    </div>
+  </aside>
 
   <div id="map"></div>
 
   <div id="etat-chargement" class="etat-chargement">Chargement de la carte…</div>
-
-  <div class="legende">
-    <div class="legende-contenu" id="legende-contenu">
-      <div class="legende-cats">
-        <span id="cle-falaises-zone"><span class="cle"><span class="dot"></span> Falaises</span></span>
-        <span class="cle"><span class="dot parking"></span> Parkings <span class="note">(via une falaise)</span></span>
-        <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
-      </div>
-      <div class="legende-falaises" id="legende-falaises"></div>
-      <div class="legende-figure">
-        <select id="mode-figure" aria-label="Grandeur utilisée pour la taille des cercles">
-          <option value="aucun">Voies</option>
-          <option value="faciles">Voies faciles (≤6a+)</option>
-          <option value="couenne" id="option-couenne">Couenne</option>
-          <option value="gv" id="option-gv">Grande voie</option>
-        </select>
-      </div>
-      <div class="legende-temps" id="legende-temps" hidden>
-        <div class="legende-temps-ligne1">
-          <label for="filtre-temps">Depuis le gîte</label>
-          <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
-        </div>
-        <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
-      </div>
-    </div>
-    <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu">Masquer</button>
-  </div>
 
   <!-- Un script type="module" s'exécute déjà après la fin du parsing HTML
        (même garantie que "defer"), donc strictement AVANT que DOMContentLoaded

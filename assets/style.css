@@ -16,6 +16,9 @@
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
 
   --radius: 3px;
+
+  --largeur-panneau-gauche: 300px; /* bloc compact recherche+légende, desktop */
+  --largeur-panneau-droit: 380px;  /* panneau fiche falaise, desktop */
 }
 
 * { box-sizing: border-box; }
