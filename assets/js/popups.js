@@ -148,7 +148,9 @@ export function popupFalaise(p, lat, lon, cle) {
     // Plusieurs parkings : le temps est déjà sur chaque bouton (voir
     // champParkingAssocie), pas de ligne "Approche" séparée à dupliquer.
     if (noms.length === 1 && approches[0]) {
-      rowsLogistique.push(champ('Approche', `${approches[0]} min` + (metres[0] ? ` (${metres[0]} m)` : '')));
+      // "à pied" : même désambiguïsation que dans champParkingAssocie, pas à
+      // confondre avec le temps en voiture depuis le gîte (popupParking).
+      rowsLogistique.push(champ('Approche', `${approches[0]} min à pied` + (metres[0] ? ` (${metres[0]} m)` : '')));
     }
   }
 
@@ -231,14 +233,27 @@ function champ(label, valeur) {
 // parkings (toujours 3 ici dans les données, jamais 2) : impossible de rester
 // générique, il faut bien distinguer les destinations — un simple rang
 // (1/2/3) suffit, dans l'ordre où data.geojson les liste.
+// "min à pied" (pas juste "min") : approche_min est un temps de MARCHE
+// parking->falaise, à ne pas confondre avec trajet_gite_min (popupParking,
+// "en voiture") — les deux se ressemblent d'un coup d'œil ("X min") sans ce
+// qualificatif, alors que ce sont deux temps de nature différente.
+//
+// Cas 1 parking : reste sur une ligne info-ligne classique (label + un seul
+// bouton, ça tient toujours). Cas plusieurs parkings : bascule sur le motif
+// "label seul sur sa ligne + liste en flux" (.liens-detail, même motif que
+// champLiensFalaises) plutôt qu'un texte assemblé avec des "·" (1er jet) —
+// avec le qualificatif "à pied" en plus sur chaque bouton, ces libellés sont
+// devenus trop longs pour rester en ligne : le séparateur pouvait finir seul
+// sur sa propre ligne au retour à la ligne (constaté en réel).
 function champParkingAssocie(noms, approches) {
-  const valeur = noms.length === 1
-    ? `<button type="button" class="lien-secteur" data-nom="${escapeHtml(noms[0])}">Voir sur la carte</button>`
-    : noms.map((nom, i) => {
-        const duree = approches[i] ? ` (${approches[i]} min)` : '';
-        return `<button type="button" class="lien-secteur" data-nom="${escapeHtml(nom)}">Parking ${i + 1}${duree}</button>`;
-      }).join(' · ');
-  return `<div class="info-ligne"><span class="info-label">Parking</span><span class="info-valeur">${valeur}</span></div>`;
+  if (noms.length === 1) {
+    return `<div class="info-ligne"><span class="info-label">Parking</span><span class="info-valeur"><button type="button" class="lien-secteur" data-nom="${escapeHtml(noms[0])}">Voir sur la carte</button></span></div>`;
+  }
+  const boutons = noms.map((nom, i) => {
+    const duree = approches[i] ? ` (${approches[i]} min à pied)` : '';
+    return `<button type="button" class="lien-secteur" data-nom="${escapeHtml(nom)}">Parking ${i + 1}${duree}</button>`;
+  }).join('');
+  return `<div class="info-ligne"><span class="info-label">Parking</span></div><div class="liens-detail">${boutons}</div>`;
 }
 
 // Liste des falaises desservies par un parking, regroupées par sommet (nom).
@@ -270,7 +285,7 @@ function champLiensFalaises(falaises) {
   // un fait unique) : le libellé reste seul sur sa ligne, la liste suit en
   // pleine largeur en dessous, en flux (plusieurs sommets courts peuvent
   // partager une ligne plutôt que d'en forcer chacun une).
-  return `<div class="info-ligne"><span class="info-label">Falaises</span></div><div class="falaises-detail">${groupes}</div>`;
+  return `<div class="info-ligne"><span class="info-label">Falaises</span></div><div class="liens-detail">${groupes}</div>`;
 }
 
 // Histogramme "1 case = 1 voie" par cotation. Remplace le 1er jet (nuage en

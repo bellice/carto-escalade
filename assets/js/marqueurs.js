@@ -53,9 +53,21 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     visuel.style.background = 'var(--ink)';
     visuel.style.transform = 'rotate(45deg)'; // losange : se distingue des ronds falaise/parking
   } else if (cat === 'parking') {
+    // Carré (pas un rond) : la catégorie falaise/parking/gîte est une
+    // variable nominale, codée par la FORME (Bertin) — la couleur seule
+    // (teal) ne suffisait pas, d'autant qu'elle change déjà de sens sur les
+    // falaises selon le mode "Cercles" actif, donc pas un repère stable.
+    // "P" à l'intérieur (pas un simple carré uni) : un carré tout court
+    // aurait pu se confondre, dans le modèle mental de l'utilisateur, avec
+    // les carrés de l'histogramme de voies (popup falaise, "1 carré = 1
+    // voie") — une signification totalement différente sous la même forme.
+    // Le "P" lève l'ambiguïté ET reste cohérent avec "texte plutôt
+    // qu'icône" (aucun pictogramme nulle part sur ce site) : une lettre est
+    // un texte, pas une icône.
     poserTailleMarqueur(el, visuel, 22);
-    visuel.style.borderRadius = '50%';
+    visuel.style.borderRadius = 'var(--radius)';
     visuel.style.background = 'var(--teal)';
+    visuel.textContent = 'P';
   } else {
     visuel.style.borderRadius = '50%'; // taille + couleur posées par dessinerFalaise() ci-dessous
   }

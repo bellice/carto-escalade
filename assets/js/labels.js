@@ -13,18 +13,16 @@ function construireGeojsonSites(geojson) {
     const p = f.properties;
     if (p.categorie !== 'falaise' || !p.site) return;
     const [lon, lat] = f.geometry.coordinates;
-    if (!groupes.has(p.site)) groupes.set(p.site, { sumLon: 0, sumLat: 0, n: 0 });
+    if (!groupes.has(p.site)) groupes.set(p.site, { sumLon: 0, sumLat: 0, n: 0, nbVoies: 0 });
     const g = groupes.get(p.site);
     g.sumLon += lon; g.sumLat += lat; g.n += 1;
+    g.nbVoies += p.nb_voie_total ?? 0;
   });
-  return {
-    type: 'FeatureCollection',
-    features: Array.from(groupes, ([site, g]) => ({
-      type: 'Feature',
-      properties: { site },
-      geometry: { type: 'Point', coordinates: [g.sumLon / g.n, g.sumLat / g.n] },
-    })),
-  };
+  return Array.from(groupes, ([site, g]) => ({
+    site,
+    nbVoies: g.nbVoies,
+    coordinates: [g.sumLon / g.n, g.sumLat / g.n],
+  })).sort((a, b) => b.nbVoies - a.nbVoies);
 }
 
 // Noms de site affichés par défaut, en marqueurs DOM (pas une couche GL,
@@ -34,26 +32,26 @@ function construireGeojsonSites(geojson) {
 // derrière un figuré ponctuel dès qu'il le chevauchait. En DOM, on récupère
 // l'empilement standard : ajoutés après les marqueurs falaise/parking/gîte
 // (voir l'appel dans carte.js), ils passent naturellement au-dessus.
-// Contrepartie assumée : pas de moteur de décollision automatique entre eux
-// (comme le ferait une couche GL) — un non-problème ici, seulement une
-// dizaine de sites répartis sur tout le département.
+// nbVoies sert de priorité d'affichage (voir appliquerAntiCollisionSites
+// dans carte.js) : en cas de conflit à l'écran, le site le plus fourni
+// l'emporte — une vraie décollision au pixel est appliquée (même algorithme
+// que pour les secteurs, voir appliquerAntiCollision dans carte.js).
 //
 // Cliquables (cadrage sur l'étendue du site, voir onClicSite) : ils
 // redeviennent donc réceptifs aux clics, ce qui peut occasionnellement
 // intercepter un clic destiné à un marqueur juste en dessous s'ils se
-// chevauchent pile — accepté pour la même raison que ci-dessus (peu de
-// sites, chevauchement pile au pixel près improbable en pratique).
+// chevauchent pile — accepté (peu de sites, chevauchement pile au pixel
+// près improbable en pratique).
 //
-// Renvoie {el, site} par site (pas juste les éléments) : appliquerVisibiliteSites
-// (carte.js) en a besoin pour masquer l'étiquette d'un site qui n'a plus
-// aucune falaise visible sous le mode "Cercles"/la recherche courants — sans
-// ça, un thème vidant entièrement un site (ex. "Grande voie" sur un site
-// 100% couenne) laissait son nom affiché seul, sans plus aucun marqueur en
-// dessous à quoi il puisse renvoyer.
+// Renvoie {el, marker, site} par site (pas juste les éléments) :
+// appliquerAntiCollisionSites (carte.js) a besoin de la position de chaque
+// marqueur pour son anti-collision à l'écran, en plus de masquer l'étiquette
+// d'un site qui n'a plus aucune falaise visible sous le mode "Cercles"/la
+// recherche courants — sans ça, un thème vidant entièrement un site (ex.
+// "Grande voie" sur un site 100% couenne) laissait son nom affiché seul,
+// sans plus aucun marqueur en dessous à quoi il puisse renvoyer.
 export function ajouterLabelsSites(map, geojson, onClicSite) {
-  const sitesGeojson = construireGeojsonSites(geojson);
-  return sitesGeojson.features.map((f) => {
-    const site = f.properties.site;
+  return construireGeojsonSites(geojson).map(({ site, coordinates }) => {
     const el = document.createElement('div');
     el.className = 'label-site';
     el.textContent = site;
@@ -68,10 +66,10 @@ export function ajouterLabelsSites(map, geojson, onClicSite) {
         activer();
       }
     });
-    new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 2] })
-      .setLngLat(f.geometry.coordinates)
+    const marker = new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 2] })
+      .setLngLat(coordinates)
       .addTo(map);
-    return { el, site };
+    return { el, marker, site };
   });
 }
 
