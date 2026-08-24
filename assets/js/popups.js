@@ -403,6 +403,15 @@ function champVoiesBeeswarm(voiesSportives, total, sportive, autres) {
   // par case) : le détail au tap sur une voie est reporté à une itération
   // future, annoncer individuellement jusqu'à plusieurs dizaines de cases
   // n'aiderait personne pour l'instant.
+  //
+  // TODO (en attente, pas de décision) : rendre chaque case cliquable pour
+  // afficher nom/cotation/nb_longueur en popup secondaire. Valeur incertaine
+  // à trancher avant de coder : utile sur les falaises à noms de voie
+  // distinctifs (ex. "ALINÉA"), quasi nul sur celles à voies numérotées
+  // ("1", "10"... — vieux topo). Et sans lien par voie vers un site
+  // communautaire (seul lien_oblyk/lien_camptocamp existe, au niveau
+  // falaise — voir donnees.js), le popup resterait pauvre. Ne pas
+  // implémenter tant que ce calcul valeur/coût n'a pas été retranché.
   const histo = `
     <div class="voies-histo" role="img" aria-label="Répartition des ${voiesSportives.length} voies sportives par cotation${nonCotees.length ? `, dont ${nonCotees.length} non côtées` : ''}">
       ${colonnesHtml}

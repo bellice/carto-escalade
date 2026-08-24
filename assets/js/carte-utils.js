@@ -1,8 +1,6 @@
 // carte-utils.js — utilitaires de cadrage caméra et de contrôle carte,
 // indépendants des marqueurs/popups.
 
-import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
-
 // Réserve la place occupée par le header + la recherche (haut) et la légende
 // (bas), pour qu'un marqueur centré ou un cadrage ajusté ne finisse pas
 // caché dessous. Padding asymétrique passé à flyTo/fitBounds.
@@ -61,32 +59,20 @@ export function reinitialiserPadding(map) {
   map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
 }
 
-export function fitToMarkers(map, geojson) {
-  if (!geojson.features.length) return null;
-  const bounds = new maplibregl.LngLatBounds();
-  geojson.features.forEach(f => bounds.extend(f.geometry.coordinates));
-  reinitialiserPadding(map);
-  map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 15 });
-  // Attend la fin de l'animation (moveend) plutôt que de calculer la limite
-  // tout de suite : voir limiterZoneCarte ci-dessous, qui a besoin de la vue
-  // RÉELLEMENT obtenue après cadrage (zoom compris), pas de l'étendue brute
-  // des marqueurs seule.
-  map.once('moveend', () => limiterZoneCarte(map));
-  return bounds;
-}
-
 // Empêche de dériver la carte loin de la sortie (Allemagne, Asie...) en
 // glissant/zoomant : verrouille le pan/zoom à une marge autour de la vue
-// obtenue par fitToMarkers. Calculée à partir de map.getBounds() (la vue
-// RÉELLEMENT visible une fois le cadrage terminé, padding+zoom déjà
-// appliqués) plutôt que de l'étendue brute des marqueurs avec un facteur
-// fixe — un facteur fixe doit deviner à l'avance de combien fitBounds va
-// zoomer en arrière pour compenser le padding demandé (voir margeToutVoir),
-// et peut devenir trop serré si ce padding grandit (ex. légende qui
-// s'allonge) sans que quiconque pense à le remonter ; en partant de la vue
-// déjà obtenue, la marge reste toujours cohérente avec ce qui est
+// initiale. Calculée à partir de map.getBounds() (la vue RÉELLEMENT visible,
+// padding+zoom déjà appliqués) plutôt que de l'étendue brute des marqueurs
+// avec un facteur fixe — un facteur fixe doit deviner à l'avance de combien
+// le cadrage va zoomer en arrière pour compenser le padding demandé (voir
+// margeToutVoir), et peut devenir trop serré si ce padding grandit (ex.
+// légende qui s'allonge) sans que quiconque pense à le remonter ; en partant
+// de la vue déjà obtenue, la marge reste toujours cohérente avec ce qui est
 // effectivement affiché, quel que soit le padding utilisé.
-function limiterZoneCarte(map) {
+// Appelée juste après la création de la carte : le cadrage initial est passé
+// au constructeur (bounds + fitBoundsOptions, voir carte.js), il n'y a donc
+// plus de moveend à attendre pour poser ces limites.
+export function limiterZoneCarte(map) {
   const vue = map.getBounds();
   const sw = vue.getSouthWest();
   const ne = vue.getNorthEast();
