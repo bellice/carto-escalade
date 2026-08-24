@@ -47,27 +47,12 @@ export function indexerParkingInfos(geojson) {
   return infos;
 }
 
-// "Voies faciles" (≤ 6a+) : depuis la disparition de nb_voies_cot5/cot6a
-// (couvraient uniquement les grades 5 et 6a/6a+, angle mort documenté sur
-// les voies encore plus faciles en 3/4), dérivé directement de la cotation
-// réelle de chaque voie — corrige cet angle mort au passage.
-const SEUIL_FACILE = cotationVersValeur('6a+');
-
-// nb_couenne/nb_gv n'existent plus comme champs source : reconstruits à
-// partir du détail voies_sportives (type_voie ne prend que "couenne" ou
-// "grande voie" dans les vraies données). Source unique, réutilisée par
-// calculerMaxima ci-dessous ET par la construction de "entree" dans
-// marqueurs.js — pas de logique dupliquée entre les deux.
-export function compterVoiesSportivesParType(voiesSportives) {
-  let couenne = 0, grandeVoie = 0, faciles = 0;
-  (voiesSportives || []).forEach(v => {
-    if (v.type_voie === 'couenne') couenne++;
-    else if (v.type_voie === 'grande voie') grandeVoie++;
-    const val = cotationVersValeur(v.cotation);
-    if (val != null && val <= SEUIL_FACILE) faciles++;
-  });
-  return { couenne, grandeVoie, faciles };
-}
+// nb_couenne/nb_gv/nb_faciles ne sont PLUS calculés ici : précalculés à la
+// GÉNÉRATION (voir scripts/export_geojson.py, repo escalade — le SQL y doit
+// rester le miroir de ce que cotationVersValeur + la règle "facile ≤ 6a+"
+// produisaient côté client). Ça permet de ne pas embarquer le détail
+// voies_sportives dans le fichier web principal (chargé à la demande dans
+// les popups, voir marqueurs.js) — c'était ~70% du poids du geojson.
 
 // Temps de trajet EN VOITURE gîte -> parking, par le meilleur parking
 // associé à chaque falaise (trajet_gite_min, sur la feature parking) —
@@ -117,10 +102,9 @@ export function calculerMaxima(geojson) {
     if (f.properties.categorie !== 'falaise') return;
     const p = f.properties;
     totaux.push(p.nb_voie_total || 0);
-    const compte = compterVoiesSportivesParType(p.voies_sportives);
-    couennes.push(compte.couenne);
-    gvs.push(compte.grandeVoie);
-    faciles.push(compte.faciles);
+    couennes.push(p.nb_couenne || 0);
+    gvs.push(p.nb_gv || 0);
+    faciles.push(p.nb_faciles || 0);
   });
   return {
     total: Math.max(0, ...totaux), totalMedian: mediane(totaux),
@@ -154,8 +138,8 @@ export function cotationVersValeur(cotation) {
 // En mode thématique (tout sauf "aucun"), une falaise sans donnée pour la
 // grandeur affichée (0 ou absente) n'a rien à montrer sur ce thème : un
 // petit cercle laisserait croire à une petite quantité plutôt qu'à une
-// absence. Utilisée à la fois pour masquer le marqueur (dessinerFalaise,
-// symboles.js) et pour exclure ces falaises de la cascade de visibilité des
+// absence. Utilisée à la fois pour exclure ces falaises de la SOURCE native
+// (construireSourceFalaises, symboles.js) et de la cascade de visibilité des
 // parkings (appliquerFiltres, carte.js) — sinon un parking reste affiché
 // seul, sans qu'aucune falaise visible ne justifie sa présence sur ce thème.
 export function estFalaiseVideDansMode(entree, mode) {
@@ -165,13 +149,8 @@ export function estFalaiseVideDansMode(entree, mode) {
   return false;
 }
 
-// Lit l'état réel du DOM plutôt que de refaire le calcul (mode + recherche) :
-// deux mécanismes indépendants peuvent masquer un marqueur falaise — la
-// classe marqueur-invisible (dessinerFalaise, piloté par le mode "Cercles")
-// et le style.display (appliquerFiltres, piloté par la recherche/sélection).
-// Utilisée par appliquerAntiCollisionSecteurs pour ne garder un libellé de
-// secteur que s'il lui reste au moins un figuré ponctuel visible en dessous.
-export function falaiseVisible(entree) {
-  const el = entree.marker.getElement();
-  return !el.classList.contains('marqueur-invisible') && el.style.display !== 'none';
-}
+// NOTE : l'ancienne fonction falaiseVisible (lecture du DOM d'un marqueur)
+// a été retirée à la Phase 3 — les falaises sont rendues en couche native
+// (source "falaises"), sans marqueur DOM. La logique équivalente vit
+// désormais dans carte.js sous le nom entreeVisible() (Set falaisesVisibles
+// maintenu par appliquerFiltres).

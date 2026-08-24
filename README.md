@@ -6,7 +6,9 @@ Site statique minimaliste : une carte par sortie (falaises + parkings), pas de b
 
 ```
 index.html          → page d'accueil, liste des sorties
-sw.js                → service worker (cache hors-ligne, voir plus bas)
+sw.js                → service worker : pré-cache de la coquille + cache-first
+                       local + stale-while-revalidate pour les données +
+                       cache-first pour les tuiles du fond (voir "Hors-ligne")
 assets/
   style.css          → tokens (palette, polices) + page d'accueil uniquement
   style-carte.css    → marqueurs, popups, légende, feuille mobile, impression
@@ -16,17 +18,41 @@ assets/
                        aucun bundler) — chargés via <script type="module">
     carte.js         → point d'entrée : initCarte(dataUrl), orchestration
     carte-utils.js   → cadrage caméra, contrôle "Tout voir"
-    marqueurs.js     → création des marqueurs falaise/parking/gîte
+    marqueurs.js     → marqueurs DOM parking/gîte + popup native des falaises
     popups.js        → HTML des popups (rose des vents, beeswarm des voies, GPS...)
-    symboles.js      → cercles proportionnels (taille, remplissage, légende)
+    symboles.js      → cercles proportionnels : construireSourceFalaises +
+                       couleurFalaisePourMode (couche native), légende
     labels.js        → libellés de site/secteur sur la carte
     donnees.js       → lecture GeoJSON, agrégats, prédicats de visibilité
     utils.js         → escapeHtml
 sorties/
   2026-10-drome-saou/
     index.html       → page carte de cette sortie
-    data.geojson     → falaises + parkings (généré depuis une base DuckDB)
+    data.geojson     → falaises + parkings, version LÉGÈRE (sans le détail des
+                       voies, compteurs précalculés) — généré depuis une base DuckDB
+    routes/          → détail des voies, 1 fichier par falaise (chargé à la
+                       demande à l'ouverture de sa popup)
 ```
+
+`maplibre-gl` 6.4.1 est chargé depuis le CDN jsDelivr (pas vendu en local —
+voir « Hors-ligne » pour la raison) mais **pré-caché par le service worker**.
+
+## Rendu des falaises (couche native, phase 3)
+
+Les falaises ne sont **pas** des marqueurs DOM mais une **couche MapLibre**
+(`circle` data-driven, source geojson `falaises` avec `promoteId: 'cle'`) :
+rendu GPU, conçu pour passer à l'échelle (milliers de falaises). La source
+est reconstruite par `construireSourceFalaises()` (symboles.js) — tri par
+valeur décroissante, exclusion des falaises vidées par le mode « Cercles » —
+et les filtres recherche/gîte passent par `map.setFilter`. La surbrillance
+(estompage des autres falaises quand une popup est ouverte) utilise
+`setFeatureState` (`circle-opacity` data-driven). Parkings et gîte restent
+des marqueurs DOM ; les falaises se dessinent donc SOUS eux (même ordre de
+lecture qu'avant).
+
+Trade-off assumé : les falaises ne sont plus focusables au clavier (canvas
+MapLibre) — la recherche (champ « Rechercher une falaise ») reste le chemin
+clavier pour y naviguer.
 
 ## Déployer sur GitHub Pages
 
@@ -43,10 +69,18 @@ serveur — hors de portée d'un site statique gratuit.
 ## Répliquer pour une nouvelle sortie
 
 1. Dupliquer `sorties/2026-10-drome-saou/` en `sorties/AAAA-MM-lieu/`.
-2. Remplacer `data.geojson` par l'export de la nouvelle sortie
-   (voir schéma de champs plus bas).
+2. Depuis le repo de génération (voir plus bas), lancer l'export puis la
+   copie vers ce repo :
+   `uv run scripts/export_geojson.py` puis `uv run scripts/copy_to_site.py --sortie AAAA-MM-lieu`
+   — ça remplace `data.geojson` (version légère, sans le détail des voies)
+   ET le dossier `routes/` (détail par falaise, chargé à la demande).
 3. Ajouter une entrée dans la liste de `index.html` (racine).
 4. `initCarte('data.geojson')` reste inchangé — aucune autre modif de code requise.
+
+La génération vit dans un repo séparé (`escalade/` : base DuckDB +
+`scripts/export_geojson.py`) ; ce repo-ci ne fait que servir les exports.
+`data.readable.geojson` (détail des voies inclus, pour référence humaine)
+reste dans `data/web/` du repo de génération, pas ici.
 
 ## Schéma `data.geojson`
 
@@ -68,9 +102,9 @@ d'abord plutôt que supposer qu'une clé existe.
 `parking_associe`/`approche_min`/`approche_metre` (tableaux, alignés
 position à position — même à 1 seul parking), `nb_voie_total`,
 `nb_voie_sportive`, `nb_voie_autres` (invariant : total = sportive + autres),
-`voies_sportives` (tableau détaillé, une entrée par voie : `nom`, `cotation`,
-`type_voie` — "couenne" ou "grande voie" —, `nb_longueur`, `source_id` ;
-`cotation` = celle de la longueur la plus dure).
+`nb_couenne`, `nb_gv`, `nb_faciles` (compteurs **précalculés** à la
+génération — voir `export_geojson.py` ; le client ne les calcule plus), et
+`routes` (id_falaise si la falaise a des voies sportives, sinon `null`).
 
 Une feature par **secteur**, pas par sommet : un même `nom` (sommet) peut
 apparaître plusieurs fois, une fois par `secteur`. `nom` seul n'est donc plus
@@ -80,10 +114,15 @@ unique : les deux valeurs sont identiques dans les données, pas de doublon
 affiché). `site` est le regroupement géographique le plus large (ex. "Saoû I") ;
 sert aussi à générer le badge affiché sur la popup des parkings associés.
 
-Pas de champs `nb_couenne`/`nb_gv`/`nb_voies_cotX`/`cotation_min`/`cotation_max` :
-la carte les dérive côté client depuis `voies_sportives` (voir
-`compterVoiesSportivesParType` et `calculerBornesCotationGlobales` dans
-`donnees.js`) plutôt que de les attendre pré-calculés dans les données.
+Le détail des voies (`voies_sportives`, une entrée par voie : `nom`,
+`cotation`, `type_voie` — "couenne" ou "grande voie" —, `nb_longueur`,
+`source_id` ; `cotation` = celle de la longueur la plus dure) n'est PAS dans
+`data.geojson` : il représentait ~70 % du poids historique du fichier, pour
+un usage uniquement à l'ouverture de la popup d'une falaise. Il est généré à
+part dans `routes/<id_falaise>.json` et chargé à la demande (voir
+`marqueurs.js`, `popup.on('open')`), avec un cache en mémoire pour les
+réouvertures. La version lisible complète est `data.readable.geojson` (repo
+de génération).
 
 **Parking**
 `nom`, `categorie` ("parking"), `trajet_gite_min`
@@ -105,30 +144,63 @@ CRS : **EPSG:4326** obligatoire.
 
 ## Hors-ligne (déjà actif)
 
-`sw.js` met en cache chaque page/requête au fur et à mesure qu'elle est
-chargée avec du réseau (stratégie "réseau d'abord, cache en secours") : si tu
-ouvres une sortie une fois en wifi/4G avant de partir, elle reste consultable
-sans réseau ensuite — y compris les tuiles de fond de carte déjà affichées.
-Zéro configuration, mais ça ne couvre que ce qui a été vu au moins une fois ;
-pour un fond de carte garanti disponible partout dès le premier chargement
-offline, voir la section PMTiles ci-dessous.
+`sw.js` applique une stratégie par type de ressource :
 
-## Passer en offline total (PMTiles)
+- **Coquille** (pages, CSS, JS, `maplibre-gl`, `data.geojson`) : **pré-cachée
+  à l'install** puis servie en **cache-first** → l'app (HTML, JS, styles,
+  données, lib de carte) démarre **offline dès la première ouverture**.
+- **`maplibre-gl` reste servi par le CDN** (et non vendu en local) : le build
+  ESM 6.4.1 ne charge pas ses tuiles vectorielles quand il est servi depuis le
+  **même domaine** que la page (constaté en test : `styleLoaded` reste faux,
+  aucune tuile demandée — alors que le même code servi cross-origin fonctionne).
+  Pour ne pas perdre l'offline de la lib, ses 4 fichiers (`.mjs`, `-shared`,
+  `-worker`, `.css`) sont **ajoutés au pré-cache** du service worker : ils
+  sont donc disponibles hors-ligne dès l'install, sans dépendre du CDN au
+  moment de l'usage.
+- **`routes/<id>.json`** (détail des voies) : **pré-cachés à l'install** (les
+  identifiants sont lus depuis `data.geojson` — total ~170 Ko par sortie),
+  puis servis en **stale-while-revalidate** : l'histogramme d'une fiche sort
+  du cache instantanément, sans aller-retour réseau (important en contexte
+  faible réseau), même à la première ouverture.
+- **Tuiles / fond de carte** (OpenFreeMap, cross-origin) : **cache d'abord**
+  → les tuiles sont versionnées (immuables, le numéro de modèle est dans
+  l'URL) : une fois affichées, elles sont servies du cache **instantanément
+  et sans bande passante** aux visites suivantes (l'objectif premier du site,
+  contexte réseau faible). Le style du fond seul est rafraîchi en arrière-plan
+  (petit fichier, il porte le modèle du jour). L'offline couvre ce qui a déjà
+  été affiché en ligne.
 
-Actuellement la carte charge le fond de plan depuis
-[OpenFreeMap](https://openfreemap.org) (vecteur, libre, gratuit, sans clé) —
-ça nécessite du réseau au premier chargement.
+Quand une sortie est mise à jour (nouveau `data.geojson`, `routes/`), il faut
+**bumper `CACHE_NAME`** dans `sw.js` pour forcer le renouvellement du cache,
+et re-pré-cacher la coquille.
 
-Pour un fond de carte 100% local :
+> **Dev avec Vite** : le service worker est volontairement désactivé (et
+> désenregistré) quand la page est servie par Vite — son cache-first
+> renverrait des ressources déjà transformées par Vite (html-proxy, modules
+> réécrits) et casserait le chargement. Pour tester le comportement offline,
+> servez le dossier avec un serveur statique simple (`python -m http.server`)
+> ou directement le site déployé.
 
-1. Générer un `.pmtiles` pour la zone avec [`tippecanoe`](https://github.com/felt/tippecanoe)
-   ou le [convertisseur PMTiles](https://github.com/protomaps/PMTiles) à partir
-   d'un extrait OpenStreetMap (via [Protomaps builds](https://maps.protomaps.com/builds/)
-   par exemple).
-2. Déposer le fichier dans le dossier de la sortie (`sorties/.../tuiles.pmtiles`).
-3. Dans `assets/js/carte.js`, remplacer la ligne `style:` de `initCarte()` par
-   une source PMTiles locale (ajouter le protocole `pmtiles://` via
-   [`pmtiles-maplibre`](https://github.com/protomaps/PMTiles/tree/main/js)).
+## Fond de carte : bande passante, pas PMTiles
 
-Le reste du code (marqueurs, popups, filtres) ne change pas — seul le fond
-de carte devient local.
+Le fond de plan vient d'[OpenFreeMap](https://openfreemap.org) (vecteur,
+libre, gratuit, sans clé), schéma OpenMapTiles — le style `positron` est
+localisé dans le pré-cache du service worker.
+
+Le premier chargement d'une zone nécessite du réseau (les tuiles de la zone
+sont téléchargées puis mises en cache par le service worker) ; ensuite elles
+sont servies **du cache, sans aucun octet réseau** — le principal levier de
+bande passante du site (objectif : contexte réseau faible en falaise).
+
+**Pourquoi pas un fond 100% local en PMTiles ?** Évalué (phase 4) et écarté
+pour l'instant :
+- OpenFreeMap ne publie **pas** de PMTiles (le planète complet en MBTiles
+  fait ~90 Go) ; les extraits OpenMapTiles passent par MapTiler (payant).
+- OSM (schéma `shortbread`) et IGN (tuiles avec clé, schéma propre) ne sont
+  pas compatibles avec le style `positron` existant → le rendu changerait.
+- Protomaps fournit des PMTiles régionaux, mais avec son propre schéma →
+  même contrainte de refonte du style.
+
+Si le vrai offline total devenait un jour nécessaire, la piste serait un
+PMTiles régional Protomaps + un style adapté à son schéma — un changement de
+rendu assumé, à trancher le moment venu.

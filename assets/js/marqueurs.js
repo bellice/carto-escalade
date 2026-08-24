@@ -2,9 +2,14 @@
 // DOM, accessibilité, popup attachée, gestion d'ouverture/fermeture.
 
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
-import { cleFalaise, libelleFalaise, secteurDistinct, compterVoiesSportivesParType } from './donnees.js';
-import { poserTailleMarqueur, dessinerFalaise } from './symboles.js';
-import { popupFalaise, popupParking, popupGite } from './popups.js';
+import { cleFalaise, libelleFalaise, secteurDistinct } from './donnees.js';
+import { poserTailleMarqueur } from './symboles.js';
+import { popupFalaise, popupParking, popupGite, construireHistogramme } from './popups.js';
+
+// Détail des voies (routes/<id>.json, généré par DuckDB) chargé à la demande
+// à l'ouverture de la popup : mis en cache en mémoire pour les réouvertures,
+// et pris en charge par le service worker pour l'offline après une 1ère vue.
+const cacheVoiesParFalaise = new Map();
 
 // Met à jour l'état visuel/accessible de la poignée (aria-expanded,
 // aria-label, texte Réduire/Agrandir) à partir d'un booléen "réduit" —
@@ -20,12 +25,29 @@ export function synchroniserPoignee(poignee, reduire) {
   if (spanTexte) spanTexte.textContent = texte;
 }
 
-export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, estFicheReduite) {
+export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, estFicheReduite, urlRoute) {
   const p = feature.properties;
   const [lon, lat] = feature.geometry.coordinates;
   const cat = p.categorie;
   const cle = cat === 'falaise' ? cleFalaise(p) : p.nom;
   const parkingAssocie = cat === 'falaise' ? (p.parking_associe || []) : [];
+
+  if (cat === 'falaise') {
+    // Falaises : rendu en COUCHE NATIVE (source "falaises", voir carte.js) —
+    // pas de marqueur DOM ni de popup attachée. La popup est ouverte à la
+    // demande (clic sur la couche, navigation), voir ouvrirPopupFalaise. On
+    // garde compteurs/libellés pour la recherche, les filtres, l'anti-
+    // collision des libellés et le lazy-load des voies.
+    return {
+      cat, cle, nom: p.nom, secteur: secteurDistinct(p), lon, lat,
+      parkingAssocie, p,
+      recherche: libelleFalaise(p).toLowerCase(),
+      nbVoies: p.nb_voie_total ?? 0,
+      nbFaciles: p.nb_faciles ?? 0,
+      nbGrandeVoie: p.nb_gv ?? 0,
+      nbCouenne: p.nb_couenne ?? 0,
+    };
+  }
 
   // "el" est la zone tactile (taille garantie par poserTailleMarqueur, voir
   // plus bas) — MapLibre réécrit intégralement son style.transform à chaque
@@ -68,9 +90,10 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     visuel.style.borderRadius = 'var(--radius)';
     visuel.style.background = 'var(--teal)';
     visuel.textContent = 'P';
-  } else {
-    visuel.style.borderRadius = '50%'; // taille + couleur posées par dessinerFalaise() ci-dessous
   }
+  // NOTE : pas de branche "falaise" ici — les falaises sont rendues en couche
+  // native MapLibre (voir le retour anticipé de addMarker, plus haut) ; à ce
+  // stade cat n'est plus que "parking" ou "hebergement".
 
   const popupHtml =
     cat === 'falaise' ? popupFalaise(p, lat, lon, cle) :
@@ -139,6 +162,31 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     } else {
       enSurbrillance([cle]);
     }
+
+    // Détail des voies chargé à la demande (routes/<id>.json, généré par
+    // DuckDB) : le fichier web principal ne contient plus voies_sportives —
+    // on ne télécharge le détail d'une falaise que si on ouvre sa fiche, une
+    // seule fois (relu ensuite dans cacheVoiesParFalaise).
+    const placeholder = elPopupOuverture && elPopupOuverture.querySelector('[data-route]');
+    if (placeholder && urlRoute) {
+      const id = placeholder.dataset.route;
+      if (cacheVoiesParFalaise.has(id)) {
+        placeholder.innerHTML = cacheVoiesParFalaise.get(id);
+      } else {
+        fetch(urlRoute(id))
+          .then(r => r.json())
+          .then(data => {
+            const html = construireHistogramme(data.voies_sportives || []);
+            cacheVoiesParFalaise.set(id, html);
+            // La popup peut avoir été refermée ou réutilisée entre-temps :
+            // on n'écrit que si ce placeholder est toujours dans le DOM.
+            if (placeholder.isConnected) placeholder.innerHTML = html;
+          })
+          .catch(() => {
+            if (placeholder.isConnected) placeholder.remove();
+          });
+      }
+    }
   });
   popup.on('close', () => {
     // Fermeture potentiellement "périmée" : si une AUTRE popup s'est déjà
@@ -160,20 +208,78 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     // popups et doit au contraire survivre à cette fermeture.
   });
 
-  const { couenne, grandeVoie, faciles } = compterVoiesSportivesParType(p.voies_sportives);
-  const secteur = cat === 'falaise' ? secteurDistinct(p) : null;
-  const rechercheTexte = cat === 'falaise' ? libelleFalaise(p).toLowerCase() : p.nom.toLowerCase();
-
+  // Compteurs précalculés à la génération (voir export_geojson.py) — plus de
+  // scan du détail des voies côté client (elles ne sont plus dans le fichier
+  // principal, chargées à la demande dans la popup).
+  // Ici, cat est forcément "parking" ou "hebergement" (les falaises sont
+  // rendues en couche native — voir le retour anticipé plus haut).
   const entree = {
-    marker, cat, nom: p.nom, secteur, cle, recherche: rechercheTexte,
+    marker, cat, nom: p.nom, secteur: null, cle, recherche: p.nom.toLowerCase(),
     parkingAssocie,
     nbVoies: p.nb_voie_total ?? 0,
-    nbFaciles: faciles,
-    nbGrandeVoie: grandeVoie,
-    nbCouenne: couenne,
+    nbFaciles: 0, nbGrandeVoie: 0, nbCouenne: 0,
   };
 
-  if (cat === 'falaise') dessinerFalaise(entree, 'aucun', maxima);
-
   return entree;
+}
+
+// Ouvre la popup d'une falaise (couche native) au clic/navigation. Reprend
+// exactement le comportement de l'ancienne popup attachée au marqueur DOM :
+// sélection + surbrillance (falaise <-> parkings), synchronisation de la
+// fiche repliée/dépliée, lazy-load du détail des voies (routes/<id>.json).
+export function ouvrirPopupFalaise(map, entree, ctx) {
+  const { enSurbrillance, onSelectionFalaise, suivrePopup, estFicheReduite, urlRoute } = ctx;
+  const popup = new maplibregl.Popup({ offset: 14 })
+    .setLngLat([entree.lon, entree.lat])
+    .setHTML(popupFalaise(entree.p, entree.lat, entree.lon, entree.cle));
+
+  // ATTENTION : les listeners 'open'/'close' doivent être posés AVANT
+  // addTo(map) — MapLibre déclenche 'open' de façon synchrone à la fin
+  // d'addTo ; les poser après ferait rater l'événement (pas de surbrillance,
+  // pas de lazy-load des voies, pas de suivi de popup).
+  popup.on('open', () => {
+    if (suivrePopup) suivrePopup(popup, true);
+    document.body.classList.add('fiche-ouverte');
+    const elPopup = popup.getElement();
+    const contenu = elPopup && elPopup.querySelector('.maplibregl-popup-content');
+    const poignee = elPopup && elPopup.querySelector('.poignee-fiche');
+    if (contenu) {
+      const reduire = Boolean(estFicheReduite && estFicheReduite());
+      contenu.style.transition = 'none';
+      contenu.classList.toggle('fiche-reduite', reduire);
+      contenu.offsetHeight;
+      contenu.style.transition = '';
+      if (poignee) synchroniserPoignee(poignee, reduire);
+    }
+    if (onSelectionFalaise) onSelectionFalaise(entree.cle);
+    enSurbrillance([entree.cle, ...entree.parkingAssocie]);
+
+    // Détail des voies chargé à la demande (voir la version marqueur DOM).
+    const placeholder = elPopup && elPopup.querySelector('[data-route]');
+    if (placeholder && urlRoute) {
+      const id = placeholder.dataset.route;
+      if (cacheVoiesParFalaise.has(id)) {
+        placeholder.innerHTML = cacheVoiesParFalaise.get(id);
+      } else {
+        fetch(urlRoute(id))
+          .then(r => r.json())
+          .then(data => {
+            const html = construireHistogramme(data.voies_sportives || []);
+            cacheVoiesParFalaise.set(id, html);
+            if (placeholder.isConnected) placeholder.innerHTML = html;
+          })
+          .catch(() => { if (placeholder.isConnected) placeholder.remove(); });
+      }
+    }
+  });
+  popup.on('close', () => {
+    const popupActive = suivrePopup ? suivrePopup(popup, false) : null;
+    if (!popupActive) {
+      document.body.classList.remove('fiche-ouverte');
+      enSurbrillance(null);
+    }
+  });
+
+  popup.addTo(map);
+  return popup;
 }

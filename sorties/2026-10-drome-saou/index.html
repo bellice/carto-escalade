@@ -17,8 +17,11 @@
        faible, exactement le contexte d'usage visé). Ces indices demandent au
        navigateur de tout récupérer en parallèle dès le départ. crossorigin
        requis pour maplibre-gl.mjs (autre origine) — sans lui, le navigateur
-       le télécharge une seconde fois au moment de l'import réel. -->
+       le télécharge une seconde fois au moment de l'import réel. Les fichiers
+       maplibre sont PRÉ-CACHÉS par le service worker (voir sw.js) : l'offline
+       reste garanti malgré le CDN. -->
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs" crossorigin />
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl-shared.mjs" crossorigin />
   <link rel="modulepreload" href="../../assets/js/carte.js" />
   <link rel="modulepreload" href="../../assets/js/carte-utils.js" />
   <link rel="modulepreload" href="../../assets/js/marqueurs.js" />
@@ -100,8 +103,17 @@
     initCarte('data.geojson');
   </script>
   <script>
+    // Service worker : enregistré SAUF en dev via Vite (voir index.html racine
+    // pour le pourquoi). Ici scope = racine du site (il contrôle aussi
+    // l'accueil et les autres sorties).
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('../../sw.js', { scope: '../../' });
+      const estVite = Array.from(document.querySelectorAll('script[src]'))
+        .some((s) => (s.getAttribute('src') || '').includes('/@vite/'));
+      if (estVite) {
+        navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
+      } else {
+        navigator.serviceWorker.register('../../sw.js', { scope: '../../' });
+      }
     }
   </script>
 </body>
