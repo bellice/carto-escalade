@@ -138,7 +138,15 @@ export function popupFalaise(p, lat, lon, cle) {
 
   if (p.type_roche) rowsCaractere.push(champ('Roche', p.type_roche));
   if (p.nb_voie_total) {
-    rowsCaractere.push(champVoiesBeeswarm(p.voies_sportives || [], p.nb_voie_total, p.nb_voie_sportive ?? 0, p.nb_voie_autres ?? 0));
+    // Synthèse (total/sportives/autres) : disponible directement, elle ne
+    // dépend que des compteurs embarqués dans le fichier principal. La
+    // grille détaillée (histogramme), elle, est chargée à la demande (voir
+    // marqueurs.js, popup.on('open')) : le détail des voies n'est plus dans
+    // data.geojson, il est généré à part par DuckDB (routes/<id>.json).
+    rowsCaractere.push(champVoiesSynthese(p.nb_voie_total, p.nb_voie_sportive ?? 0, p.nb_voie_autres ?? 0));
+    if (p.routes) {
+      rowsCaractere.push(`<div class="voies-histo-placeholder" data-route="${escapeHtml(String(p.routes))}"></div>`);
+    }
   }
   if (p.parking_associe && p.parking_associe.length) {
     const noms = p.parking_associe;
@@ -328,21 +336,52 @@ function approximerCotation(cotation) {
   return null;
 }
 
-function champVoiesBeeswarm(voiesSportives, total, sportive, autres) {
+// Synthèse "Voies" (total + répartition sportives/autres) : n'utilise que les
+// compteurs du fichier principal, pas le détail des voies — affichée tout de
+// suite à l'ouverture de la fiche, pendant que l'histogramme se charge à la
+// demande. "autres" (trad/artificielle) n'est pas détaillé par voie (seul le
+// compte existe dans les données) — pas d'histogramme pour cette part,
+// seulement ce compteur global.
+function champVoiesSynthese(total, sportive, autres) {
   if (!total) return '';
-
-  // --- Synthèse : total + répartition sportives/autres ---
-  // "autres" (trad/artificielle) n'est pas détaillé par voie (seul le compte
-  // existe dans les données) — pas d'histogramme pour cette part, seulement
-  // ce compteur global.
   const pctSportive = Math.round((sportive / total) * 100);
-  const synthese = `
+  return `
     <div class="info-ligne"><span class="info-label">Voies</span><span class="info-valeur voies-total-valeur">${total}</span></div>
     <div class="voies-repartition-barre" role="img" aria-label="${sportive} voies sportives et ${autres} autres sur ${total} au total">
       <span class="voies-repartition-segment sportive" style="width:${pctSportive}%"></span>
       <span class="voies-repartition-segment autres" style="width:${100 - pctSportive}%"></span>
     </div>
     <div class="voies-repartition-texte">${sportive} sportives · ${autres} autres</div>`;
+}
+
+// Histogramme "1 case = 1 voie" par cotation — chargé à la demande (voir
+// marqueurs.js, popup.on('open')) depuis routes/<id>.json : c'est la seule
+// partie du popup qui a besoin de la liste détaillée des voies, donc la
+// seule qui ne vit pas dans le fichier de données principal. Remplace le 1er
+// jet (nuage en miroir sur une échelle 3a→9b fixe et globale) : testé en
+// vrai, une falaise typique ne couvre que 2-3 crans sur les ~39 possibles,
+// donc l'échelle globale compressait ses points dans une toute petite
+// tranche du popup — des cotations voisines finissaient à quelques pixels
+// les unes des autres, illisible (confirmé sur capture d'écran réelle, pas
+// en théorie).
+//
+// Ici, une colonne par cotation RÉELLEMENT présente sur CETTE falaise (pas
+// les ~39 crans possibles) : la largeur du popup reste toujours bien
+// utilisée, quelle que soit l'étendue de la falaise, aucun risque de
+// chevauchement (positions de grille, pas de pixels calculés en continu).
+// Contrepartie assumée : la position d'une colonne n'est plus comparable
+// d'une fiche à l'autre — priorité donnée à la lisibilité individuelle.
+// Best-effort de placement pour 3 formes de cotation non standard mais
+// raisonnablement déductibles — UNIQUEMENT pour positionner une voie sur ce
+// graphique, jamais pour une valeur affichée ailleurs (cotationVersValeur,
+// donnees.js, reste strict — utilisée entre autres pour le mode "Voies
+// faciles" du sélecteur "Cercles", où une estimation n'a pas sa place). Les
+// cases qui en résultent ne sont PAS distinguées visuellement des cotations
+// exactes (essayé, puis retiré : un marquage pour un cas aussi marginal
+// faisait plus de bruit qu'autre chose) — une fois la règle posée, elle
+// s'applique sans réserve affichée.
+export function construireHistogramme(voiesSportives) {
+  if (!voiesSportives || !voiesSportives.length) return '';
 
   // Regroupe par cotation EXACTE (6a et 6a+ n'ont jamais la même colonne).
   // Les voies à cotation non standard (~2,5% des cas réels — anciennes
@@ -371,9 +410,9 @@ function champVoiesBeeswarm(voiesSportives, total, sportive, autres) {
     if (!parCotation.has(label)) parCotation.set(label, { val, voies: [] });
     parCotation.get(label).voies.push(v);
   });
-  // Pas de voie sportive à afficher du tout (falaise 100% trad) : la
-  // synthèse suffit.
-  if (!parCotation.size && !nonCotees.length) return synthese;
+  // Pas de voie sportive à afficher du tout (falaise 100% trad) : rien à
+  // rendre — la synthèse, affichée séparément, suffit.
+  if (!parCotation.size && !nonCotees.length) return '';
 
   const colonnes = Array.from(parCotation.entries())
     .map(([cotation, { val, voies }]) => ({ cotation, val, voies, nonCote: false }))
@@ -418,5 +457,5 @@ function champVoiesBeeswarm(voiesSportives, total, sportive, autres) {
     </div>
     <div class="histo-legende">${legende.join('')}</div>`;
 
-  return `${synthese}${histo}`;
+  return histo;
 }

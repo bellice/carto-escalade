@@ -47,10 +47,11 @@ function calculerRayon(valeur, max) {
 }
 
 // Remplissage représentatif d'un mode (couleur unie). Utilisée à la fois par
-// dessinerFalaise() pour les vrais marqueurs ET par construireLegendeFalaises()
-// pour les cercles de référence : une seule source de vérité, sinon la
-// légende peut afficher une couleur différente de ce qui est réellement sur
-// la carte.
+// couleurFalaisePourMode() (couche native MapLibre — qui résout le var(--...)
+// en hex, MapLibre n'acceptant pas var() dans les expressions de style) et
+// par construireLegendeFalaises() pour les cercles de référence : une seule
+// source de vérité, sinon la légende peut afficher une couleur différente de
+// ce qui est réellement sur la carte.
 //
 // Pas de mode combiné "type de voie" (couenne+grande voie sur un même
 // marqueur) : testé en camembert proportionnel (conic-gradient), retiré —
@@ -90,10 +91,10 @@ export function infosLegendePourMode(mode, maxima) {
 // remplissage suit la même logique : uni / teinte dédiée par sous-catégorie
 // / teinte répartie (grande voie-couenne, catégorielle donc couleur, pas
 // taille).
-// Grandeur affichée par la taille selon le mode "Cercles" courant — factorisé
-// ici (plutôt qu'en dur dans dessinerFalaise) car carte.js en a aussi besoin
-// pour trier les cercles par taille avant de les empiler (voir
-// trierCerclesParTaille), sans dupliquer ce mapping mode -> propriété.
+// Grandeur encodée par la taille selon le mode "Cercles" courant — factorisé
+// ici car carte.js en a aussi besoin (construireSourceFalaises, tri par
+// valeur décroissante dans la source), sans dupliquer ce mapping mode ->
+// propriété.
 export function valeurPourMode(entree, mode) {
   return mode === 'couenne' ? entree.nbCouenne
     : mode === 'gv' ? entree.nbGrandeVoie
@@ -101,25 +102,50 @@ export function valeurPourMode(entree, mode) {
     : entree.nbVoies;
 }
 
-export function dessinerFalaise(entree, mode, maxima) {
-  const el = entree.marker.getElement();
-  const visuel = el.querySelector('.marqueur-visuel');
+// Couleur "plume" d'un mode pour la COUCHE NATIVE MapLibre. remplissagePourMode
+// renvoie un var(--...) : parfait pour le DOM/la légende, mais MapLibre ne
+// résout pas var() dans les expressions de style (circle-color). On lit donc
+// la valeur calculée de la variable une fois (les couleurs sont fixes).
+export function couleurFalaisePourMode(mode) {
+  const nom = remplissagePourMode(mode);
+  if (!nom.startsWith('var(')) return nom;
+  const nomVar = nom.slice(4, -1).trim();
+  return getComputedStyle(document.documentElement).getPropertyValue(nomVar).trim() || '#a8452f';
+}
 
-  const valeur = valeurPourMode(entree, mode);
-
-  const estVide = estFalaiseVideDansMode(entree, mode);
-  el.classList.toggle('marqueur-invisible', estVide); // cache la cible tactile entière
-  if (estVide) return;
-
-  // Échelle commune à tous les modes (maxima.total, jamais le max du thème
-  // affiché) : une même falaise garde une taille comparable d'un mode à
-  // l'autre. Contrepartie assumée pour un thème peu présent au global (ex.
-  // grande voie) : même sa meilleure falaise reste visuellement modeste —
-  // c'est une lecture honnête ("peu présent ici"), pas un défaut.
-  const rayon = calculerRayon(valeur, maxima.total);
-  poserTailleMarqueur(el, visuel, rayon * 2);
-
-  visuel.style.background = remplissagePourMode(mode);
+// Construit la FeatureCollection GeoJSON de la couche native "falaises"
+// (rendu GPU, plus de marqueurs DOM — voir carte.js) : une feature par falaise
+// VISIBLE pour le mode "Cercles" courant (celles vidées par le thème en sont
+// exclues, comme l'ancienne classe marqueur-invisible). Chaque feature porte
+// ce qu'il faut pour le rendu data-driven ET les filtres :
+//  - cle : identifiant stable (promoteId) pour le feature-state (surbrillance)
+//  - r : rayon en px (formule de Flannery, PRÉCALCULÉE — pas d'opérateur
+//    puissance dans les expressions de style)
+//  - valeur : pour l'ordre de dessin et la légende
+//  - recherche : texte bas-de-casse pour le filtre de recherche
+//  - tempsGite : null si inconnu (filtre "Depuis le gîte")
+// Triées par valeur DÉCROISSANTE : le plus petit est peint en dernier (dessus),
+// même règle que l'ancien réordonnancement DOM des cercles.
+export function construireSourceFalaises(entries, mode, maxima) {
+  const features = [];
+  entries.forEach((entree) => {
+    if (entree.cat !== 'falaise') return;
+    if (estFalaiseVideDansMode(entree, mode)) return;
+    const valeur = valeurPourMode(entree, mode);
+    features.push({
+      type: 'Feature',
+      properties: {
+        cle: entree.cle,
+        valeur,
+        r: calculerRayon(valeur, maxima.total),
+        recherche: entree.recherche,
+        tempsGite: entree.tempsGite ?? null,
+      },
+      geometry: { type: 'Point', coordinates: [entree.lon, entree.lat] },
+    });
+  });
+  features.sort((a, b) => b.properties.valeur - a.properties.valeur);
+  return { type: 'FeatureCollection', features };
 }
 
 // Mini-légende à cercles de référence (min / médiane / max de la grandeur
@@ -152,7 +178,7 @@ export function construireLegendeFalaises(max, median, titre, remplissage, simpl
   // ce thème, pour des repères parlants) — mais leur RAYON se calcule sur
   // "echelle" (toujours maxima.total) : même une falaise au max de son
   // thème peut donc rester visuellement modeste si ce thème est peu présent
-  // au global (ex. grande voie) — cohérent avec dessinerFalaise().
+  // au global (ex. grande voie) — cohérent avec construireSourceFalaises().
   const repere = (valeur) => `
     <span class="repere-taille">
       <span class="cercle-repere" style="width:${calculerRayon(valeur, echelle) * 2}px; height:${calculerRayon(valeur, echelle) * 2}px;"></span>

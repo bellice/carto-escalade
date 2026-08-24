@@ -24,8 +24,22 @@
   </div>
 
   <script>
+    // Service worker : enregistré SAUF en dev via Vite. Le SW (pré-cache +
+    // cache-first) est incompatible avec Vite, qui transforme les fichiers à
+    // la volée : il servirait des ressources déjà transformées d'une session
+    // précédente (HTML avec html-proxy, modules réécrits) et la page ne se
+    // chargerait plus. Détecté par la présence de /@vite/client (injecté par
+    // Vite dans chaque page) : on désenregistre alors tout SW résiduel. En
+    // production (GitHub Pages) ou sur un serveur statique simple, le SW
+    // s'enregistre normalement.
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
+      const estVite = Array.from(document.querySelectorAll('script[src]'))
+        .some((s) => (s.getAttribute('src') || '').includes('/@vite/'));
+      if (estVite) {
+        navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
+      } else {
+        navigator.serviceWorker.register('sw.js');
+      }
     }
   </script>
 </body>

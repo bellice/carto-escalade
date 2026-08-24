@@ -6,10 +6,10 @@ import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist
 import { escapeHtml } from './utils.js';
 import {
   indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite,
-  estFalaiseVideDansMode, falaiseVisible, libelleFalaise,
+  estFalaiseVideDansMode, libelleFalaise,
 } from './donnees.js';
-import { dessinerFalaise, valeurPourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
-import { addMarker, synchroniserPoignee } from './marqueurs.js';
+import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
+import { addMarker, ouvrirPopupFalaise, synchroniserPoignee } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
 import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte } from './carte-utils.js';
 
@@ -34,6 +34,27 @@ export function initCarte(dataUrl) {
   // .then, juste avant les contrôles/écouteurs qui en dépendent.
   let map;
 
+  // Détail des voies d'une falaise (routes/<id>.json), à côté du fichier de
+  // données principal dans le dossier de la sortie — charge uniquement la
+  // falaise dont on ouvre la fiche (voir marqueurs.js, popup.on('open')).
+  const baseRoutes = dataUrl.slice(0, dataUrl.lastIndexOf('/') + 1) + 'routes/';
+
+  // Couleur des falaises en vue d'ensemble (ancien .zoom-eloigne) : résolue
+  // depuis le token CSS --clay — MapLibre n'accepte pas var() dans toutes les
+  // expressions de style, on lit la valeur réelle une fois au démarrage.
+  const couleurCss = (nom) => getComputedStyle(document.documentElement).getPropertyValue(nom).trim() || '#a8452f';
+  const COULEUR_ELOIGNE = couleurCss('--clay');
+
+  // Contexte partagé pour ouvrirPopupFalaise (couche native) : mêmes
+  // callbacks que les popups des marqueurs DOM parking/gîte.
+  const ctxPopup = {
+    enSurbrillance,
+    onSelectionFalaise: definirFalaiseSelectionnee,
+    suivrePopup,
+    estFicheReduite: () => ficheReduite,
+    urlRoute: (id) => baseRoutes + id + '.json',
+  };
+
   const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne, tempsGite }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
   let labelsSecteurs = []; // [{el, marker, nom}], peuplé une fois le geojson chargé
@@ -42,6 +63,8 @@ export function initCarte(dataUrl) {
   const entriesParSite = new Map(); // site -> entrees falaise, pour appliquerAntiCollisionSites
   let secteursVisibles = null; // vrai quand les noms de secteur sont affichés (zoom >= ZOOM_LABELS_SECTEUR)
   let sitesVisibles = null; // vrai quand les noms de site sont affichés (zoom < ZOOM_LABELS_SECTEUR) — miroir de secteursVisibles, voir appliquerVisibiliteSites
+  let falaisesVisibles = new Set(); // clés des falaises actuellement affichées (couche native) — voir appliquerFiltres
+  const etatEstompeParCle = new Map(); // dernier état feature-state "estompe" posé par enSurbrillance, pour ne pas re-poser à l'identique
   // tempsMaxGite/tempsGitePlafond : Infinity tant que le slider n'est pas
   // configuré (pas de falaise sans filtre actif avant que les vraies bornes
   // ne soient connues, voir configurerFiltreTemps) — tempsGitePlafond sert
@@ -96,8 +119,29 @@ export function initCarte(dataUrl) {
   function enSurbrillance(cles) {
     const actifs = cles ? new Set(cles) : null;
     entries.forEach((e) => {
-      e.marker.setOpacity((!actifs || actifs.has(e.cle)) ? '1' : '0.25');
+      if (e.cat === 'falaise') {
+        // Couche native : estompe via feature-state (voir circle-opacity dans
+        // construireCoucheFalaises). On ne pose l'état que s'il change : le
+        // feature-state relance la source à chaque appel, à éviter pour des
+        // milliers de falaises.
+        const estompe = Boolean(actifs && !actifs.has(e.cle));
+        if (etatEstompeParCle.get(e.cle) !== estompe) {
+          etatEstompeParCle.set(e.cle, estompe);
+          if (map.getLayer('falaises')) map.setFeatureState({ source: 'falaises', id: e.cle }, { estompe });
+        }
+      } else if (e.marker) {
+        e.marker.setOpacity((!actifs || actifs.has(e.cle)) ? '1' : '0.25');
+      }
     });
+  }
+
+  // Une entrée a-t-elle un figuré ponctuel visible en ce moment ? Pour les
+  // falaises (couche native) on consulte le Set maintenu par appliquerFiltres
+  // — l'ancien falaiseVisible lisait le DOM d'un marqueur qui n'existe plus.
+  function entreeVisible(entree) {
+    if (entree.cat === 'falaise') return falaisesVisibles.has(entree.cle);
+    const el = entree.marker && entree.marker.getElement();
+    return Boolean(el && el.style.display !== 'none');
   }
 
   // Point de passage unique pour appliquerFiltres (recherche/mode/sélection) :
@@ -173,7 +217,7 @@ export function initCarte(dataUrl) {
     labels.forEach((label) => {
       const { el, marker } = label;
       const entreesDuGroupe = entriesParGroupe.get(cleDe(label)) || [];
-      if (!entreesDuGroupe.some(falaiseVisible)) {
+      if (!entreesDuGroupe.some(entreeVisible)) {
         el.style.visibility = 'hidden';
         return;
       }
@@ -281,7 +325,11 @@ export function initCarte(dataUrl) {
     const simplifie = map.getZoom() < ZOOM_SIMPLIFICATION;
     if (simplifie === modeSimplifieActuel) return;
     modeSimplifieActuel = simplifie;
+    // Falaises : la réduction à un petit point uniforme est portée par des
+    // expressions de zoom dans la couche native (voir construireCoucheFalaises)
+    // — on ne touche ici qu'aux marqueurs DOM restants (parkings, gîte).
     entries.forEach((entree) => {
+      if (entree.cat === 'falaise' || !entree.marker) return;
       entree.marker.getElement().classList.toggle('zoom-eloigne', simplifie);
     });
     rafraichirLegendeFalaises();
@@ -299,32 +347,60 @@ export function initCarte(dataUrl) {
     construireLegendeFalaises(max, median, titre, remplissage, modeSimplifieActuel, maxima.total);
   }
 
-  // Empile les cercles proportionnels du plus grand (derrière) au plus petit
-  // (devant) : sans ça un grand cercle peut visuellement engloutir un petit
-  // juste à côté, le pire cas pour un symbole proportionnel (illisible ET
-  // inatteignable au clic). PAS de z-index (essayé, revert : le canvas de la
-  // carte ET tous les marqueurs partagent par défaut le même stack level
-  // "auto" côté CSS MapLibre — un z-index négatif fait alors passer le
-  // marqueur SOUS le canvas, invisible ; un positif le fait au contraire
-  // passer AU-DESSUS des labels/parkings). On réordonne donc les nœuds DOM
-  // entre eux à la place, en ne touchant qu'à leur position relative les uns
-  // par rapport aux autres : l'ancre (le nœud qui suit le dernier cercle
-  // falaise dans l'ordre DOM courant) est capturée une seule fois, AVANT
-  // toute permutation, donc jamais elle-même déplacée par la boucle — la
-  // position des parkings/gîte/labels autour du groupe reste intacte.
-  function trierCerclesParTaille() {
-    const falaises = entries.filter((e) => e.cat === 'falaise');
-    if (!falaises.length) return;
-    const parent = falaises[0].marker.getElement().parentNode;
-    if (!parent) return;
-    const elementsFalaise = new Set(falaises.map((e) => e.marker.getElement()));
-    let dernier = null;
-    parent.childNodes.forEach((node) => { if (elementsFalaise.has(node)) dernier = node; });
-    const ancre = dernier ? dernier.nextSibling : null;
-    falaises
-      .slice()
-      .sort((a, b) => valeurPourMode(b, modeFigureActuel) - valeurPourMode(a, modeFigureActuel))
-      .forEach(({ marker }) => parent.insertBefore(marker.getElement(), ancre));
+  // Couche native "falaises" (rendu GPU) : un seul canvas au lieu d'un
+  // marqueur DOM par falaise — indispensable pour passer à l'échelle quand le
+  // geojson atteindra des milliers de falaises (peinture GPU, tri des cercles
+  // par taille fait dans la SOURCE via construireSourceFalaises, plus de
+  // réordonnancement DOM). Le rendu est data-driven par expressions de zoom :
+  //  - rayon : petit point uniforme (7px) sous ZOOM_SIMPLIFICATION, rayon
+  //    proportionnel (formule de Flannery, précalculé dans "r") au-delà ;
+  //  - couleur : COULEUR_ELOIGNE sous le seuil, couleur du mode "Cercles"
+  //    courant au-delà (mise à jour via setPaintProperty, voir
+  //    definirModeFigure) ;
+  //  - opacité : estompée par feature-state quand une autre falaise a la
+  //    popup ouverte (voir enSurbrillance).
+  // promoteId: 'cle' -> le feature-state s'indexe sur la clé falaise (stable).
+  // Ordre de lecture : la couche est peinte au-dessus du fond ; les marqueurs
+  // DOM (parkings, gîte, libellés) passent au-dessus d'elle via le conteneur
+  // .maplibregl-marker — les falaises restent donc SOUS les parkings, comme
+  // avant.
+  function construireCoucheFalaises() {
+    map.addSource('falaises', {
+      type: 'geojson',
+      promoteId: 'cle',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+    map.addLayer({
+      id: 'falaises',
+      type: 'circle',
+      source: 'falaises',
+      paint: {
+        'circle-radius': ['step', ['zoom'], 3.5, ZOOM_SIMPLIFICATION, ['get', 'r']],
+        'circle-color': ['step', ['zoom'], COULEUR_ELOIGNE, ZOOM_SIMPLIFICATION, couleurFalaisePourMode('aucun')],
+        'circle-stroke-width': ['step', ['zoom'], 1, ZOOM_SIMPLIFICATION, 2],
+        'circle-stroke-color': '#ffffff',
+        'circle-opacity': ['case', ['boolean', ['feature-state', 'estompe'], false], 0.25, 1],
+      },
+    });
+    map.on('mouseenter', 'falaises', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'falaises', () => { map.getCanvas().style.cursor = ''; });
+    map.on('click', 'falaises', (e) => {
+      const cle = e.features && e.features[0] && e.features[0].properties.cle;
+      if (cle) ouvrirFalaise(cle);
+    });
+  }
+
+  // Ouvre la fiche (popup) d'une falaise de la couche native, au clic ou via
+  // la navigation. Ferme d'abord toute popup déjà ouverte (falaise OU
+  // parking/gîte) — le comportement miroir de cible.marker.togglePopup() des
+  // marqueurs DOM, qui est ici délégué à suivrePopup (tracking dans
+  // popupOuverte).
+  function ouvrirFalaise(cle) {
+    const entree = index.get(cle);
+    if (!entree) return;
+    if (popupOuverte) popupOuverte.remove();
+    definirFalaiseSelectionnee(cle);
+    popupOuverte = ouvrirPopupFalaise(map, entree, ctxPopup);
   }
 
   // Change le mode "Cercles" et redessine tout ce qui en dépend — utilisé
@@ -334,16 +410,21 @@ export function initCarte(dataUrl) {
   function definirModeFigure(nouveauMode) {
     modeFigureActuel = nouveauMode;
     if (selectFigure) selectFigure.value = nouveauMode;
-    entries.forEach((entree) => {
-      if (entree.cat === 'falaise') dessinerFalaise(entree, modeFigureActuel, maxima);
-    });
-    // Les tailles ont changé avec le mode : réordonne les cercles en
-    // conséquence (voir trierCerclesParTaille ci-dessus).
-    trierCerclesParTaille();
+    // Couche native : remplace les features (un mode en exclut certaines,
+    // voir construireSourceFalaises) et la couleur du thème. setData
+    // remplace l'ancien dessinerFalaise + trierCerclesParTaille : le tri par
+    // taille est fait dans construireSourceFalaises (valeur décroissante).
+    const source = map.getSource('falaises');
+    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima));
+    if (map.getLayer('falaises')) {
+      map.setPaintProperty('falaises', 'circle-color', ['step', ['zoom'], COULEUR_ELOIGNE, ZOOM_SIMPLIFICATION, couleurFalaisePourMode(modeFigureActuel)]);
+    }
     rafraichirLegendeFalaises();
     // Un changement de mode peut vider un thème entier (ex. "Grande voie" sur
     // un secteur 100% couenne) : le libellé de secteur n'a plus de figuré
-    // ponctuel sous lui, voir appliquerAntiCollisionSecteurs.
+    // ponctuel sous lui, voir appliquerAntiCollisionSecteurs. Les parkings
+    // eux-mêmes sont retraités par appliquerFiltresEtSecteurs() (appelé par
+    // le sélecteur après definirModeFigure).
     appliquerAntiCollisionSecteurs();
   }
 
@@ -404,18 +485,27 @@ export function initCarte(dataUrl) {
     map.stop();
     reinitialiserPadding(map);
 
-    // margeAvantPopup() (pas MARGE_UI) : cible.marker.togglePopup() ouvre une
-    // popup juste après ce cadrage — sur mobile, il faut lui laisser sa place.
+    // Position à l'écran d'une entrée : marqueur DOM (parking/gîte) ou
+    // coordonnées directes (falaise en couche native — plus de marqueur).
+    const pointDe = (e) => (e.marker ? e.marker.getLngLat() : [e.lon, e.lat]);
+
+    // margeAvantPopup() (pas MARGE_UI) : la popup de la cible s'ouvre juste
+    // après ce cadrage (falaise native ou marqueur DOM) — sur mobile, il faut
+    // lui laisser sa place.
     if (origine) {
       const bounds = new maplibregl.LngLatBounds();
-      bounds.extend(origine.marker.getLngLat());
-      bounds.extend(cible.marker.getLngLat());
+      bounds.extend(pointDe(origine));
+      bounds.extend(pointDe(cible));
       map.fitBounds(bounds, { padding: margeAvantPopup(), maxZoom: 16 });
     } else {
-      map.flyTo({ center: cible.marker.getLngLat(), zoom: Math.max(map.getZoom(), 15), padding: margeAvantPopup() });
+      map.flyTo({ center: pointDe(cible), zoom: Math.max(map.getZoom(), 15), padding: margeAvantPopup() });
     }
 
-    cible.marker.togglePopup();
+    if (cible.cat === 'falaise') {
+      ouvrirFalaise(cible.cle);
+    } else {
+      cible.marker.togglePopup();
+    }
     enSurbrillance(origine ? [origine.cle, cible.cle] : [cible.cle]);
   }
 
@@ -483,7 +573,7 @@ export function initCarte(dataUrl) {
       maxima = calculerMaxima(geojson);
       const tempsDepuisGite = calculerTempsDepuisGite(geojson);
       geojson.features.forEach(f => {
-        const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, () => ficheReduite);
+        const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, () => ficheReduite, (id) => baseRoutes + id + '.json');
         entries.push(entree);
         index.set(entree.cle, entree);
         if (entree.cat === 'falaise') {
@@ -500,9 +590,29 @@ export function initCarte(dataUrl) {
           }
         }
       });
-      // Tri initial des cercles par taille (voir trierCerclesParTaille) :
-      // à ce stade mode "aucun", donc nbVoies (total).
-      trierCerclesParTaille();
+      // Couche native "falaises" : construite une fois (source + couche), puis
+      // alimentée par construireSourceFalaises — features triées par valeur
+      // décroissante (ordre de peinture, le plus petit dessus), mode "aucun"
+      // donc nbVoies total au départ. Voir construireCoucheFalaises.
+      // MapLibre exige le STYLE chargé avant addSource/addLayer : on attend
+      // 'load' quand il ne l'est pas encore (cas normal, le style met plus de
+      // temps que le fetch du geojson préchargé). La source est ajoutée vide
+      // puis remplie, le FILTRE est re-posé dans la foulée par
+      // appliquerFiltresEtSecteurs() — même tick, aucun flash de points non
+      // filtrés. Cas inverse (style déjà chargé : data.geojson lent), on
+      // construit directement.
+      const chargerFalaises = () => {
+        construireCoucheFalaises();
+        map.getSource('falaises').setData(construireSourceFalaises(entries, 'aucun', maxima));
+      };
+      if (map.isStyleLoaded()) {
+        chargerFalaises();
+      } else {
+        map.once('load', () => {
+          chargerFalaises();
+          appliquerFiltresEtSecteurs();
+        });
+      }
 
       // Clic sur un label de site : cadre sur l'étendue de toutes ses
       // falaises — pas de popup (ce n'est pas une entité unique), juste la
@@ -553,11 +663,10 @@ export function initCarte(dataUrl) {
       // ci-dessus (state changed depuis null au premier appel).
 
       // Les modes "Couenne"/"Grande voie" n'ont de sens que si au moins une
-      // falaise a des voies_sportives typées couenne/grande voie — sinon ces
-      // options restent masquées. Relit les "entries" déjà construites
-      // (nbGrandeVoie/nbCouenne y sont déjà dérivées de voies_sportives, voir
-      // compterVoiesSportivesParType dans donnees.js) plutôt que de
-      // rescanner le geojson brut une 2e fois.
+      // falaise a des voies typées couenne/grande voie — sinon ces options
+      // restent masquées. Relit les "entries" déjà construites
+      // (nbGrandeVoie/nbCouenne précalculés à la génération, voir
+      // export_geojson.py) plutôt que de rescanner le geojson brut une 2e fois.
       const auMoinsUneAvecType = entries.some(e =>
         e.cat === 'falaise' && (e.nbGrandeVoie > 0 || e.nbCouenne > 0)
       );
@@ -659,7 +768,7 @@ export function initCarte(dataUrl) {
       return;
     }
     const bounds = new maplibregl.LngLatBounds();
-    correspondances.forEach((e) => bounds.extend(e.marker.getLngLat()));
+    correspondances.forEach((e) => bounds.extend(e.marker ? e.marker.getLngLat() : [e.lon, e.lat]));
     reinitialiserPadding(map);
     map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
   }
@@ -688,14 +797,17 @@ export function initCarte(dataUrl) {
   if (selectFigure) {
     selectFigure.addEventListener('change', () => {
       definirModeFigure(selectFigure.value);
-      // Une falaise sans donnée pour ce thème disparaît (dessinerFalaise) —
-      // son parking ne doit pas rester affiché seul, sans rien à proposer.
+      // Une falaise sans donnée pour ce thème disparaît (source reconstruite
+      // par construireSourceFalaises) — son parking ne doit pas rester
+      // affiché seul, sans rien à proposer.
       appliquerFiltresEtSecteurs();
     });
   }
-}
 
-function appliquerFiltres(entries, filtres, mode, falaiseSelectionneeCle) {
+  // NOTE portée : cette fonction est déplacée ICI, dans initCarte — depuis
+  // la couche native elle utilise map et falaisesVisibles via la closure
+  // (elle ne peut plus rester au niveau module, comme avant).
+  function appliquerFiltres(entries, filtres, mode, falaiseSelectionneeCle) {
   // Le mode "Cercles" ET le filtre "Depuis le gîte" masquent des falaises
   // (estFalaiseVideDansMode / seuil de temps) mais n'autorisent PAS à eux
   // seuls l'affichage de leurs parkings — sinon déplacer le slider ou
@@ -711,23 +823,39 @@ function appliquerFiltres(entries, filtres, mode, falaiseSelectionneeCle) {
   //   courants.
   const parkingsAutorises = new Set();
 
+  // Falaises (couche native) : pas de display DOM — on pose le FILTRE de la
+  // couche (rendu GPU, expressions sur les properties de la source) et on
+  // miroite le résultat dans falaisesVisibles pour entreeVisible (anti-
+  // collision des libellés) sans relire le DOM. 'index-of' vaut -1 quand la
+  // recherche est absente, donc >= 0 = présente. tempsGite null -> coalesce
+  // 0 : une falaise sans trajet calculé n'est jamais exclue par le slider.
+  // L'exclusion liée au MODE (estFalaiseVideDansMode) est, elle, faite dans
+  // la SOURCE (construireSourceFalaises) et non ici.
+  const conditions = [];
+  if (filtres.recherche) conditions.push(['>=', ['index-of', filtres.recherche, ['get', 'recherche']], 0]);
+  if (Number.isFinite(filtres.tempsMaxGite)) conditions.push(['<=', ['coalesce', ['get', 'tempsGite'], 0], filtres.tempsMaxGite]);
+  if (map.getLayer('falaises')) map.setFilter('falaises', conditions.length ? ['all', ...conditions] : null);
+
+  falaisesVisibles = new Set();
   entries.forEach((entree) => {
     if (entree.cat !== 'falaise') return;
     const visible =
       (!filtres.recherche || entree.recherche.includes(filtres.recherche)) &&
       !estFalaiseVideDansMode(entree, mode) &&
       (entree.tempsGite == null || entree.tempsGite <= filtres.tempsMaxGite);
-    entree.marker.getElement().style.display = visible ? '' : 'none';
-    if (visible && filtres.recherche) entree.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));
+    if (visible) {
+      falaisesVisibles.add(entree.cle);
+      if (filtres.recherche) entree.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));
+    }
   });
 
   // La falaise sélectionnée ne compte que si elle est toujours effectivement
-  // visible (recherche/mode/temps compris, cf. display posé juste au-dessus)
-  // — sinon son parking ne doit pas rester affiché seul, sans qu'aucune
-  // falaise visible ne le justifie.
+  // visible (recherche/mode/temps compris, cf. falaisesVisibles posé juste
+  // au-dessus) — sinon son parking ne doit pas rester affiché seul, sans
+  // qu'aucune falaise visible ne le justifie.
   if (falaiseSelectionneeCle) {
     const falaise = entries.find((e) => e.cat === 'falaise' && e.cle === falaiseSelectionneeCle);
-    if (falaise && falaise.marker.getElement().style.display !== 'none') {
+    if (falaise && falaisesVisibles.has(falaise.cle)) {
       falaise.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));
     }
   }
@@ -741,6 +869,7 @@ function appliquerFiltres(entries, filtres, mode, falaiseSelectionneeCle) {
     entree.marker.getElement().style.display = (montrerParkings && parkingsAutorises.has(entree.nom)) ? '' : 'none';
   });
 }
+} // fin de initCarte
 
 function remplirAutocompletion(geojson) {
   const datalist = document.getElementById('falaises-liste');
