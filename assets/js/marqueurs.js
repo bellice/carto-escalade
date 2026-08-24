@@ -5,11 +5,41 @@ import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist
 import { cleFalaise, libelleFalaise, secteurDistinct } from './donnees.js';
 import { poserTailleMarqueur } from './symboles.js';
 import { popupFalaise, popupParking, popupGite, construireHistogramme } from './popups.js';
+import { reinitialiserPadding, margeAvantPopup, estPointVisible } from './carte-utils.js';
 
 // Détail des voies (routes/<id>.json, généré par DuckDB) chargé à la demande
 // à l'ouverture de la popup : mis en cache en mémoire pour les réouvertures,
 // et pris en charge par le service worker pour l'offline après une 1ère vue.
 const cacheVoiesParFalaise = new Map();
+
+// Charge (une seule fois par falaise, relu ensuite dans cacheVoiesParFalaise)
+// le détail des voies dans le placeholder [data-route] trouvé sous racineEl,
+// et l'injecte sous forme d'histogramme — factorisé ici : avant, cette même
+// logique était dupliquée entre addMarker (popup parking/gîte — où elle
+// n'avait plus aucun effet, [data-route] n'existe QUE dans popupFalaise) et
+// ouvrirPopupFalaise. Un 3e appelant (ouvrirPanneauFalaise, panneau desktop)
+// la réutilise telle quelle plutôt que d'en copier une 3e version.
+function chargerDetailVoies(racineEl, urlRoute) {
+  const placeholder = racineEl && racineEl.querySelector('[data-route]');
+  if (!placeholder || !urlRoute) return;
+  const id = placeholder.dataset.route;
+  if (cacheVoiesParFalaise.has(id)) {
+    placeholder.innerHTML = cacheVoiesParFalaise.get(id);
+    return;
+  }
+  fetch(urlRoute(id))
+    .then(r => r.json())
+    .then(data => {
+      const html = construireHistogramme(data.voies_sportives || []);
+      cacheVoiesParFalaise.set(id, html);
+      // La fiche (popup ou panneau) peut avoir été refermée ou réutilisée
+      // entre-temps : on n'écrit que si ce placeholder est toujours dans le DOM.
+      if (placeholder.isConnected) placeholder.innerHTML = html;
+    })
+    .catch(() => {
+      if (placeholder.isConnected) placeholder.remove();
+    });
+}
 
 // Met à jour l'état visuel/accessible de la poignée (aria-expanded,
 // aria-label, texte Réduire/Agrandir) à partir d'un booléen "réduit" —
@@ -100,12 +130,14 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     cat === 'parking' ? popupParking(p, lat, lon, parkingInfos, cle) :
     popupGite(p, lat, lon, cle);
 
-  // closeOnClick (par défaut, true) : ferme la popup ouverte au clic
-  // ailleurs sur la carte, y compris sur un autre marqueur — comportement
-  // volontairement gardé (voir suivrePopup plus bas pour Échap) : la
-  // fermeture ne touche plus falaiseSelectionneeCle, donc plus de risque de
-  // masquer par erreur le parking qu'on vient de rejoindre.
-  const popup = new maplibregl.Popup({ offset: 14 }).setHTML(popupHtml);
+  // closeOnClick:false — on ferme la popup NOUS-MÊME (handler clic carte de
+  // carte.js, popupOuverte.remove()), pas via le closeOnClick natif de
+  // MapLibre : sur desktop, une popup parking peut être affichée par-dessus
+  // le panneau falaise resté ouvert, et le clic sur la carte doit alors
+  // fermer SEULEMENT la popup, pas le panneau. En reprenant la main, la
+  // fermeture ne touche pas non plus falaiseSelectionneeCle (voir
+  // suivrePopup plus bas pour Échap).
+  const popup = new maplibregl.Popup({ offset: 14, closeOnClick: false }).setHTML(popupHtml);
 
   const marker = new maplibregl.Marker({ element: el })
     .setLngLat([lon, lat])
@@ -164,29 +196,12 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     }
 
     // Détail des voies chargé à la demande (routes/<id>.json, généré par
-    // DuckDB) : le fichier web principal ne contient plus voies_sportives —
-    // on ne télécharge le détail d'une falaise que si on ouvre sa fiche, une
-    // seule fois (relu ensuite dans cacheVoiesParFalaise).
-    const placeholder = elPopupOuverture && elPopupOuverture.querySelector('[data-route]');
-    if (placeholder && urlRoute) {
-      const id = placeholder.dataset.route;
-      if (cacheVoiesParFalaise.has(id)) {
-        placeholder.innerHTML = cacheVoiesParFalaise.get(id);
-      } else {
-        fetch(urlRoute(id))
-          .then(r => r.json())
-          .then(data => {
-            const html = construireHistogramme(data.voies_sportives || []);
-            cacheVoiesParFalaise.set(id, html);
-            // La popup peut avoir été refermée ou réutilisée entre-temps :
-            // on n'écrit que si ce placeholder est toujours dans le DOM.
-            if (placeholder.isConnected) placeholder.innerHTML = html;
-          })
-          .catch(() => {
-            if (placeholder.isConnected) placeholder.remove();
-          });
-      }
-    }
+    // DuckDB) : le fichier web principal ne contient plus voies_sportives.
+    // Sans effet ici en pratique : [data-route] n'existe que dans
+    // popupFalaise (voir chargerDetailVoies), or cat vaut forcément
+    // "parking"/"hebergement" à ce point (retour anticipé falaise plus haut)
+    // — gardé pour rester robuste si cette contrainte venait à changer.
+    chargerDetailVoies(elPopupOuverture, urlRoute);
   });
   popup.on('close', () => {
     // Fermeture potentiellement "périmée" : si une AUTRE popup s'est déjà
@@ -229,7 +244,9 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
 // fiche repliée/dépliée, lazy-load du détail des voies (routes/<id>.json).
 export function ouvrirPopupFalaise(map, entree, ctx) {
   const { enSurbrillance, onSelectionFalaise, suivrePopup, estFicheReduite, urlRoute } = ctx;
-  const popup = new maplibregl.Popup({ offset: 14 })
+  // closeOnClick:false : même principe qu'addMarker — la fermeture au clic
+  // carte est gérée par le handler générique de carte.js, pas par MapLibre.
+  const popup = new maplibregl.Popup({ offset: 14, closeOnClick: false })
     .setLngLat([entree.lon, entree.lat])
     .setHTML(popupFalaise(entree.p, entree.lat, entree.lon, entree.cle));
 
@@ -254,23 +271,7 @@ export function ouvrirPopupFalaise(map, entree, ctx) {
     if (onSelectionFalaise) onSelectionFalaise(entree.cle);
     enSurbrillance([entree.cle, ...entree.parkingAssocie]);
 
-    // Détail des voies chargé à la demande (voir la version marqueur DOM).
-    const placeholder = elPopup && elPopup.querySelector('[data-route]');
-    if (placeholder && urlRoute) {
-      const id = placeholder.dataset.route;
-      if (cacheVoiesParFalaise.has(id)) {
-        placeholder.innerHTML = cacheVoiesParFalaise.get(id);
-      } else {
-        fetch(urlRoute(id))
-          .then(r => r.json())
-          .then(data => {
-            const html = construireHistogramme(data.voies_sportives || []);
-            cacheVoiesParFalaise.set(id, html);
-            if (placeholder.isConnected) placeholder.innerHTML = html;
-          })
-          .catch(() => { if (placeholder.isConnected) placeholder.remove(); });
-      }
-    }
+    chargerDetailVoies(elPopup, urlRoute);
   });
   popup.on('close', () => {
     const popupActive = suivrePopup ? suivrePopup(popup, false) : null;
@@ -282,4 +283,150 @@ export function ouvrirPopupFalaise(map, entree, ctx) {
 
   popup.addTo(map);
   return popup;
+}
+
+// Panneau droit (fiche falaise, voir style-carte.css @media min-width:641px)
+// : alternative à ouvrirPopupFalaise pour ouvrirFalaise (carte.js), qui
+// choisit l'un ou l'autre selon estDesktop(). Un seul singleton DOM, créé une
+// fois (assurerPanneauFalaise) puis réutilisé/rempli à chaque sélection —
+// pas un élément recréé par falaise comme les popups MapLibre. Contrairement
+// au panneau gauche (recherche/légende, toujours visible, jamais animé), ce
+// panneau reste contextuel : sa largeur se révèle/se referme à la sélection
+// (voir la classe .ouvert, sens CSS width dans style-carte.css).
+let panneauFacade = null; // {estPanneauFalaise:true, remove} — façade compatible avec suivrePopup/popupOuverte (carte.js), qui n'attend qu'un objet avec .remove()
+
+// Garantit la présence de #panneau-falaise dans le DOM : présent en HTML
+// statique dans chaque sortie, comme SIBLING de #panneau-lateral (pas
+// imbriqué dedans — voir sorties/*/index.html) : le panneau droit (fiche
+// falaise) est indépendant du panneau gauche (recherche/légende), qui reste
+// stable pendant que celui-ci s'ouvre/se ferme (retour terrain : les voir
+// se déplacer ou se faire pousser par une fiche longue perturbait plus qu'il
+// n'aidait). Ce filet de sécurité crée l'élément sinon plutôt que de casser
+// silencieusement une sortie qui aurait oublié de le copier.
+function assurerPanneauFalaise() {
+  let panneau = document.getElementById('panneau-falaise');
+  if (panneau) return panneau;
+  panneau = document.createElement('aside');
+  panneau.id = 'panneau-falaise';
+  panneau.setAttribute('aria-label', 'Détails de la falaise');
+  panneau.setAttribute('inert', '');
+  panneau.innerHTML = `
+    <div class="panneau-falaise-interieur">
+      <button type="button" class="panneau-falaise-fermer" aria-label="Fermer le panneau">×</button>
+      <div class="panneau-falaise-contenu"></div>
+    </div>`;
+  document.body.appendChild(panneau);
+  return panneau;
+}
+
+// Ouvre (ou, si déjà ouvert, remplace le contenu de) le panneau falaise
+// desktop. Contrairement à ouvrirPopupFalaise : pas de .poignee-fiche/
+// estFicheReduite (concept mobile uniquement — la poignée générée par
+// popupFalaise() reste présente dans le HTML mais display:none hors mobile,
+// et le listener délégué de carte.js cherche .closest('.maplibregl-popup-content'),
+// introuvable ici, no-op silencieux — rien à câbler côté panneau).
+//
+// cameraDejaEncadree : true quand l'appelant (allerVers, carte.js) a DÉJÀ
+// lancé son propre fitBounds/flyTo (avec le bon padding, cf.
+// margeAvantPopup(cible.cat==='falaise')) juste avant d'ouvrir cette falaise
+// — dans ce cas, ne PAS toucher la caméra ici. Piège vérifié en test réel :
+// appeler map.stop() ici coupait l'animation d'allerVers à mi-vol (les deux
+// s'exécutent dans le même tick synchrone, avant que la moindre frame de
+// cette animation n'ait pu s'écouler), la caméra restait figée près de son
+// zoom de départ au lieu d'atteindre la falaise ciblée. Par défaut false
+// (clic direct sur la couche native : aucun cadrage n'a eu lieu avant,
+// c'est à cette fonction de s'en charger).
+export function ouvrirPanneauFalaise(map, entree, ctx, cameraDejaEncadree = false) {
+  const { enSurbrillance, onSelectionFalaise, suivrePopup, urlRoute } = ctx;
+  const panneau = assurerPanneauFalaise();
+  const dejaOuvert = panneau.classList.contains('ouvert');
+
+  panneau.querySelector('.panneau-falaise-contenu').innerHTML =
+    popupFalaise(entree.p, entree.lat, entree.lon, entree.cle);
+
+  if (!panneauFacade) {
+    panneauFacade = { estPanneauFalaise: true, remove: () => fermerPanneauFalaise(map, ctx) };
+  }
+  if (suivrePopup) suivrePopup(panneauFacade, true);
+  if (onSelectionFalaise) onSelectionFalaise(entree.cle);
+  enSurbrillance([entree.cle, ...entree.parkingAssocie]);
+  chargerDetailVoies(panneau, urlRoute);
+
+  // Le panneau droit a son propre scroll interne (.panneau-falaise-contenu,
+  // overflow-y:auto — indépendant du panneau gauche). Changer de falaise
+  // pendant qu'il reste ouvert doit ramener ce scroll en haut : sans ça, si
+  // l'utilisateur avait descendu jusqu'au bas de l'histogramme d'une longue
+  // fiche, la suivante s'ouvrirait déjà scrollée, titre hors champ.
+  const contenu = panneau.querySelector('.panneau-falaise-contenu');
+  if (contenu) contenu.scrollTop = 0;
+
+  if (!dejaOuvert) {
+    panneau.classList.add('ouvert');
+    panneau.removeAttribute('inert');
+    document.body.classList.add('panneau-falaise-ouvert');
+    if (!cameraDejaEncadree) {
+      // Première ouverture ET aucun cadrage déjà en cours (clic direct) :
+      // réserve le padding caméra. reinitialiserPadding() d'abord (même
+      // garde-fou que partout ailleurs, voir carte-utils.js) : repart d'une
+      // base à zéro avant de poser le padding réservé au panneau.
+      map.stop();
+      reinitialiserPadding(map);
+      const padding = margeAvantPopup(true);
+      const visible = estPointVisible(map, entree.lon, entree.lat, map.getPadding());
+      map.easeTo({ padding, ...(visible ? {} : { center: [entree.lon, entree.lat] }), duration: 200 });
+    }
+    // Sinon (cameraDejaEncadree) : allerVers a déjà posé le bon padding et
+    // vole déjà vers le bon centre/zoom, rien à faire de plus ici.
+  } else if (!cameraDejaEncadree && !estPointVisible(map, entree.lon, entree.lat, map.getPadding())) {
+    // Changement de falaise pendant que la section reste ouverte : PAS de
+    // collapse/reopen (dejaOuvert), juste un recentrage si la nouvelle
+    // falaise tombe sous la colonne — et seulement si l'appelant n'a pas
+    // déjà géré la caméra lui-même.
+    map.easeTo({ center: [entree.lon, entree.lat], duration: 200 });
+  }
+
+  return panneauFacade;
+}
+
+// Exportée : carte.js la référence (import) pour fermer le panneau depuis
+// les handlers clic-carte / Échap. Sans ce export, l'import échoue en
+// SyntaxError et TOUT le graphe de modules (dont initCarte) ne se charge
+// pas → carte complètement vide (ni données, ni fond).
+export function fermerPanneauFalaise(map, ctx) {
+  const panneau = document.getElementById('panneau-falaise');
+  if (panneau) {
+    panneau.classList.remove('ouvert');
+    panneau.setAttribute('inert', '');
+  }
+  document.body.classList.remove('panneau-falaise-ouvert');
+  map.stop();
+  // PAS un padding à zéro : le panneau gauche (recherche/légende) reste
+  // affiché en permanence même panneau droit fermé — revenir à
+  // margeAvantPopup() SANS argument (= margeDesktop(), réservation gauche
+  // seule) plutôt qu'à zéro, sinon cette réservation disparaîtrait alors que
+  // le panneau gauche, lui, occupe toujours cet espace à l'écran. Le
+  // panneau droit, lui, redevient contextuel : sa réservation (right) est
+  // bien relâchée ici, contrairement au panneau gauche.
+  map.easeTo({ padding: margeAvantPopup(), duration: 200 });
+  const popupActive = ctx.suivrePopup ? ctx.suivrePopup(panneauFacade, false) : null;
+  if (!popupActive) ctx.enSurbrillance(null);
+  // Contrairement à la fermeture d'une popup mobile (qui NE vide PAS
+  // falaiseSelectionneeCle, voir le commentaire dans ouvrirPopupFalaise ci-
+  // dessus) : la visibilité de la section falaise EST le reflet de la
+  // sélection sur desktop (contextuelle, contrairement à la colonne elle-
+  // même qui reste affichée en permanence) — la fermer doit donc vider
+  // la sélection, sans quoi la section resterait fermée pendant que le
+  // parking associé à l'ancienne falaise resterait affiché sans raison
+  // visible. carte.js est seul propriétaire de falaiseSelectionneeCle, d'où
+  // cette callback injectée plutôt qu'un accès direct depuis marqueurs.js.
+  if (ctx.onFermeturePanneau) ctx.onFermeturePanneau();
+}
+
+// Câble le bouton fermer du panneau (posé une fois, l'élément est un
+// singleton — voir assurerPanneauFalaise). Appelée depuis initCarte
+// (carte.js), avec le même ctx que celui passé à ouvrirPanneauFalaise.
+export function cablerFermetureManuellePanneau(map, ctx) {
+  const panneau = assurerPanneauFalaise();
+  const bouton = panneau.querySelector('.panneau-falaise-fermer');
+  if (bouton) bouton.addEventListener('click', () => fermerPanneauFalaise(map, ctx));
 }

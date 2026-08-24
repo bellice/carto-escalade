@@ -2,7 +2,6 @@
 // légende) : la traduction visuelle des grandeurs quantitatives du mode
 // "Cercles" en figurés ponctuels sur la carte.
 
-import { escapeHtml } from './utils.js';
 import { estFalaiseVideDansMode } from './donnees.js';
 
 // Rayon min/max des cercles proportionnels (falaises) — taille VISUELLE
@@ -75,10 +74,10 @@ function remplissagePourMode(mode) {
 // Quelle grandeur (max + médiane) affiche la mini-légende selon le mode courant.
 export function infosLegendePourMode(mode, maxima) {
   const remplissage = remplissagePourMode(mode);
-  if (mode === 'couenne') return { max: maxima.couenne, median: maxima.couenneMedian, titre: 'Falaises (couenne)', remplissage };
-  if (mode === 'gv') return { max: maxima.gv, median: maxima.gvMedian, titre: 'Falaises (grande voie)', remplissage };
-  if (mode === 'faciles') return { max: maxima.faciles, median: maxima.facilesMedian, titre: 'Falaises (voies 5-6a+)', remplissage };
-  return { max: maxima.total, median: maxima.totalMedian, titre: 'Falaises (voies)', remplissage };
+  if (mode === 'couenne') return { max: maxima.couenne, median: maxima.couenneMedian, remplissage };
+  if (mode === 'gv') return { max: maxima.gv, median: maxima.gvMedian, remplissage };
+  if (mode === 'faciles') return { max: maxima.faciles, median: maxima.facilesMedian, remplissage };
+  return { max: maxima.total, median: maxima.totalMedian, remplissage };
 }
 
 // Redessine une falaise selon le mode choisi dans le sélecteur "Cercles".
@@ -154,7 +153,7 @@ export function construireSourceFalaises(entries, mode, maxima) {
 // Le rayon de chaque repère passe par calculerRayon(), la même formule que
 // pour les marqueurs réels : sinon le repère "1" ne correspondrait pas à la
 // taille qu'aurait une vraie falaise à 1 voie sur la carte.
-export function construireLegendeFalaises(max, median, titre, remplissage, simplifie, echelle) {
+export function construireLegendeFalaises(max, median, remplissage, simplifie, echelle) {
   // Pastille "Falaises" (à côté de Parkings/Gîte dans .legende-cats),
   // couleur du mode "Cercles" actif.
   const zoneFalaises = document.getElementById('cle-falaises-zone');
@@ -170,7 +169,6 @@ export function construireLegendeFalaises(max, median, titre, remplissage, simpl
   // trompeurs puisque rien de tel n'est réellement affiché à cette échelle.
   if (simplifie) {
     conteneur.innerHTML = `
-      <span class="legende-titre">Falaises</span>
       <span class="legende-note">Zoomez pour voir la taille proportionnelle</span>`;
     return;
   }
@@ -186,7 +184,6 @@ export function construireLegendeFalaises(max, median, titre, remplissage, simpl
     </span>`;
   const valeurs = (median > 0 && median < max) ? [1, median, max] : [1, max];
   conteneur.innerHTML = `
-    <span class="legende-titre">${escapeHtml(titre)}</span>
     <div class="reperes-taille">
       ${valeurs.map(repere).join('')}
     </div>`;

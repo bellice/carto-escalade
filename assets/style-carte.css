@@ -152,6 +152,158 @@
   top: 44px; bottom: 0; left: 0; right: 0;
 }
 
+/* Panneau gauche (recherche + légende) et panneau droit (fiche falaise) —
+   overlays par-dessus la carte, PAS des colonnes qui la redimensionnent
+   (#map ne change jamais de taille, aucun map.resize() n'est appelé).
+   Historique de ce bloc, pour comprendre le "pourquoi" des choix ci-dessous :
+   1er jet : panneau falaise seul, docké à droite, contextuel (largeur 0 par
+   défaut). 2e jet : tout fusionné (recherche+légende+fiche) dans une seule
+   colonne gauche PERMANENTE, pleine hauteur — retour terrain : une fiche
+   longue poussait la légende hors de l'écran, obligeant à scroller pour
+   ajuster un filtre en cours de lecture. Design actuel (3e jet, "Option E") :
+   RECOMBINE les deux — panneau gauche COMPACT (recherche+légende seulement,
+   toujours visible, hauteur au contenu) + panneau droit CONTEXTUEL (fiche
+   falaise seule, plein hauteur, apparaît/disparaît à la sélection) — les
+   filtres restent lisibles EN PERMANENCE pendant la lecture du détail, sans
+   jamais se faire pousser hors champ ni scroller.
+   Masqué par défaut hors media query : ce filet de sécurité garantit que la
+   fiche reste invisible sur mobile quel que soit l'état JS (classe .ouvert). */
+#panneau-falaise { display: none; }
+
+@media (min-width: 641px) {
+  /* Bloc compact ancré en haut à gauche (PAS pleine hauteur comme le 2e jet)
+     — se dimensionne à son contenu (recherche + légende), avec un plafond de
+     hauteur + scroll interne en secours pour un petit écran ou une légende
+     très développée. Traité comme une carte flottante (bordure+ombre sur
+     tout le pourtour) plutôt qu'une colonne bord à bord, cohérent avec son
+     nouveau gabarit compact. */
+  #panneau-lateral {
+    position: absolute;
+    top: 54px; left: 12px;
+    z-index: 10;
+    width: var(--largeur-panneau-gauche);
+    max-height: calc(100vh - 54px - 20px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.12);
+  }
+
+  /* .recherche et .legende redeviennent des enfants de flux normal (plus de
+     position:absolute individuel — c'est #panneau-lateral qui porte
+     désormais le positionnement) : sélecteur #panneau-lateral > .recherche
+     (spécificité ID+classe) plutôt que compter sur l'ordre de cascade,
+     robuste indépendamment de la position de ce bloc dans le fichier. Sur
+     mobile, hors de ce bloc, .recherche/.legende gardent leurs règles
+     position:absolute d'origine (plus bas dans ce fichier) : elles se
+     positionnent par rapport au viewport (aucun ancêtre positionné avant
+     641px), exactement comme avant leur déplacement dans #panneau-lateral. */
+  #panneau-lateral > .recherche,
+  #panneau-lateral > .legende {
+    position: static;
+    top: auto; left: auto; bottom: auto;
+    width: auto;
+    z-index: auto;
+    padding: 14px 16px;
+  }
+  #panneau-lateral > .recherche { border-bottom: 1px solid var(--stone-dark); }
+
+  /* Sur desktop, la légende vit dans la colonne gauche PERMANENTE : le bouton
+     de repli (concept mobile, où la légende flotte par-dessus la carte et doit
+     pouvoir se ranger) n'a pas de raison d'être — la légende est toujours
+     visible. On masque donc l'en-tête (chevron) ; il reste fonctionnel sur
+     mobile, hors de ce bloc. */
+  #panneau-lateral > .legende .legende-entete {
+    display: none;
+  }
+
+  /* .legende-contenu retrouve son plafond/scroll interne propre (valeurs
+     d'origine du fichier, aucun override ici) — pertinent à nouveau
+     maintenant que le panneau gauche est compact et ne partage plus son
+     scroll avec une fiche falaise potentiellement longue. */
+
+  /* Panneau droit : fiche falaise, contextuelle (apparaît/disparaît à la
+     sélection), plein hauteur, largeur 0 -> fixe. Révélation par width (pas
+     grid-template-rows comme les sections repliables de la légende) : sa
+     hauteur ne varie jamais (top:44px à bottom:0 fixes), seule sa largeur
+     change — une simple transition width + overflow:hidden suffit, sans le
+     piège du padding qui bloquait grid-template-rows:0fr (rencontré et
+     documenté lors du 2e jet, non applicable ici). */
+  #panneau-falaise {
+    display: block;
+    position: absolute;
+    top: 44px; right: 0; bottom: 0;
+    width: 0;
+    overflow: hidden;
+    z-index: 10;
+    background: var(--paper);
+    border-left: 1px solid var(--stone-dark);
+    box-shadow: -3px 0 14px rgba(0, 0, 0, 0.12);
+    transition: width 0.2s ease; /* même langage d'animation que le reste du site (ex. .legende-contenu.fiche-reduite mobile) */
+  }
+  #panneau-falaise.ouvert { width: var(--largeur-panneau-droit); }
+
+  /* Largeur FIXE sur l'intérieur, indépendante du width animé du parent :
+     sans ça, le contenu se compresserait pendant les 200ms de transition
+     puis "pop" à sa taille finale au dernier instant — avec une largeur
+     fixe, seule la fenêtre de clipping (overflow du parent) grandit, le
+     contenu est simplement révélé, jamais redimensionné. */
+  .panneau-falaise-interieur {
+    position: relative; /* ancre pour .panneau-falaise-fermer */
+    width: var(--largeur-panneau-droit);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panneau-falaise-contenu {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto; /* scroll propre au panneau droit, indépendant du panneau gauche */
+    /* Le bouton fermer (position:absolute, right:8px) ne chevauche que le
+       bord DROIT de l'en-tête (titre à gauche, bouton à droite) : dégagé via
+       padding-right sur l'en-tête (voir #panneau-falaise .popup-entete), pas
+       un grand padding-top qui poussait tout le contenu vers le bas. */
+    padding: 14px 16px 14px;
+  }
+
+  /* En-tête falaise dans le panneau droit : bouton fermer 28px à right:8px
+     (contre 22px à right:2px pour les popups flottantes) — les 24px du
+     .popup-entete global ne suffisent plus, le titre/coin serait chevauché. */
+  #panneau-falaise .popup-entete {
+    padding-right: 40px;
+  }
+
+  .panneau-falaise-fermer {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .panneau-falaise-fermer:hover { background: var(--stone); }
+
+  /* Les contrôles MapLibre top-right (zoom, "Tout voir") sont rendus À
+     L'INTÉRIEUR de #map (map.addControl(..., 'top-right')) — le panneau
+     droit (z-index 10, ancré right:0) les recouvrirait sinon pendant qu'il
+     est ouvert. */
+  body.panneau-falaise-ouvert .maplibregl-ctrl-top-right {
+    right: var(--largeur-panneau-droit);
+    transition: right 0.2s ease;
+  }
+}
+
 /* Recherche */
 .recherche {
   position: absolute;
@@ -278,17 +430,46 @@
   gap: 8px;
 }
 
-.legende-toggle {
+/* En-tête de la légende (titre + bouton de repli en icône compacte) : le
+   panneau gauche ne recouvre rien d'important — masquer/afficher la légende
+   en entier reste le bon comportement, seule la FORME du bouton change
+   (chevron compact en haut, au lieu du gros bouton "Masquer" pleine largeur
+   en bas). L'état replié/déplié est porté par aria-expanded (rotation du
+   chevron, voir .legende-toggle-icone), explicité au lecteur d'écran par le
+   aria-label mis à jour en JS. */
+.legende-entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  padding: 6px 8px;
+  color: #5a6058;
+}
+.legende-toggle {
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: 1px solid var(--stone-dark);
   border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .legende-toggle:hover { background: var(--stone-dark); }
+.legende-toggle-icone {
+  display: inline-block;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+.legende-toggle[aria-expanded="false"] .legende-toggle-icone {
+  transform: rotate(-90deg);
+}
 
 .legende-contenu {
   background: var(--paper);
@@ -335,6 +516,15 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* min-height calé sur la variante la plus haute (titre + cercles de
+     référence jusqu'à 52px + leur libellé) : sans ça, franchir
+     ZOOM_SIMPLIFICATION bascule vers/depuis le message texte "Zoomez pour
+     voir..." (nettement plus court) et fait visiblement grandir/rétrécir
+     toute la colonne à chaque changement de zoom — gênant une fois la
+     colonne fusionnée avec recherche/légende (retour terrain). Un simple
+     espace vide sous le message court coûte moins qu'un déplacement
+     constant du reste de la légende en dessous. */
+  min-height: 90px;
 }
 .legende-titre {
   font-family: var(--font-mono);
@@ -374,13 +564,17 @@
   flex-shrink: 0;
 }
 
-/* Sélecteur de figuré */
+/* Sélecteur de figuré : sert de TITRE aux cercles proportionnels rendus
+   juste en dessous (#legende-falaises) — placé au-dessus d'eux dans le HTML.
+   La bordure du haut le sépare des catégories (Falaises/Parkings/Gîte), le
+   margin-bottom laisse un peu d'air avant les cercles de référence. */
 .legende-figure {
   display: flex;
   align-items: center;
   gap: 6px;
   border-top: 1px solid var(--stone-dark);
   padding-top: 8px;
+  margin-bottom: 8px;
   font-size: 0.78rem;
 }
 .legende-figure select {
@@ -625,7 +819,13 @@
   font-family: var(--font-mono);
   font-size: 0.74rem;
   color: #5a6058;
-  flex-shrink: 0;
+  /* Le libellé peut se replier sur DEUX lignes si nécessaire (ex. "Temps de
+     trajet depuis le gîte" dans une popup parking étroite, max-width 260px) :
+     sans min-width:0, un item flex avec flex-shrink:1 ne rétrécit JAMAIS sous
+     son contenu texte (min-width:auto) et fait déborder la ligne au lieu de
+     couper — bug réel : la valeur "82 min en voiture" sortait de la fiche. */
+  min-width: 0;
+  flex-shrink: 1;
 }
 /* Sépare le groupe "à quoi ressemble l'escalade" (roche/cotation/voies) du
    groupe "comment y aller" (parking/approche) dans popupFalaise — juste plus
@@ -645,6 +845,10 @@
   font-family: var(--font-mono);
   font-size: 0.74rem;
   color: var(--ink);
+  /* La valeur garde sa largeur (reste lisible sur sa ligne, à droite) : c'est
+     le libellé qui se replie en cas d'étroitesse — pas elle qui se comprime
+     ou déborde. */
+  flex-shrink: 0;
 }
 
 /* Total de voies en gros (voir champVoiesBeeswarm dans popups.js) : même
