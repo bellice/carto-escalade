@@ -28,6 +28,17 @@
   <link rel="modulepreload" href="../../assets/js/donnees.js" />
   <link rel="modulepreload" href="../../assets/js/utils.js" />
 
+  <!-- data.geojson (falaises + parkings) ne dépend d'aucun des modules
+       ci-dessus : sans cet indice, son fetch() (dans initCarte, carte.js)
+       n'aurait démarré qu'une fois tout le graphe JS résolu ET exécuté —
+       ici il part en parallèle, dès le parsing HTML. crossorigin (même en
+       same-origin) : requis pour que ce préchargement soit réutilisé par le
+       fetch() réel de carte.js plutôt que retéléchargé une 2e fois — fetch()
+       utilise le mode "cors" par défaut, un preload sans crossorigin ne
+       matche pas ce mode et le navigateur traite les deux comme des
+       requêtes différentes. -->
+  <link rel="preload" href="data.geojson" as="fetch" crossorigin />
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="../../assets/style.css" />
   <link rel="stylesheet" href="../../assets/style-carte.css" />
@@ -66,27 +77,27 @@
           <option value="faciles">Voies faciles (≤6a+)</option>
           <option value="couenne" id="option-couenne">Couenne</option>
           <option value="gv" id="option-gv">Grande voie</option>
-          <option value="type" id="option-type">Type de voie</option>
         </select>
       </div>
       <div class="legende-temps" id="legende-temps" hidden>
-        <label for="filtre-temps">Depuis le gîte</label>
+        <div class="legende-temps-ligne1">
+          <label for="filtre-temps">Depuis le gîte</label>
+          <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
+        </div>
         <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
-        <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
       </div>
     </div>
     <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu">Masquer</button>
   </div>
 
-  <!-- assets/js/carte.js et ses propres imports (maplibre-gl, puis les
-       modules internes qu'il importe) s'exécutent dans l'ordre du document,
-       avant DOMContentLoaded — donc initCarte est déjà résolu au moment où
-       ce code s'exécute. -->
+  <!-- Un script type="module" s'exécute déjà après la fin du parsing HTML
+       (même garantie que "defer"), donc strictement AVANT que DOMContentLoaded
+       ne se déclenche — attendre cet évènement ici n'apportait rien, juste un
+       aller-retour de plus dans la boucle d'évènements avant que le fetch de
+       data.geojson (voir initCarte, carte.js) ne parte réellement. -->
   <script type="module">
     import { initCarte } from '../../assets/js/carte.js';
-    document.addEventListener('DOMContentLoaded', () => {
-      initCarte('data.geojson');
-    });
+    initCarte('data.geojson');
   </script>
   <script>
     if ('serviceWorker' in navigator) {

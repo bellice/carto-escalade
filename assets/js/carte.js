@@ -8,7 +8,7 @@ import {
   indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite,
   estFalaiseVideDansMode, falaiseVisible, libelleFalaise,
 } from './donnees.js';
-import { dessinerFalaise, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
+import { dessinerFalaise, valeurPourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
 import { addMarker, synchroniserPoignee } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
 import { margeAvantPopup, margeToutVoir, fitToMarkers, creerControleToutVoir, reinitialiserPadding } from './carte-utils.js';
@@ -65,9 +65,9 @@ export function initCarte(dataUrl) {
   const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne, tempsGite }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
   let labelsSecteurs = []; // [{el, marker, nom}], peuplé une fois le geojson chargé
-  let labelsSites = []; // [{el, site}], peuplé une fois le geojson chargé — voir appliquerVisibiliteSites
+  let labelsSites = []; // [{el, marker, site}], peuplé une fois le geojson chargé — voir appliquerAntiCollisionSites
   const entriesParSecteur = new Map(); // clé de regroupement secteur -> entrees falaise, pour appliquerAntiCollisionSecteurs
-  const entriesParSite = new Map(); // site -> entrees falaise, pour appliquerVisibiliteSites
+  const entriesParSite = new Map(); // site -> entrees falaise, pour appliquerAntiCollisionSites
   let secteursVisibles = null;
   // tempsMaxGite/tempsGitePlafond : Infinity tant que le slider n'est pas
   // configuré (pas de falaise sans filtre actif avant que les vraies bornes
@@ -127,30 +127,17 @@ export function initCarte(dataUrl) {
     });
   }
 
-  // Même principe que appliquerAntiCollisionSecteurs (voir plus bas) mais
-  // pour les libellés de SITE : pas de collision à gérer ici (peu de sites,
-  // déjà espacés — voir ajouterLabelsSites dans labels.js), juste la
-  // présence d'au moins une falaise visible en dessous. Sans ça, un mode
-  // "Cercles" qui vide entièrement un site (ex. "Grande voie" sur un site
-  // 100% couenne, comme le Vallon de Baïn) laissait son nom affiché seul,
-  // sans plus aucun marqueur à quoi il puisse renvoyer.
-  function appliquerVisibiliteSites() {
-    labelsSites.forEach(({ el, site }) => {
-      const falaisesDuSite = entriesParSite.get(site) || [];
-      el.style.display = falaisesDuSite.some(falaiseVisible) ? '' : 'none';
-    });
-  }
-
   // Point de passage unique pour appliquerFiltres (recherche/mode/sélection) :
   // recalcule dans la foulée quels libellés de secteur ET de site ont encore
-  // un figuré ponctuel visible en dessous (voir appliquerAntiCollisionSecteurs/
-  // appliquerVisibiliteSites) — sinon un libellé peut rester affiché seul,
-  // sans plus aucun marqueur associé (ex. recherche qui ne laisse aucune
-  // falaise du secteur/site visible).
+  // un figuré ponctuel visible en dessous, et retraite les collisions à
+  // l'écran (voir appliquerAntiCollisionSecteurs/appliquerAntiCollisionSites)
+  // — sinon un libellé peut rester affiché seul, sans plus aucun marqueur
+  // associé (ex. recherche qui ne laisse aucune falaise du secteur/site
+  // visible).
   function appliquerFiltresEtSecteurs() {
     appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
     appliquerAntiCollisionSecteurs();
-    appliquerVisibiliteSites();
+    appliquerAntiCollisionSites();
   }
 
   // Change la falaise "active" (popup ouverte) : ses parkings associés
@@ -177,20 +164,24 @@ export function initCarte(dataUrl) {
     }
   }
 
-  // Masque un libellé de secteur dans deux cas : (1) plus aucune falaise de ce
-  // secteur n'a de figuré ponctuel visible en ce moment (mode "Cercles" vidé,
-  // recherche qui l'exclut...) — un nom de secteur sans le moindre marqueur en
-  // dessous n'a aucun intérêt ; (2) son rectangle à l'écran chevauche celui
-  // d'un libellé déjà retenu (visibility, pas display : garde le DOM mesurable
-  // sans fausser le calcul). Priorité aux secteurs les plus fournis
-  // (labelsSecteurs déjà trié par nbVoies décroissant, voir
-  // construireGeojsonSecteurs) : à conflit égal, celui-là gagne.
-  function appliquerAntiCollisionSecteurs() {
-    if (!secteursVisibles) return;
+  // Décollision au pixel générique, partagée entre libellés de secteur et de
+  // site (même algorithme, seule la source des libellés/du regroupement
+  // change) : pour chaque libellé, dans l'ordre de priorité déjà décidé par
+  // l'appelant (nbVoies décroissant, voir construireGeojsonSecteurs/Sites
+  // dans labels.js), masque-le si plus aucune falaise de son groupe n'a de
+  // figuré ponctuel visible en ce moment (mode "Cercles" vidé, recherche qui
+  // l'exclut...), sinon compare son rectangle à l'écran à ceux déjà retenus
+  // (visibility, pas display : garde le DOM mesurable sans fausser le calcul
+  // suivant) — à conflit, le premier retenu (le plus fourni) gagne.
+  // - labels : [{el, marker, ...}], déjà trié par priorité
+  // - entriesParGroupe : clé de regroupement -> entrees falaise
+  // - cleDe(label) -> clé à chercher dans entriesParGroupe
+  function appliquerAntiCollision(labels, entriesParGroupe, cleDe) {
     const retenus = [];
-    labelsSecteurs.forEach(({ el, marker, nom }) => {
-      const falaisesDuSecteur = entriesParSecteur.get(nom) || [];
-      if (!falaisesDuSecteur.some(falaiseVisible)) {
+    labels.forEach((label) => {
+      const { el, marker } = label;
+      const entreesDuGroupe = entriesParGroupe.get(cleDe(label)) || [];
+      if (!entreesDuGroupe.some(falaiseVisible)) {
         el.style.visibility = 'hidden';
         return;
       }
@@ -205,6 +196,15 @@ export function initCarte(dataUrl) {
       el.style.visibility = chevauche ? 'hidden' : 'visible';
       if (!chevauche) retenus.push(rect);
     });
+  }
+
+  function appliquerAntiCollisionSecteurs() {
+    if (!secteursVisibles) return;
+    appliquerAntiCollision(labelsSecteurs, entriesParSecteur, (l) => l.nom);
+  }
+
+  function appliquerAntiCollisionSites() {
+    appliquerAntiCollision(labelsSites, entriesParSite, (l) => l.site);
   }
 
   // Garde la trace de la popup actuellement ouverte : ferme via la touche
@@ -298,8 +298,36 @@ export function initCarte(dataUrl) {
   // montrer des cercles de référence à une échelle où seuls des points
   // uniformes sont réellement affichés (trompeur).
   function rafraichirLegendeFalaises() {
-    const { max, median, titre, couleurs, remplissage } = infosLegendePourMode(modeFigureActuel, maxima);
-    construireLegendeFalaises(max, median, titre, couleurs, remplissage, modeSimplifieActuel, maxima.total);
+    const { max, median, titre, remplissage } = infosLegendePourMode(modeFigureActuel, maxima);
+    construireLegendeFalaises(max, median, titre, remplissage, modeSimplifieActuel, maxima.total);
+  }
+
+  // Empile les cercles proportionnels du plus grand (derrière) au plus petit
+  // (devant) : sans ça un grand cercle peut visuellement engloutir un petit
+  // juste à côté, le pire cas pour un symbole proportionnel (illisible ET
+  // inatteignable au clic). PAS de z-index (essayé, revert : le canvas de la
+  // carte ET tous les marqueurs partagent par défaut le même stack level
+  // "auto" côté CSS MapLibre — un z-index négatif fait alors passer le
+  // marqueur SOUS le canvas, invisible ; un positif le fait au contraire
+  // passer AU-DESSUS des labels/parkings). On réordonne donc les nœuds DOM
+  // entre eux à la place, en ne touchant qu'à leur position relative les uns
+  // par rapport aux autres : l'ancre (le nœud qui suit le dernier cercle
+  // falaise dans l'ordre DOM courant) est capturée une seule fois, AVANT
+  // toute permutation, donc jamais elle-même déplacée par la boucle — la
+  // position des parkings/gîte/labels autour du groupe reste intacte.
+  function trierCerclesParTaille() {
+    const falaises = entries.filter((e) => e.cat === 'falaise');
+    if (!falaises.length) return;
+    const parent = falaises[0].marker.getElement().parentNode;
+    if (!parent) return;
+    const elementsFalaise = new Set(falaises.map((e) => e.marker.getElement()));
+    let dernier = null;
+    parent.childNodes.forEach((node) => { if (elementsFalaise.has(node)) dernier = node; });
+    const ancre = dernier ? dernier.nextSibling : null;
+    falaises
+      .slice()
+      .sort((a, b) => valeurPourMode(b, modeFigureActuel) - valeurPourMode(a, modeFigureActuel))
+      .forEach(({ marker }) => parent.insertBefore(marker.getElement(), ancre));
   }
 
   // Change le mode "Cercles" et redessine tout ce qui en dépend — utilisé
@@ -312,6 +340,9 @@ export function initCarte(dataUrl) {
     entries.forEach((entree) => {
       if (entree.cat === 'falaise') dessinerFalaise(entree, modeFigureActuel, maxima);
     });
+    // Les tailles ont changé avec le mode : réordonne les cercles en
+    // conséquence (voir trierCerclesParTaille ci-dessus).
+    trierCerclesParTaille();
     rafraichirLegendeFalaises();
     // Un changement de mode peut vider un thème entier (ex. "Grande voie" sur
     // un secteur 100% couenne) : le libellé de secteur n'a plus de figuré
@@ -417,6 +448,9 @@ export function initCarte(dataUrl) {
           }
         }
       });
+      // Tri initial des cercles par taille (voir trierCerclesParTaille) :
+      // à ce stade mode "aucun", donc nbVoies (total).
+      trierCerclesParTaille();
 
       // Clic sur un label de site : cadre sur l'étendue de toutes ses
       // falaises — pas de popup (ce n'est pas une entité unique), juste la
@@ -436,7 +470,9 @@ export function initCarte(dataUrl) {
         reinitialiserPadding(map);
         map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
       });
-      appliquerVisibiliteSites();
+      appliquerAntiCollisionSites();
+      map.on('moveend', appliquerAntiCollisionSites);
+      map.on('zoomend', appliquerAntiCollisionSites);
       appliquerSimplificationZoom();
 
       // Noms de secteur : masqués par défaut, affichés seulement à fort zoom
@@ -457,17 +493,17 @@ export function initCarte(dataUrl) {
       // La légende initiale est déjà construite par appliquerSimplificationZoom()
       // ci-dessus (state changed depuis null au premier appel).
 
-      // Les modes liés au type de voie (couenne / grande voie / répartition)
-      // n'ont de sens que si au moins une falaise a des voies_sportives
-      // typées couenne/grande voie — sinon ces options restent masquées.
-      // Relit les "entries" déjà construites (nbGrandeVoie/nbCouenne y sont
-      // déjà dérivées de voies_sportives, voir compterVoiesSportivesParType
-      // dans donnees.js) plutôt que de rescanner le geojson brut une 2e fois.
+      // Les modes "Couenne"/"Grande voie" n'ont de sens que si au moins une
+      // falaise a des voies_sportives typées couenne/grande voie — sinon ces
+      // options restent masquées. Relit les "entries" déjà construites
+      // (nbGrandeVoie/nbCouenne y sont déjà dérivées de voies_sportives, voir
+      // compterVoiesSportivesParType dans donnees.js) plutôt que de
+      // rescanner le geojson brut une 2e fois.
       const auMoinsUneAvecType = entries.some(e =>
         e.cat === 'falaise' && (e.nbGrandeVoie > 0 || e.nbCouenne > 0)
       );
       if (!auMoinsUneAvecType) {
-        ['option-couenne', 'option-gv', 'option-type'].forEach((id) => {
+        ['option-couenne', 'option-gv'].forEach((id) => {
           const opt = document.getElementById(id);
           if (opt) opt.remove();
         });
@@ -483,9 +519,9 @@ export function initCarte(dataUrl) {
       // Filtre "Depuis le gîte" : masqué par défaut (voir HTML, attribut
       // hidden) tant qu'on n'a pas confirmé qu'au moins une falaise a un
       // temps calculable — un slider sans borne réelle n'aurait rien à
-      // montrer. Bornes arrondies au multiple de 5 le plus proche (13→10,
-      // 147→150) pour un pas de slider net plutôt que des valeurs à la minute
-      // près, qui n'apportent rien de plus utile ici.
+      // montrer. Bornes arrondies au multiple de 5 le plus proche (ex. 5→120
+      // sur ce jeu de données) pour un pas de slider net plutôt que des
+      // valeurs à la minute près, qui n'apportent rien de plus utile ici.
       const tempsValeurs = Array.from(tempsDepuisGite.values());
       if (tempsValeurs.length && filtreTemps && filtreTempsValeur && legendeTemps) {
         const plancher = Math.floor(Math.min(...tempsValeurs) / 5) * 5;

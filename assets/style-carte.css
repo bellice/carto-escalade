@@ -32,6 +32,20 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 
+/* Lettre "P" centrée dans le carré parking (voir addMarker, marqueurs.js) —
+   display:flex écrase le display:block de .marqueur-visuel ci-dessus pour
+   ce cas précis, le reste (bordure, ombre) reste hérité. */
+.marqueur-parking .marqueur-visuel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+}
+
 /* Vue d'ensemble (zoom < ZOOM_SIMPLIFICATION, voir app.js) : les cercles
    proportionnels se recouvrent trop entre eux pour être lisibles à cette
    échelle — remplacés par un petit point uniforme, quel que soit le mode
@@ -54,6 +68,11 @@
   width: 7px !important;
   height: 7px !important;
   border-width: 1px !important;
+}
+/* Le "P" n'a plus sa place à 7px (illisible, déborderait) : simple point de
+   couleur à cette échelle, comme les falaises simplifiées juste au-dessus. */
+.marqueur-parking.zoom-eloigne .marqueur-visuel {
+  font-size: 0 !important;
 }
 
 /* Nom de site (marqueur DOM non interactif, ajouté après les marqueurs
@@ -389,12 +408,16 @@
 
 /* Filtre "Depuis le gîte" — slider à un seul seuil (voir carte.js) : montre
    tout par défaut (poignée au maximum), glisser vers la gauche resserre
-   progressivement aux falaises les plus proches. label+input+valeur sur une
-   seule ligne pour rester compact dans le panneau légende, déjà dense. */
+   progressivement aux falaises les plus proches. Label+valeur sur une ligne
+   (comme .info-ligne des popups : libellé à gauche, valeur à droite), le
+   slider sur sa PROPRE ligne pleine largeur en dessous — repéré après test :
+   les trois sur une seule ligne (1er jet) laissaient le slider bien trop
+   étroit pour rester maniable, le texte (surtout la précision "en voiture")
+   lui volant l'essentiel de la largeur disponible. */
 .legende-temps {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   border-top: 1px solid var(--stone-dark);
   padding-top: 8px;
   font-size: 0.78rem;
@@ -403,12 +426,14 @@
    (spécificité plus forte) sans cette règle — même piège déjà couvert pour
    .legende-contenu[hidden] un peu plus haut dans ce fichier. */
 .legende-temps[hidden] { display: none; }
-.legende-temps label {
-  flex-shrink: 0;
+.legende-temps-ligne1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
 }
 .legende-temps input[type="range"] {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   accent-color: var(--forest);
 }
 .filtre-temps-valeur {
@@ -417,8 +442,6 @@
   font-size: 0.72rem;
   color: #5a6058;
   white-space: nowrap;
-  min-width: 3.5em;
-  text-align: right;
 }
 
 .legende .dot {
@@ -431,7 +454,10 @@
      chargent. */
   background: var(--stone-dark);
 }
-.dot.parking { background: var(--teal); }
+/* border-radius plus petit que .dot (50%) : garde le carré lisible à cette
+   taille réduite, cohérent avec le vrai marqueur parking sur la carte (voir
+   addMarker, marqueurs.js) — la légende doit montrer la même forme. */
+.dot.parking { background: var(--teal); border-radius: 2px; }
 .dot.gite {
   border-radius: 0;
   background: var(--ink);
@@ -705,21 +731,17 @@
   border-radius: 2px;
   flex-shrink: 0;
 }
-/* Couleur ET forme redondantes pour le type de voie (accessibilité
-   daltonisme) : couenne = case pleine, grande voie = contour creux — jamais
-   la couleur seule pour distinguer les deux. Couleurs harmonisées avec le
-   mode "Type de voie" des cercles proportionnels de la carte (--gv/--couenne,
-   symboles.js) plutôt que teal/argile — un seul vocabulaire de couleurs pour
-   "couenne"/"grande voie" sur tout le site. "non-cote" (cotation
-   absente/non standard, ex. anciennes cotations sans lettre) : même
-   traitement que l'ancienne case "autres" du 1er jet — contour neutre, sans
-   prétendre dire de quel type est la voie. */
+/* Couenne/grande voie : même forme (carré), couleur seule pour les
+   distinguer — corrigé après retour terrain : un fond blanc/papier avec
+   juste un contour (1er jet) se lit comme "vide"/absence de donnée sur un
+   popup, mauvaise lisibilité. Couleurs harmonisées avec les cercles
+   proportionnels de la carte (--gv/--couenne, symboles.js) — un seul
+   vocabulaire de couleurs pour "couenne"/"grande voie" sur tout le site.
+   "non-cote" (cotation absente/non standard, ex. anciennes cotations sans
+   lettre) : reste en contour creux, seul cas où "vide" est justement le bon
+   message (pas de type de voie à annoncer). */
 .histo-case.couenne { background: var(--couenne); }
-.histo-case.gv {
-  background: var(--paper);
-  border: 2px solid var(--gv);
-  box-sizing: border-box;
-}
+.histo-case.gv { background: var(--gv); }
 .histo-case.non-cote {
   background: var(--paper);
   border: 2px solid var(--stone-dark);
@@ -752,12 +774,16 @@
   display: inline-block;
 }
 .histo-swatch.couenne { background: var(--couenne); }
-.histo-swatch.gv {
-  background: var(--paper);
-  border: 2px solid var(--gv);
-  box-sizing: border-box;
-}
-.popup .falaises-detail {
+.histo-swatch.gv { background: var(--gv); }
+/* Liste de boutons .lien-secteur en flux (flex-wrap) : réutilisée pour la
+   liste "Falaises" (popup parking, plusieurs sommets) ET la liste "Parking"
+   (popup falaise, plusieurs parkings, voir champParkingAssocie) — même
+   besoin dans les deux sens (label seul sur sa ligne, boutons qui s'enroulent
+   en dessous), pas de raison d'avoir deux règles identiques. Corrige un texte
+   assemblé en ligne avec des "·" (1er jet) : au-delà d'une certaine longueur
+   de bouton (ex. "Parking 1 (5 min à pied)"), le séparateur pouvait se
+   retrouver seul sur sa propre ligne au retour à la ligne — constaté en réel. */
+.popup .liens-detail {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;

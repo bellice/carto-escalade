@@ -46,33 +46,37 @@ function calculerRayon(valeur, max) {
   return RAYON_MIN + (RAYON_MAX - RAYON_MIN) * Math.pow((valeur || 0) / max, EXPOSANT_FLANNERY);
 }
 
-// Remplissage représentatif d'un mode (couleur unie, ou un dégradé 50/50
-// pour "type" — il n'y a pas de répartition "typique" à représenter, un
-// exemple neutre suffit). Utilisée à la fois par dessinerFalaise() pour les
-// vrais marqueurs ET par construireLegendeFalaises() pour les cercles de
-// référence : une seule source de vérité, sinon la légende peut afficher une
-// couleur différente de ce qui est réellement sur la carte.
+// Remplissage représentatif d'un mode (couleur unie). Utilisée à la fois par
+// dessinerFalaise() pour les vrais marqueurs ET par construireLegendeFalaises()
+// pour les cercles de référence : une seule source de vérité, sinon la
+// légende peut afficher une couleur différente de ce qui est réellement sur
+// la carte.
+//
+// Pas de mode combiné "type de voie" (couenne+grande voie sur un même
+// marqueur) : testé en camembert proportionnel (conic-gradient), retiré —
+// couenne/grande voie est une variable catégorielle (nominale), qui se code
+// par la teinte (Bertin), pas par un diagramme en secteurs (l'œil compare
+// mal les angles/aires, Cleveland & McGill — encore plus vrai en petits
+// multiples sur une carte). Vérifié sur les vraies données avant de trancher
+// entre "retirer" et "remplacer par un code couleur à 3 classes" : près de
+// la moitié des falaises (48/109) sont mixtes couenne+grande voie — un code
+// couleur à 3 classes (couenne/grande voie/mixte) aurait perdu leur ratio
+// réel sans gagner grand-chose en retour. Les deux modes "Couenne" et
+// "Grande voie" (déjà ci-dessous, cercles pleins sans ambiguïté) couvrent
+// déjà le besoin séparément.
 function remplissagePourMode(mode) {
   if (mode === 'couenne') return 'var(--couenne)';
   if (mode === 'gv') return 'var(--gv)';
   if (mode === 'faciles') return 'var(--forest)'; // vert = facile, convention courante en sports outdoor
-  if (mode === 'type') return 'conic-gradient(var(--gv) 0% 50%, var(--couenne) 50% 100%)';
   return 'var(--clay)';
 }
 
-// Quelle grandeur (max + médiane) affiche la mini-légende selon le mode
-// courant, plus la clé de couleurs quand le remplissage encode une variable
-// catégorielle (mode "type" : conic-gradient grande voie/couenne) — sans ça
-// rien n'indique quelle couleur correspond à quelle catégorie.
+// Quelle grandeur (max + médiane) affiche la mini-légende selon le mode courant.
 export function infosLegendePourMode(mode, maxima) {
   const remplissage = remplissagePourMode(mode);
   if (mode === 'couenne') return { max: maxima.couenne, median: maxima.couenneMedian, titre: 'Falaises (couenne)', remplissage };
   if (mode === 'gv') return { max: maxima.gv, median: maxima.gvMedian, titre: 'Falaises (grande voie)', remplissage };
   if (mode === 'faciles') return { max: maxima.faciles, median: maxima.facilesMedian, titre: 'Falaises (voies 5-6a+)', remplissage };
-  if (mode === 'type') return {
-    max: maxima.total, median: maxima.totalMedian, titre: 'Falaises (voies)', remplissage,
-    couleurs: [{ nom: 'Grande voie', variable: '--gv' }, { nom: 'Couenne', variable: '--couenne' }],
-  };
   return { max: maxima.total, median: maxima.totalMedian, titre: 'Falaises (voies)', remplissage };
 }
 
@@ -86,14 +90,22 @@ export function infosLegendePourMode(mode, maxima) {
 // remplissage suit la même logique : uni / teinte dédiée par sous-catégorie
 // / teinte répartie (grande voie-couenne, catégorielle donc couleur, pas
 // taille).
+// Grandeur affichée par la taille selon le mode "Cercles" courant — factorisé
+// ici (plutôt qu'en dur dans dessinerFalaise) car carte.js en a aussi besoin
+// pour trier les cercles par taille avant de les empiler (voir
+// trierCerclesParTaille), sans dupliquer ce mapping mode -> propriété.
+export function valeurPourMode(entree, mode) {
+  return mode === 'couenne' ? entree.nbCouenne
+    : mode === 'gv' ? entree.nbGrandeVoie
+    : mode === 'faciles' ? entree.nbFaciles
+    : entree.nbVoies;
+}
+
 export function dessinerFalaise(entree, mode, maxima) {
   const el = entree.marker.getElement();
   const visuel = el.querySelector('.marqueur-visuel');
 
-  const valeur = mode === 'couenne' ? entree.nbCouenne
-    : mode === 'gv' ? entree.nbGrandeVoie
-    : mode === 'faciles' ? entree.nbFaciles
-    : entree.nbVoies;
+  const valeur = valeurPourMode(entree, mode);
 
   const estVide = estFalaiseVideDansMode(entree, mode);
   el.classList.toggle('marqueur-invisible', estVide); // cache la cible tactile entière
@@ -107,12 +119,7 @@ export function dessinerFalaise(entree, mode, maxima) {
   const rayon = calculerRayon(valeur, maxima.total);
   poserTailleMarqueur(el, visuel, rayon * 2);
 
-  if (mode === 'type') {
-    const pctGV = Math.round((entree.nbGrandeVoie / (entree.nbGrandeVoie + entree.nbCouenne)) * 100);
-    visuel.style.background = `conic-gradient(var(--gv) 0% ${pctGV}%, var(--couenne) ${pctGV}% 100%)`;
-  } else {
-    visuel.style.background = remplissagePourMode(mode);
-  }
+  visuel.style.background = remplissagePourMode(mode);
 }
 
 // Mini-légende à cercles de référence (min / médiane / max de la grandeur
@@ -121,20 +128,12 @@ export function dessinerFalaise(entree, mode, maxima) {
 // Le rayon de chaque repère passe par calculerRayon(), la même formule que
 // pour les marqueurs réels : sinon le repère "1" ne correspondrait pas à la
 // taille qu'aurait une vraie falaise à 1 voie sur la carte.
-export function construireLegendeFalaises(max, median, titre, couleurs, remplissage, simplifie, echelle) {
-  // Chip(s) de catégorie "Falaises" (à côté de Parkings/Gîte dans
-  // .legende-cats). Cas normal : une seule pastille "Falaises", couleur du
-  // mode actif. Mode "Type de voie" : le remplissage réel est un dégradé à
-  // deux teintes propre à CHAQUE falaise (sa répartition grande voie/couenne),
-  // qu'une seule pastille ne peut pas représenter honnêtement — on affiche
-  // alors les deux catégories séparément (couleurs vient d'infosLegendePourMode).
-  // Remplace l'ancien double affichage (une pastille "Falaises" ET une clé
-  // couleurs séparée plus bas) qui montrait 3 couleurs pour 2 informations.
+export function construireLegendeFalaises(max, median, titre, remplissage, simplifie, echelle) {
+  // Pastille "Falaises" (à côté de Parkings/Gîte dans .legende-cats),
+  // couleur du mode "Cercles" actif.
   const zoneFalaises = document.getElementById('cle-falaises-zone');
   if (zoneFalaises) {
-    zoneFalaises.innerHTML = (couleurs && couleurs.length)
-      ? couleurs.map(c => `<span class="cle"><span class="dot" style="background:var(${c.variable})"></span> ${escapeHtml(c.nom)}</span>`).join('')
-      : `<span class="cle"><span class="dot" style="background:${remplissage}"></span> Falaises</span>`;
+    zoneFalaises.innerHTML = `<span class="cle"><span class="dot" style="background:${remplissage}"></span> Falaises</span>`;
   }
 
   const conteneur = document.getElementById('legende-falaises');
