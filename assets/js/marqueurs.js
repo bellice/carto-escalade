@@ -7,10 +7,23 @@ import { poserTailleMarqueur } from './symboles.js';
 import { popupFalaise, popupParking, popupGite, construireHistogramme } from './popups.js';
 import { reinitialiserPadding, margeAvantPopup, estPointVisible } from './carte-utils.js';
 
-// Détail des voies (routes/<id>.json, généré par DuckDB) chargé à la demande
-// à l'ouverture de la popup : mis en cache en mémoire pour les réouvertures,
-// et pris en charge par le service worker pour l'offline après une 1ère vue.
-const cacheVoiesParFalaise = new Map();
+// Détail des voies (routes/<slug-site>.json, généré par DuckDB, un fichier
+// par SITE — plusieurs falaises/secteurs dedans, indexées par id_falaise)
+// chargé à la demande à l'ouverture de la popup : mis en cache en mémoire
+// pour les réouvertures, et pris en charge par le service worker pour
+// l'offline après une 1ère vue.
+const cacheVoiesParFalaise = new Map(); // id_falaise -> HTML déjà construit
+const cacheSitesRoutes = new Map(); // slug-site -> Promise<JSON du site>
+
+// Un seul fetch par SITE, dédupliqué via un cache de PROMESSES (pas juste de
+// valeurs résolues) : ouvrir 2 falaises du même site coup sur coup, avant que
+// le 1er fetch n'ait répondu, ne déclenche pas 2 requêtes.
+function chargerJsonSite(siteId, urlRoute) {
+  if (!cacheSitesRoutes.has(siteId)) {
+    cacheSitesRoutes.set(siteId, fetch(urlRoute(siteId)).then(r => r.json()));
+  }
+  return cacheSitesRoutes.get(siteId);
+}
 
 // Charge (une seule fois par falaise, relu ensuite dans cacheVoiesParFalaise)
 // le détail des voies dans le placeholder [data-route] trouvé sous racineEl,
@@ -22,16 +35,17 @@ const cacheVoiesParFalaise = new Map();
 function chargerDetailVoies(racineEl, urlRoute) {
   const placeholder = racineEl && racineEl.querySelector('[data-route]');
   if (!placeholder || !urlRoute) return;
-  const id = placeholder.dataset.route;
-  if (cacheVoiesParFalaise.has(id)) {
-    placeholder.innerHTML = cacheVoiesParFalaise.get(id);
+  const siteId = placeholder.dataset.route;
+  const falaiseId = placeholder.dataset.routeFalaise;
+  if (cacheVoiesParFalaise.has(falaiseId)) {
+    placeholder.innerHTML = cacheVoiesParFalaise.get(falaiseId);
     return;
   }
-  fetch(urlRoute(id))
-    .then(r => r.json())
-    .then(data => {
-      const html = construireHistogramme(data.voies_sportives || []);
-      cacheVoiesParFalaise.set(id, html);
+  chargerJsonSite(siteId, urlRoute)
+    .then(donneesSite => {
+      const voies = (donneesSite[falaiseId] && donneesSite[falaiseId].voies_sportives) || [];
+      const html = construireHistogramme(voies);
+      cacheVoiesParFalaise.set(falaiseId, html);
       // La fiche (popup ou panneau) peut avoir été refermée ou réutilisée
       // entre-temps : on n'écrit que si ce placeholder est toujours dans le DOM.
       if (placeholder.isConnected) placeholder.innerHTML = html;

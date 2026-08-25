@@ -102,10 +102,21 @@ export function estPointVisible(map, lon, lat, padding, marge = 24) {
 //   ajout dans ce panneau sans cette mesure. Recalculée à chaque appel : la
 //   légende peut être repliée/dépliée entre deux appels, la hauteur d'écran
 //   peut changer (rotation).
+//   Repli sur MARGE_MOBILE.bottom si la légende est présente dans le DOM
+//   mais MASQUÉE (offsetParent === null) : body.fiche-ouverte lui applique
+//   display:none tant qu'une fiche reste ouverte (voir le CSS) — un élément
+//   display:none renvoie un getBoundingClientRect() à zéro, donc top=0, ce
+//   qui aurait donné bas≈innerHeight (quasi tout l'écran). Bug réel constaté :
+//   cliquer un libellé de site (qui recadre via margeToutVoir) pendant que la
+//   fiche falaise est ouverte sur mobile ne faisait plus rien — le padding
+//   obtenu dépassait la hauteur du conteneur, MapLibre abandonnait
+//   silencieusement le fitBounds (même défaillance déjà documentée plus bas,
+//   voir reinitialiserPadding).
 export function margeToutVoir() {
   if (estDesktop()) return margeDesktop();
   const legende = document.querySelector('.legende');
-  const bas = legende ? Math.round(window.innerHeight - legende.getBoundingClientRect().top) + 10 : MARGE_MOBILE.bottom;
+  const legendeVisible = legende && legende.offsetParent !== null;
+  const bas = legendeVisible ? Math.round(window.innerHeight - legende.getBoundingClientRect().top) + 10 : MARGE_MOBILE.bottom;
   return { ...MARGE_MOBILE, bottom: Math.max(bas, 40) };
 }
 

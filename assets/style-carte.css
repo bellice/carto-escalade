@@ -228,7 +228,14 @@
      du panneau. La largeur stable vient du panneau lui-même (width fixe
      --largeur-panneau-gauche) : le width:280px ajouté précédemment n'a plus
      lieu d'être. Le plafond de hauteur + scroll reviennent au panneau
-     (overflow-y:auto), pas à la légende. */
+     (overflow-y:auto), pas à la légende.
+     width:100% (pas auto) : .legende est display:flex avec
+     align-items:flex-start (règle mobile, non annulée ici) -- un enfant flex
+     en width:auto s'y dimensionne à son contenu (shrink-to-fit) au lieu de
+     remplir la largeur disponible. 100% force le remplissage quel que soit
+     align-items, et rétablit la largeur stable que ce bloc visait déjà
+     (repéré au test : .legende-contenu rétrécissait avec .reperes-taille,
+     même symptôme que la règle mobile ci-dessus, cause différente). */
   #panneau-lateral > .legende .legende-contenu {
     border: none;
     background: none;
@@ -237,7 +244,7 @@
     max-width: none;
     max-height: none;
     overflow: visible;
-    width: auto;
+    width: 100%;
   }
 
   /* Panneau droit : fiche falaise, contextuelle (apparaît/disparaît à la
@@ -517,6 +524,15 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* width (pas seulement max-width) : .legende (mobile) est en position:absolute
+     avec un seul côté (left) fixé -- sans width explicite, elle se dimensionne
+     au contenu (shrink-to-fit), et la ligne .reperes-taille change de largeur
+     avec le rayon des cercles (calculerRayon, symboles.js) selon la grandeur
+     affichée et le zoom (cercles proportionnels vs message "Zoomez pour
+     voir..."). Repéré au test : le panneau entier changeait de largeur en
+     zoomant. width fige la légende à sa largeur par défaut, quel que soit
+     son contenu du moment. */
+  width: min(280px, calc(100vw - 24px));
   max-width: min(280px, calc(100vw - 24px));
   max-height: min(360px, calc(100vh - 160px));
   overflow-y: auto;
@@ -553,15 +569,16 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* min-height calé sur la variante la plus haute (titre + cercles de
-     référence jusqu'à 52px + leur libellé) : sans ça, franchir
+  /* min-height calé sur la variante la plus haute (cercle de référence au
+     rayon max (RAYON_MAX=26 => 52px de diamètre, symboles.js) + son gap 2px
+     + son libellé ~14px = 68px, arrondi à 70) : sans ça, franchir
      ZOOM_SIMPLIFICATION bascule vers/depuis le message texte "Zoomez pour
      voir..." (nettement plus court) et fait visiblement grandir/rétrécir
-     toute la colonne à chaque changement de zoom — gênant une fois la
-     colonne fusionnée avec recherche/légende (retour terrain). Un simple
-     espace vide sous le message court coûte moins qu'un déplacement
-     constant du reste de la légende en dessous. */
-  min-height: 90px;
+     toute la colonne à chaque changement de zoom. Calé au plus près du
+     contenu réel (pas une valeur ronde arbitraire) : une marge trop large
+     laisse un vide visible sous les cercles avant le bloc suivant (repéré au
+     test après un 1er réglage à 90px). */
+  min-height: 70px;
 }
 .legende-titre {
   font-family: var(--font-mono);
@@ -1320,6 +1337,26 @@
     width: 28px;
   }
   .histo-label {
+    font-size: 0.68rem;
+  }
+
+  /* Micro-libellés de la fiche (Roche/Parking via .info-label/.info-valeur ;
+     Voies/Grimpe/Roche via .col-label/.col-valeur ; "Cotation (hors trad et
+     artificielle)"/"Accès" via .legende-titre et .fiche-groupe-titre) : trop
+     petits pour rester confortablement lisibles sur mobile (0.62-0.74rem,
+     calés à l'origine pour la popup desktop de 260px). Même logique de bump
+     que .histo-label juste au-dessus (retour terrain identique). .legende-
+     titre/.fiche-groupe-titre/.col-label sont explicitement déclarés à LA
+     MÊME taille l'un que l'autre ailleurs dans ce fichier ("même voix
+     typographique") — bumpés ensemble ici pour ne pas rouvrir cet écart. */
+  .popup .info-label,
+  .popup .info-valeur,
+  .popup .col-valeur {
+    font-size: 0.8rem;
+  }
+  .popup .legende-titre,
+  .popup .fiche-groupe-titre,
+  .popup .col-label {
     font-size: 0.68rem;
   }
 
