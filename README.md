@@ -30,8 +30,8 @@ sorties/
     index.html       → page carte de cette sortie
     data.geojson     → falaises + parkings, version LÉGÈRE (sans le détail des
                        voies, compteurs précalculés) — généré depuis une base DuckDB
-    routes/          → détail des voies, 1 fichier par falaise (chargé à la
-                       demande à l'ouverture de sa popup)
+    routes/          → détail des voies, 1 fichier par SITE (chargé à la
+                       demande à l'ouverture de la popup d'une de ses falaises)
 ```
 
 `maplibre-gl` 6.4.1 est chargé depuis le CDN jsDelivr (pas vendu en local —
@@ -73,7 +73,7 @@ serveur — hors de portée d'un site statique gratuit.
    copie vers ce repo :
    `uv run scripts/export_geojson.py` puis `uv run scripts/copy_to_site.py --sortie AAAA-MM-lieu`
    — ça remplace `data.geojson` (version légère, sans le détail des voies)
-   ET le dossier `routes/` (détail par falaise, chargé à la demande).
+   ET le dossier `routes/` (détail par site, chargé à la demande).
 3. Ajouter une entrée dans la liste de `index.html` (racine).
 4. `initCarte('data.geojson')` reste inchangé — aucune autre modif de code requise.
 
@@ -119,10 +119,11 @@ Le détail des voies (`voies_sportives`, une entrée par voie : `nom`,
 `source_id` ; `cotation` = celle de la longueur la plus dure) n'est PAS dans
 `data.geojson` : il représentait ~70 % du poids historique du fichier, pour
 un usage uniquement à l'ouverture de la popup d'une falaise. Il est généré à
-part dans `routes/<id_falaise>.json` et chargé à la demande (voir
-`marqueurs.js`, `popup.on('open')`), avec un cache en mémoire pour les
-réouvertures. La version lisible complète est `data.readable.geojson` (repo
-de génération).
+part dans `routes/<slug-site>.json` (un fichier par site, indexé par
+`id_falaise` — plusieurs falaises d'un même site partagent le fichier) et
+chargé à la demande (voir `marqueurs.js`, `popup.on('open')`), avec un cache
+en mémoire pour les réouvertures. La version lisible complète est
+`data.readable.geojson` (repo de génération).
 
 **Parking**
 `nom`, `categorie` ("parking"), `trajet_gite_min`
@@ -157,7 +158,7 @@ CRS : **EPSG:4326** obligatoire.
   `-worker`, `.css`) sont **ajoutés au pré-cache** du service worker : ils
   sont donc disponibles hors-ligne dès l'install, sans dépendre du CDN au
   moment de l'usage.
-- **`routes/<id>.json`** (détail des voies) : **pré-cachés à l'install** (les
+- **`routes/<slug-site>.json`** (détail des voies) : **pré-cachés à l'install** (les
   identifiants sont lus depuis `data.geojson` — total ~170 Ko par sortie),
   puis servis en **stale-while-revalidate** : l'histogramme d'une fiche sort
   du cache instantanément, sans aller-retour réseau (important en contexte

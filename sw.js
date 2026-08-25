@@ -12,7 +12,7 @@
 //   visites suivantes (le principal gain de bande passante du site). Le style
 //   seul est rafraîchi en arrière-plan (voir le fetch handler).
 // Bump CACHE_NAME pour forcer un renouvellement complet après un déploiement.
-const CACHE_NAME = 'sorties-escalade-v4';
+const CACHE_NAME = 'sorties-escalade-v5';
 
 // Coquille pré-cachée à l'install. Liste manuelle : une entrée par dossier
 // sortie/ (page + data.geojson). maplibre-gl reste servi par le CDN (voir
@@ -51,9 +51,10 @@ const PRECACHE = [
   './sorties/2026-10-drome-saou/data.geojson',
 ];
 
-// Pré-cache du détail des voies (routes/<id>.json) de chaque sortie, à
-// l'install. L'histogramme d'une fiche est chargé à la demande à l'ouverture
-// de la popup (voir marqueurs.js) : sans ce pré-cache, sa première ouverture
+// Pré-cache du détail des voies (routes/<slug-site>.json, un fichier par
+// SITE — plusieurs falaises dedans) de chaque sortie, à l'install.
+// L'histogramme d'une fiche est chargé à la demande à l'ouverture de la
+// popup (voir marqueurs.js) : sans ce pré-cache, sa première ouverture
 // déclenche un aller-retour réseau — ~2 Ko en moyenne, mais une LATENCE
 // pleine sur réseau faible (le motif exact du "ça met du temps à afficher la
 // dataviz"). Le total d'une sortie est négligeable (~170 Ko) : on pré-cache
@@ -71,9 +72,14 @@ function precacherRoutes() {
         .then((geo) => {
           if (!geo || !geo.features) return;
           const base = abs.slice(0, abs.lastIndexOf('/') + 1);
-          const urls = geo.features
-            .filter((f) => f.properties && f.properties.categorie === 'falaise' && f.properties.routes)
-            .map((f) => base + 'routes/' + f.properties.routes + '.json');
+          // new Set(...) : plusieurs falaises d'un même site partagent
+          // désormais la même URL routes/<slug>.json — sans dédup, ce fichier
+          // serait mis en cache une fois par falaise plutôt qu'une fois.
+          const urls = [...new Set(
+            geo.features
+              .filter((f) => f.properties && f.properties.categorie === 'falaise' && f.properties.routes)
+              .map((f) => base + 'routes/' + f.properties.routes + '.json')
+          )];
           if (!urls.length) return;
           // allSettled : un fichier manquant (404) ne fait pas échouer le
           // pré-cache des autres.

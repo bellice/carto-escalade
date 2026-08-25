@@ -627,14 +627,22 @@ export function initCarte(dataUrl) {
     // avant cet appel, popupOuverte n'est alors plus le panneau — sans ce
     // garde, le 2e cadrage n'aurait plus réservé le panneau droit et perdait
     // le centrage falaise+parking (bug réel constaté).
+    // duration:800 explicite : sans lui, la durée par défaut de MapLibre se
+    // calcule sur la distance/le delta de zoom (courbe "fly") et peut
+    // dépasser 2s pour un grand saut (ex. recherche depuis une vue éloignée
+    // vers une falaise précise) — mesuré en conditions réelles : la fiche et
+    // sa cotation sont déjà affichées bien avant, mais la caméra continue de
+    // bouger derrière, ce qui donne l'impression d'attendre alors que les
+    // données sont prêtes. 800ms reste un mouvement de caméra lisible sans
+    // sembler figé.
     const reserverPanneauDroit = cible.cat === 'falaise' || panneauFalaiseOuvert();
     if (origine) {
       const bounds = new maplibregl.LngLatBounds();
       bounds.extend(pointDe(origine));
       bounds.extend(pointDe(cible));
-      map.fitBounds(bounds, { padding: margeAvantPopup(reserverPanneauDroit), maxZoom: 16 });
+      map.fitBounds(bounds, { padding: margeAvantPopup(reserverPanneauDroit), maxZoom: 16, duration: 800 });
     } else {
-      map.flyTo({ center: pointDe(cible), zoom: Math.max(map.getZoom(), 15), padding: margeAvantPopup(reserverPanneauDroit) });
+      map.flyTo({ center: pointDe(cible), zoom: Math.max(map.getZoom(), 15), padding: margeAvantPopup(reserverPanneauDroit), duration: 800 });
     }
 
     if (cible.cat === 'falaise') {
@@ -643,10 +651,19 @@ export function initCarte(dataUrl) {
       // commentaire de ouvrirFalaise/ouvrirPanneauFalaise sur pourquoi ne
       // pas la court-circuiter avec un 2e cadrage ici serait un bug.
       ouvrirFalaise(cible.cle, true);
+      // PAS de enSurbrillance ici pour ce cas : ouvrirFalaise vient déjà d'en
+      // poser une correcte (falaise + SES parkings associés, voir
+      // ouvrirPanneauFalaise/ouvrirPopupFalaise). Un appel enSurbrillance
+      // générique juste après, sans parkingAssocie, l'écraserait aussitôt et
+      // ré-estompait le parking à 0.25 (bug réel constaté : après une
+      // recherche+"Voir" sur une falaise, son parking associé restait grisé
+      // malgré tout). S'il y a une origine (lien croisé), on l'ajoute à la
+      // liste déjà posée par ouvrirFalaise plutôt que la remplacer.
+      if (origine) enSurbrillance([origine.cle, cible.cle, ...cible.parkingAssocie]);
     } else {
       cible.marker.togglePopup();
+      enSurbrillance(origine ? [origine.cle, cible.cle] : [cible.cle]);
     }
-    enSurbrillance(origine ? [origine.cle, cible.cle] : [cible.cle]);
   }
 
   const etatChargement = document.getElementById('etat-chargement');

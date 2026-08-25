@@ -175,7 +175,7 @@ export function popupFalaise(p, lat, lon, cle) {
     // il ne couvre que les SPORTIVES — le titre "Cotation voies sportives" et
     // la colonne Grimpe (mixte, le cas échéant) signalent l'écart avec le
     // total de la colonne Voies.
-    contenuCaractere += `<div class="voies-histo-placeholder" data-route="${escapeHtml(String(p.routes))}"></div>`;
+    contenuCaractere += `<div class="voies-histo-placeholder" data-route="${escapeHtml(String(p.routes))}" data-route-falaise="${escapeHtml(String(p.routes_falaise))}"></div>`;
   }
   if (p.parking_associe && p.parking_associe.length) {
     const noms = p.parking_associe;
@@ -509,13 +509,18 @@ export function construireHistogramme(voiesSportives) {
   // communautaire (seul lien_oblyk/lien_camptocamp existe, au niveau
   // falaise — voir donnees.js), le popup resterait pauvre. Ne pas
   // implémenter tant que ce calcul valeur/coût n'a pas été retranché.
-  // Le titre "Cotation voies sportives" (plus haut, même voix typographique
-  // que les colonnes Voies/Grimpe/Roche) et cette légende couenne/grande voie
-  // sous l'histogramme sont deux classifications différentes qui s'enchaînent
-  // sans signal de rupture : un micro-libellé annonce explicitement le
-  // changement.
+  // Titre "Cotation (hors trad et artificielle)" plutôt que "Cotation voies
+  // sportives" : au-delà de servir de rupture visuelle avant la légende
+  // couenne/grande voie (une classification différente qui s'enchaînerait
+  // sinon sans signal), la formulation par EXCLUSION prévient explicitement
+  // toute confusion avec le total "Voies" plus haut — l'histogramme ne
+  // couvre pas les voies trad/artificielle (non détaillées par voie dans les
+  // données, seulement comptées), contrairement à ce qu'un titre par
+  // inclusion ("voies sportives") laisse deviner seul. "trad"/"artificielle"
+  // sont déjà le vocabulaire affiché ailleurs dans cette même fiche (colonne
+  // "Grimpe", voir styleGrimpe) — pas une terminologie nouvelle.
   const histo = `
-    <span class="legende-titre">Cotation voies sportives</span>
+    <span class="legende-titre">Cotation (hors trad et artificielle)</span>
     <div class="voies-histo" role="img" aria-label="Répartition des ${voiesSportives.length} voies sportives par cotation${nonCotees.length ? `, dont ${nonCotees.length} non côtées` : ''}">
       ${colonnesHtml}
     </div>
