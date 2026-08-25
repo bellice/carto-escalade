@@ -220,10 +220,25 @@
     display: none;
   }
 
-  /* .legende-contenu retrouve son plafond/scroll interne propre (valeurs
-     d'origine du fichier, aucun override ici) — pertinent à nouveau
-     maintenant que le panneau gauche est compact et ne partage plus son
-     scroll avec une fiche falaise potentiellement longue. */
+  /* Sur desktop, .legende-contenu vit DANS la carte #panneau-lateral
+     (bordure + fond + ombre sur tout le panneau) : son propre cadre
+     (bordure/fond/padding) serait une "boîte dans la boîte" redondante. On
+     l'aplatit — le contenu de la légende s'aligne alors sur les bords du
+     champ de recherche (.recherche-champ), tous deux calés au padding 16px
+     du panneau. La largeur stable vient du panneau lui-même (width fixe
+     --largeur-panneau-gauche) : le width:280px ajouté précédemment n'a plus
+     lieu d'être. Le plafond de hauteur + scroll reviennent au panneau
+     (overflow-y:auto), pas à la légende. */
+  #panneau-lateral > .legende .legende-contenu {
+    border: none;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    width: auto;
+  }
 
   /* Panneau droit : fiche falaise, contextuelle (apparaît/disparaît à la
      sélection), plein hauteur, largeur 0 -> fixe. Révélation par width (pas
