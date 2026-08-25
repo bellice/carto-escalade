@@ -391,17 +391,24 @@ function approximerCotation(cotation) {
 // Style de grimpe de la falaise (colonne "Grimpe"), déduit du rapport
 // sportives / autres : la colonne Voies porte le TOTAL, l'histogramme ne
 // montre que les SPORTIVES (titre "Cotation voies sportives") — la colonne
-// Grimpe signale l'écart sans ligne de texte séparée. Limite assumée : les
-// données ne distinguent pas trad et artificielle ("autres" recouvre les
-// voies non sportives ; ici de grandes voies classiques) — "artificielle"
-// serait le pendant de "trad" si les données le portaient un jour.
+// Grimpe signale l'écart sans ligne de texte séparée. Les données portent
+// désormais la répartition exacte (nb_voie_sportive / nb_voie_trad /
+// nb_voie_artificielle) : on ne déduit plus le style d'un vague "autres".
 function styleGrimpe(p) {
   const total = p.nb_voie_total ?? 0;
   const sportive = p.nb_voie_sportive ?? 0;
-  const autres = p.nb_voie_autres ?? 0;
+  const trad = p.nb_voie_trad ?? 0;
+  const artificielle = p.nb_voie_artificielle ?? 0;
   if (total <= 0) return '';
-  if (autres <= 0) return 'sportive';
-  if (sportive <= 0) return 'trad';
+  // Nombre de disciplines réellement présentes : une seule -> son nom ;
+  // plusieurs -> "mixte".
+  const disciplines = [sportive > 0, trad > 0, artificielle > 0].filter(Boolean).length;
+  if (disciplines <= 1) {
+    if (sportive > 0) return 'sportive';
+    if (trad > 0) return 'trad';
+    if (artificielle > 0) return 'artificielle';
+    return '';
+  }
   return 'mixte';
 }
 
