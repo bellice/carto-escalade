@@ -19,36 +19,60 @@ import { secteurDistinct, cotationVersValeur } from './donnees.js';
 // discrètes pastilles muettes qui donnent le contexte de l'anneau complet
 // (donc plus besoin de traiter N à part : sa position — en haut — suffit).
 const POINTS_ROSE = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
-const ROSE_RAYON_POINTS = 12; // distance centre -> pastille, px
-const ROSE_RAYON_LABELS = 22; // distance centre -> libellé, px
 
 function roseDesVents(orientation) {
   const actifs = new Set(orientation.map(s => s.trim()).filter(Boolean));
+  const indexDir = Object.fromEntries(POINTS_ROSE.map((d, i) => [d, i]));
+  const cx = 32, cy = 32;
 
-  const points = POINTS_ROSE.map((point, i) => {
-    const angle = i * 45;
-    const classe = actifs.has(point) ? 'rose-vents-point rose-vents-point-actif' : 'rose-vents-point';
-    return `<span class="${classe}" style="transform: rotate(${angle}deg) translateY(-${ROSE_RAYON_POINTS}px);"></span>`;
+  // Une vraie rose des vents à 8 pointes (losanges) : 4 cardinales longues et
+  // larges, 4 intercardinales courtes — le vocabulaire classique d'une rose.
+  // Vectorielle (SVG) donc nette quel que soit l'affichage. Pointe active en
+  // encre pleine, inactives en remplissage doux.
+  const polygone = (i, rayon, base, demiL) => {
+    const a = (i * 45 * Math.PI) / 180;
+    const sin = Math.sin(a), cos = Math.cos(a);
+    const tipX = cx + rayon * sin, tipY = cy - rayon * cos;
+    const inX = cx + base * sin, inY = cy - base * cos;
+    const Rm = (rayon + base) / 2;
+    const gX = cx + Rm * sin + demiL * cos, gY = cy - Rm * cos + demiL * sin;
+    const dX = cx + Rm * sin - demiL * cos, dY = cy - Rm * cos - demiL * sin;
+    return `${tipX},${tipY} ${gX},${gY} ${inX},${inY} ${dX},${dY}`;
+  };
+
+  const pointes = POINTS_ROSE.map((d, i) => {
+    const cardinal = i % 2 === 0;
+    const actif = actifs.has(d);
+    // Pointes raccourcies (17/11 au lieu de 22/15) : à rayon 22, les pointes
+    // cardinales venaient chevaucher les libellés placés à rayon 25
+    // (enchevêtrement signalé au test). Les 4 cardinales restent nettement
+    // plus longues que les intercardinales, toujours bien à l'intérieur de
+    // l'anneau (r 24) — un net espace d'air entre la rose et les lettres.
+    const rayon = cardinal ? 17 : 11;
+    const demiL = cardinal ? 4 : 2.8;
+    const classe = actif ? 'rose-vents-pointe rose-vents-pointe-actif' : 'rose-vents-pointe';
+    return `<polygon class="${classe}" points="${polygone(i, rayon, 6.5, demiL)}" />`;
   }).join('');
 
-  // Réserve tout de même un repère "N" discret même hors zone orientée (sauf
-  // si N est déjà actif, pour ne pas doubler le libellé) : la position en
-  // haut de l'anneau ne suffit à elle seule que si on sait déjà que la carte
-  // est orientée nord en haut — un rappel textuel évite d'avoir à le savoir.
+  // Libellés : direction(s) active(s) en évidence, repère N discret sinon.
   const labels = POINTS_ROSE
-    .filter(point => actifs.has(point) || point === 'N')
-    .map(point => {
-      const angle = POINTS_ROSE.indexOf(point) * 45;
-      const classe = actifs.has(point) ? 'rose-vents-label rose-vents-label-actif' : 'rose-vents-label';
-      return `<span class="${classe}" style="transform: rotate(${angle}deg) translateY(-${ROSE_RAYON_LABELS}px) rotate(${-angle}deg);">${escapeHtml(point)}</span>`;
+    .filter(d => actifs.has(d) || d === 'N')
+    .map(d => {
+      const i = indexDir[d];
+      const a = (i * 45 * Math.PI) / 180;
+      const x = cx + 25 * Math.sin(a);
+      const y = cy - 25 * Math.cos(a);
+      const actif = actifs.has(d);
+      return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" class="rose-vents-label${actif ? ' rose-vents-label-actif' : ''}">${escapeHtml(d)}</text>`;
     }).join('');
 
   return `
-    <div class="rose-vents" role="img" aria-label="Orientation : ${escapeHtml(Array.from(actifs).join(', '))}">
-      <div class="rose-vents-cercle"></div>
-      ${points}
+    <svg class="rose-vents" viewBox="0 0 64 64" role="img" aria-label="Orientation : ${escapeHtml(Array.from(actifs).join(', '))}">
+      <circle class="rose-vents-anneau" cx="32" cy="32" r="24" />
+      ${pointes}
+      <circle class="rose-vents-centre" cx="32" cy="32" r="2.5" />
       ${labels}
-    </div>`;
+    </svg>`;
 }
 
 // Orientation en haut à droite de l'en-tête falaise (voir popup-entete) : ce
@@ -133,38 +157,40 @@ export function popupFalaise(p, lat, lon, cle) {
   // deux lignes du même groupe (voir .fiche-groupe-suivant) — pas de trait ni
   // de fond, juste plus de blanc : le regroupement par proximité (Gestalt)
   // suffit à signaler "nouveau sujet" sans ajouter le moindre élément visuel.
-  const rowsCaractere = []; // à quoi ressemble l'escalade ici
   const rowsLogistique = []; // comment y aller
 
-  if (p.type_roche) rowsCaractere.push(champ('Roche', p.type_roche));
-  if (p.nb_voie_total) {
-    // Synthèse (total/sportives/autres) : disponible directement, elle ne
-    // dépend que des compteurs embarqués dans le fichier principal. La
-    // grille détaillée (histogramme), elle, est chargée à la demande (voir
-    // marqueurs.js, popup.on('open')) : le détail des voies n'est plus dans
-    // data.geojson, il est généré à part par DuckDB (routes/<id>.json).
-    rowsCaractere.push(champVoiesSynthese(p.nb_voie_total, p.nb_voie_sportive ?? 0, p.nb_voie_autres ?? 0));
-    if (p.routes) {
-      rowsCaractere.push(`<div class="voies-histo-placeholder" data-route="${escapeHtml(String(p.routes))}"></div>`);
-    }
+  // Métadonnées clés en COLONNES ÉTROITES (Voies / Grimpe / Roche) : mini-
+  // colonnes sans bordure, label en petite majuscule au-dessus de la valeur.
+  // Ordre : VOIES d'abord (le chiffre clé pour choisir un site), puis GRIMPE
+  // (le style : sportive/trad/mixte), puis Roche (qualificatif géologique).
+  const cols = [];
+  if (p.nb_voie_total) cols.push(col('Voies', p.nb_voie_total));
+  const grimpe = styleGrimpe(p);
+  if (grimpe) cols.push(col('Grimpe', grimpe));
+  if (p.type_roche) cols.push(col('Roche', p.type_roche));
+  let contenuCaractere = cols.length ? `<div class="fiche-infos-cols">${cols.join('')}</div>` : '';
+
+  if (p.nb_voie_total && p.routes) {
+    // Histogramme des cotations, chargé à la demande (voir chargerDetailVoies) :
+    // il ne couvre que les SPORTIVES — le titre "Cotation voies sportives" et
+    // la colonne Grimpe (mixte, le cas échéant) signalent l'écart avec le
+    // total de la colonne Voies.
+    contenuCaractere += `<div class="voies-histo-placeholder" data-route="${escapeHtml(String(p.routes))}"></div>`;
   }
   if (p.parking_associe && p.parking_associe.length) {
     const noms = p.parking_associe;
     const approches = p.approche_min || [];
-    const metres = p.approche_metre || [];
+    // Le temps d'approche voyage AVEC le(s) parking(s) (voir
+    // champParkingAssocie) : plus de ligne "Approche" séparée, qui détachait
+    // l'info du parking auquel elle se rapporte. La distance en mètres est
+    // retirée de l'affichage (chacun se fait son itinéraire), le temps à
+    // pied reste.
     rowsLogistique.push(champParkingAssocie(noms, approches));
-    // Plusieurs parkings : le temps est déjà sur chaque bouton (voir
-    // champParkingAssocie), pas de ligne "Approche" séparée à dupliquer.
-    if (noms.length === 1 && approches[0]) {
-      // "à pied" : même désambiguïsation que dans champParkingAssocie, pas à
-      // confondre avec le temps en voiture depuis le gîte (popupParking).
-      rowsLogistique.push(champ('Approche', `${approches[0]} min à pied` + (metres[0] ? ` (${metres[0]} m)` : '')));
-    }
   }
 
   const rows = [
-    rowsCaractere.join(''),
-    rowsLogistique.length ? `<div class="fiche-groupe-suivant">${rowsLogistique.join('')}</div>` : '',
+    contenuCaractere,
+    rowsLogistique.length ? `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Accès</div>${rowsLogistique.join('')}</div>` : '',
   ];
 
   const secteur = secteurDistinct(p);
@@ -193,7 +219,7 @@ export function popupFalaise(p, lat, lon, cle) {
 
 export function popupParking(p, lat, lon, parkingInfos, cle) {
   const rows = [];
-  if (p.trajet_gite_min) rows.push(champ('Trajet depuis le gîte', `${p.trajet_gite_min} min en voiture`));
+  if (p.trajet_gite_min) rows.push(champBloc('Trajet depuis le gîte', `${p.trajet_gite_min} min en voiture`));
 
   const info = parkingInfos.get(p.nom);
   if (info && info.falaises.length) {
@@ -232,6 +258,22 @@ function champ(label, valeur) {
   return `<div class="info-ligne"><span class="info-label">${label}</span><span class="info-valeur">${escapeHtml(String(valeur))}</span></div>`;
 }
 
+// Variante "bloc" (voir .info-bloc) : libellé sur sa propre ligne, valeur en
+// pleine largeur en dessous — pour une valeur à donner en évidence (ex. le
+// temps de trajet "71 min en voiture" dans la popup parking) plutôt que
+// serrée à droite d'un libellé.
+function champBloc(label, valeur) {
+  return `<div class="info-bloc"><span class="info-label">${label}</span><span class="info-valeur">${escapeHtml(String(valeur))}</span></div>`;
+}
+
+// Mini-colonne d'info (Roche / Voies, fiche falaise) : label en petite
+// majuscule au-dessus de la valeur (voir .fiche-infos-cols/.col).
+function col(label, valeur) {
+  return `<div class="col"><span class="col-label">${label}</span><span class="col-valeur">${escapeHtml(String(valeur))}</span></div>`;
+}
+
+
+
 // Parking(s) associé(s) à une falaise : le nom réel du parking (souvent une
 // description type "petit parking D136") n'aide pas à décider de cliquer —
 // seul le fait qu'il y en ait un compte. Cas courant (61 falaises/71, un
@@ -254,14 +296,18 @@ function champ(label, valeur) {
 // devenus trop longs pour rester en ligne : le séparateur pouvait finir seul
 // sur sa propre ligne au retour à la ligne (constaté en réel).
 function champParkingAssocie(noms, approches) {
-  if (noms.length === 1) {
-    return `<div class="info-ligne"><span class="info-label">Parking</span><span class="info-valeur"><button type="button" class="lien-secteur" data-nom="${escapeHtml(noms[0])}">Voir sur la carte</button></span></div>`;
-  }
-  const boutons = noms.map((nom, i) => {
-    const duree = approches[i] ? ` (${approches[i]} min à pied)` : '';
-    return `<button type="button" class="lien-secteur" data-nom="${escapeHtml(nom)}">Parking ${i + 1}${duree}</button>`;
+  // Chaque parking est une LIGNE cliquable avec son temps d'approche — modèle
+  // uniforme entre 1 et N parkings : [P] Parking [n] · X min à pied. La ligne
+  // entière navigue vers le parking (handler .parking-ligne dans carte.js,
+  // même chemin que .lien-secteur). Le badge P relie aux icônes P de la carte,
+  // le libellé "Parking n" est souligné (affordance de lien cliquable).
+  const badgeP = '<span class="badge-parking" aria-hidden="true">P</span>';
+  const lignes = noms.map((nom, i) => {
+    const libelle = noms.length === 1 ? 'Parking' : `Parking ${i + 1}`;
+    const duree = approches[i] ? `<span class="parking-duree">· ${approches[i]} min à pied</span>` : '';
+    return `<button type="button" class="parking-ligne" data-nom="${escapeHtml(nom)}">${badgeP}<span class="parking-libelle">${libelle}</span>${duree}</button>`;
   }).join('');
-  return `<div class="info-ligne"><span class="info-label">Parking</span></div><div class="liens-detail">${boutons}</div>`;
+  return `<div class="parkings-list">${lignes}</div>`;
 }
 
 // Liste des falaises desservies par un parking, regroupées par sommet (nom).
@@ -342,16 +388,21 @@ function approximerCotation(cotation) {
 // demande. "autres" (trad/artificielle) n'est pas détaillé par voie (seul le
 // compte existe dans les données) — pas d'histogramme pour cette part,
 // seulement ce compteur global.
-function champVoiesSynthese(total, sportive, autres) {
-  if (!total) return '';
-  const pctSportive = Math.round((sportive / total) * 100);
-  return `
-    <div class="info-ligne"><span class="info-label">Voies</span><span class="info-valeur voies-total-valeur">${total}</span></div>
-    <div class="voies-repartition-barre" role="img" aria-label="${sportive} voies sportives et ${autres} autres sur ${total} au total">
-      <span class="voies-repartition-segment sportive" style="width:${pctSportive}%"></span>
-      <span class="voies-repartition-segment autres" style="width:${100 - pctSportive}%"></span>
-    </div>
-    <div class="voies-repartition-texte">${sportive} sportives · ${autres} autres</div>`;
+// Style de grimpe de la falaise (colonne "Grimpe"), déduit du rapport
+// sportives / autres : la colonne Voies porte le TOTAL, l'histogramme ne
+// montre que les SPORTIVES (titre "Cotation voies sportives") — la colonne
+// Grimpe signale l'écart sans ligne de texte séparée. Limite assumée : les
+// données ne distinguent pas trad et artificielle ("autres" recouvre les
+// voies non sportives ; ici de grandes voies classiques) — "artificielle"
+// serait le pendant de "trad" si les données le portaient un jour.
+function styleGrimpe(p) {
+  const total = p.nb_voie_total ?? 0;
+  const sportive = p.nb_voie_sportive ?? 0;
+  const autres = p.nb_voie_autres ?? 0;
+  if (total <= 0) return '';
+  if (autres <= 0) return 'sportive';
+  if (sportive <= 0) return 'trad';
+  return 'mixte';
 }
 
 // Histogramme "1 case = 1 voie" par cotation — chargé à la demande (voir
@@ -451,12 +502,13 @@ export function construireHistogramme(voiesSportives) {
   // communautaire (seul lien_oblyk/lien_camptocamp existe, au niveau
   // falaise — voir donnees.js), le popup resterait pauvre. Ne pas
   // implémenter tant que ce calcul valeur/coût n'a pas été retranché.
-  // La synthèse "X sportives · Y autres" (plus haut) et la légende couenne/
-  // grande voie sous l'histogramme sont deux classifications différentes qui
-  // s'enchaînent sans signal de rupture : un micro-libellé (même vocabulaire
-  // que .legende-titre de la légende) annonce explicitement le changement.
+  // Le titre "Cotation voies sportives" (plus haut, même voix typographique
+  // que les colonnes Voies/Grimpe/Roche) et cette légende couenne/grande voie
+  // sous l'histogramme sont deux classifications différentes qui s'enchaînent
+  // sans signal de rupture : un micro-libellé annonce explicitement le
+  // changement.
   const histo = `
-    <span class="legende-titre">Détail par cotation</span>
+    <span class="legende-titre">Cotation voies sportives</span>
     <div class="voies-histo" role="img" aria-label="Répartition des ${voiesSportives.length} voies sportives par cotation${nonCotees.length ? `, dont ${nonCotees.length} non côtées` : ''}">
       ${colonnesHtml}
     </div>

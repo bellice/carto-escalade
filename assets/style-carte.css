@@ -448,9 +448,10 @@
   color: #5a6058;
 }
 .legende-toggle {
-  width: 24px;
-  height: 24px;
-  padding: 0;
+  /* Bouton à LIBELLÉ (pas un simple chevron 24x24, illisible) : le texte
+     "Masquer"/"Afficher" (mis à jour en JS selon aria-expanded) dit ce que
+     fait le bouton, le chevron reste pour l'affordance de repli. */
+  padding: 2px 8px;
   border: 1px solid var(--stone-dark);
   border-radius: var(--radius);
   background: var(--paper);
@@ -458,7 +459,9 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
   flex-shrink: 0;
 }
 .legende-toggle:hover { background: var(--stone-dark); }
@@ -469,6 +472,25 @@
 }
 .legende-toggle[aria-expanded="false"] .legende-toggle-icone {
   transform: rotate(-90deg);
+}
+
+/* Pastille "P" du parking, miniaturisée pour les fiches (carré teal à P
+   blanc, même vocabulaire que les marqueurs carte) : dans la fiche falaise,
+   la ligne Parking renvoie aux icônes P de la carte sans qu'aucun symbole
+   ne les relie — le badge crée ce lien visuel immédiat. */
+.badge-parking {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--teal);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .legende-contenu {
@@ -578,8 +600,11 @@
   font-size: 0.78rem;
 }
 .legende-figure select {
-  font-family: var(--font-body);
-  font-size: 0.78rem;
+  /* Même typo que les libellés de légende supprimés (mono, petite taille) :
+     le sélecteur est le TITRE des cercles proportionnels, il doit partager
+     la même voix typographique que le reste de la légende. */
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
   padding: 4px 6px;
   border: 1px solid var(--stone-dark);
   border-radius: var(--radius);
@@ -690,9 +715,12 @@
 }
 .popup-coin {
   flex-shrink: 0;
-  width: 60px; /* = largeur de .rose-vents */
+  width: 56px; /* = largeur de .rose-vents (SVG) */
   display: flex;
   justify-content: center;
+  /* Petit décalage vers le bas (4px) pour que le N ne colle pas au haut de
+     l'en-tête sans pour autant descendre trop (10px testé = trop bas). */
+  padding-top: 4px;
 }
 
 /* Rose des vents miniature (voir roseDesVents dans app.js) : un anneau de
@@ -706,55 +734,40 @@
    ~22px du centre, sans cette marge ils chevauchaient le texte "roche"
    juste au-dessus (bug remonté après test).
    */
+/* Rose des vents en SVG (voir roseDesVents) : une vraie rose à 8 pointes
+   (4 cardinales longues + 4 intercardinales courtes), pointes actives en
+   encre pleine, inactives en remplissage doux. Vectorielle donc nette (pas
+   de "pixelisation"), avec l'identité d'une rose des vents classique. */
 .rose-vents {
-  position: relative;
-  width: 60px;
-  height: 60px;
-  margin: 0 auto;
+  display: block;
+  width: 56px;
+  height: 56px;
 }
-.rose-vents-cercle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
-  border-radius: 50%;
-  border: 1px solid var(--stone-dark);
+.rose-vents-anneau {
+  fill: none;
+  stroke: var(--stone-dark);
+  stroke-width: 1.5;
 }
-.rose-vents-point {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 4px;
-  height: 4px;
-  margin: -2px 0 0 -2px;
-  border-radius: 50%;
-  background: var(--stone-dark);
+.rose-vents-pointe {
+  fill: #d8d4ca;
+  opacity: 0.55;
 }
-.rose-vents-point-actif {
-  width: 7px;
-  height: 7px;
-  margin: -3.5px 0 0 -3.5px;
-  background: var(--ink);
+.rose-vents-pointe-actif {
+  fill: var(--ink);
+  opacity: 1;
+}
+.rose-vents-centre {
+  fill: var(--ink);
 }
 .rose-vents-label {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 18px;
-  margin-left: -9px;
-  margin-top: -6px;
-  text-align: center;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
-  color: #8a9088;
-  line-height: 1;
+  font-size: 10px;
+  fill: #8a9088;
 }
 .rose-vents-label-actif {
   font-weight: 700;
-  color: var(--ink);
-  font-size: 0.66rem;
+  font-size: 11px;
+  fill: var(--ink);
 }
 
 /* Poignée de la feuille du bas mobile — sans objet hors de ce contexte
@@ -833,7 +846,19 @@
    d'autre : le regroupement par proximité seul suffit à marquer "nouveau
    sujet", pas besoin d'un trait ou d'un fond pour ça. */
 .popup .fiche-groupe-suivant {
-  margin-top: 16px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--stone-dark);
+}
+/* Micro-titre de section (ex. "Accès" dans la fiche falaise) : en-tête mono
+   discret en majuscules — structure le groupe sans concurrencer le contenu. */
+.popup .fiche-groupe-titre {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a9088;
+  margin-bottom: 6px;
 }
 /* Même famille, même taille que le libellé (voir .info-label) : la valeur
    est l'info qui compte, mais pas au prix d'un déséquilibre visuel sur une
@@ -851,32 +876,62 @@
   flex-shrink: 0;
 }
 
-/* Total de voies en gros (voir champVoiesBeeswarm dans popups.js) : même
-   famille/police que .info-valeur, juste agrandi — reste dans le style de
-   fiche existant plutôt que d'inventer un bloc à part. */
-.voies-total-valeur {
-  font-size: 1.1rem;
-  font-weight: 700;
+/* Métadonnées clés de la fiche falaise (Roche / Voies, voir popupFalaise) en
+   COLONNES ÉTROITES : 2 mini-colonnes sans bordure, label en petite majuscule
+   au-dessus de la valeur — plus léger que des tuiles, plus structuré que des
+   tags, et ça ne boxe pas la fiche. */
+.popup .fiche-infos-cols {
+  display: flex;
+  gap: 24px;
+  margin-top: 6px;
+}
+.popup .col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.popup .col-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a9088;
+}
+.popup .col-valeur {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
   color: var(--ink);
 }
 
-/* Micro-barre sportives/autres — même langage visuel que .jauge-cotation
-   (barre fine, coins arrondis) qu'elle remplace. */
-.voies-repartition-barre {
-  display: flex;
-  height: 6px;
-  border-radius: 3px;
-  overflow: hidden;
-  margin-top: 4px;
-  background: var(--stone-dark);
-}
-.voies-repartition-segment.sportive { background: var(--forest); }
-.voies-repartition-segment.autres { background: var(--stone-dark); }
-.voies-repartition-texte {
-  margin-top: 2px;
+/* Le micro-titre de l'histogramme ("Cotation") : même voix typographique que
+   les libellés des colonnes Voies/Roche (.col-label) — un simple label au-
+   dessus du graphique, pas un titre concurrent. L'espace de 12px garde un
+   net respir entre les infos clés (et la mention de mix, le cas échéant) et
+   le graphique. */
+.popup .legende-titre {
+  display: block;
+  margin-top: 12px;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: #5a6058;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a9088;
+}
+
+/* Variante "bloc" d'une ligne d'info (voir champBloc) : libellé au-dessus,
+   valeur en pleine largeur en dessous — la valeur, seule sur sa ligne,
+   ressort plus qu'alignée à droite d'un libellé, sans en faire trop (0.78rem,
+   légèrement au-dessus du libellé — un 0.9rem testé paraissait trop gros). */
+.popup .info-bloc {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.popup .info-bloc .info-valeur {
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 /* Histogramme "1 case = 1 voie" par cotation (voir construireHistogramme
@@ -920,12 +975,15 @@
   display: flex;
   flex-flow: row wrap-reverse;
   justify-content: center;
-  width: 22px;
+  width: 26px; /* 2 cases de 12px + 2px de marge (voir .histo-case) */
   gap: 2px;
 }
 .histo-case {
-  width: 10px;
-  height: 10px;
+  /* 12px sur desktop (au lieu de 10) : des cibles un peu plus grandes, déjà
+     prêtes si on rend les cases cliquables (détail de la voie) — le mobile
+     garde ses 13px via la media query ci-dessous. */
+  width: 12px;
+  height: 12px;
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -985,7 +1043,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .popup .nom-falaise {
   font-family: var(--font-mono);
@@ -1004,6 +1062,44 @@
   cursor: pointer;
 }
 .popup .lien-secteur:hover { color: var(--clay); }
+
+/* Listes des parkings d'une falaise (voir champParkingAssocie) : une ligne
+   cliquable par parking, uniforme entre 1 et N — [P] Parking [n] - X min à
+   pied. La ligne entière navigue vers le parking (le badge P relie aux
+   icônes de la carte). */
+.popup .parkings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.popup .parking-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: none;
+  border: none;
+  padding: 3px 4px;
+  margin: 0 -4px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+/* Affordance cliquable : le libellé "Parking n" ressemble à un lien
+   (souligné, vert), le temps reste en gris muet ; au survol la ligne se
+   teinte légèrement et le libellé passe en argile. */
+.popup .parking-libelle {
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.popup .parking-ligne:hover { background: rgba(0, 0, 0, 0.045); }
+.popup .parking-ligne:hover .parking-libelle { color: var(--clay); }
+.popup .parking-ligne .badge-parking { flex-shrink: 0; }
+.popup .parking-duree { color: #5a6058; }
 
 /* Une seule action "forte" (bouton plein, l'itinéraire — la plus utilisée
    sur le terrain) et le reste en discrets liens texte soulignés en dessous

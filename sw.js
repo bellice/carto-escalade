@@ -12,7 +12,7 @@
 //   visites suivantes (le principal gain de bande passante du site). Le style
 //   seul est rafraîchi en arrière-plan (voir le fetch handler).
 // Bump CACHE_NAME pour forcer un renouvellement complet après un déploiement.
-const CACHE_NAME = 'sorties-escalade-v3';
+const CACHE_NAME = 'sorties-escalade-v4';
 
 // Coquille pré-cachée à l'install. Liste manuelle : une entrée par dossier
 // sortie/ (page + data.geojson). maplibre-gl reste servi par le CDN (voir
