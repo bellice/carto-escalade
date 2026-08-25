@@ -18,6 +18,14 @@ import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPad
 // ajuster après un premier test réel sur le terrain.
 const ZOOM_SIMPLIFICATION = 13;
 
+// Au-delà de ce zoom, les parkings sont visibles par défaut, sans recherche
+// ni falaise sélectionnée (voir appliquerVisibiliteParkings). Calé sur
+// ZOOM_LABELS_SECTEUR (labels.js) : le repère "vue détaillée", où l'info
+// parking devient la plus actionnable et où les marqueurs sont assez espacés
+// pour ne pas se chevaucher. En dessous, ils restent masqués — révélés par
+// recherche/sélection seulement.
+const ZOOM_PARKINGS = 15;
+
 export function initCarte(dataUrl) {
   // La carte est créée APRÈS le chargement de data.geojson (voir la chaîne
   // .then plus bas) : on calcule alors les bounds réelles des marqueurs et on
@@ -86,6 +94,7 @@ export function initCarte(dataUrl) {
   let secteursVisibles = null; // vrai quand les noms de secteur sont affichés (zoom >= ZOOM_LABELS_SECTEUR)
   let sitesVisibles = null; // vrai quand les noms de site sont affichés (zoom < ZOOM_LABELS_SECTEUR) — miroir de secteursVisibles, voir appliquerVisibiliteSites
   let falaisesVisibles = new Set(); // clés des falaises actuellement affichées (couche native) — voir appliquerFiltres
+  let parkingsAutorises = new Set(); // noms des parkings autorisés (falaises visibles) — voir appliquerFiltres/appliquerVisibiliteParkings
   const etatEstompeParCle = new Map(); // dernier état feature-state "estompe" posé par enSurbrillance, pour ne pas re-poser à l'identique
   // tempsMaxGite/tempsGitePlafond : Infinity tant que le slider n'est pas
   // configuré (pas de falaise sans filtre actif avant que les vraies bornes
@@ -712,6 +721,10 @@ export function initCarte(dataUrl) {
         if (attrib) attrib.classList.remove('maplibregl-compact-show');
       });
       map.on('zoom', appliquerSimplificationZoom);
+      // L'affichage des parkings dépend aussi du zoom (voir
+      // appliquerVisibiliteParkings) — rafraîchi à chaque zoom, sans repasser
+      // par appliquerFiltres.
+      map.on('zoom', appliquerVisibiliteParkings);
 
       const parkingInfos = indexerParkingInfos(geojson);
       maxima = calculerMaxima(geojson);
@@ -953,6 +966,39 @@ export function initCarte(dataUrl) {
     });
   }
 
+  // Parkings : visibles par défaut à fort zoom (>= ZOOM_PARKINGS), et
+  // toujours révélés par une recherche ou une falaise sélectionnée (à tout
+  // zoom) — le tout restreint aux parkings des falaises visibles
+  // (parkingsAutorises, construit par appliquerFiltres). Contrairement aux
+  // falaises (filtre de couche GPU), les parkings sont des marqueurs DOM :
+  // leur affichage se pilote ici, re-exécuté sur chaque zoom sans repasser
+  // par appliquerFiltres (qui re-poserait inutilement le filtre de la couche).
+  function appliquerVisibiliteParkings() {
+    // Déclencheurs d'affichage : recherche active, falaise sélectionnée, ou
+    // fort zoom (>= ZOOM_PARKINGS) — à tout autre moment, tout est masqué.
+    const zoomPousse = map.getZoom() >= ZOOM_PARKINGS;
+    const montrerParkings = Boolean(filtres.recherche) || Boolean(falaiseSelectionneeCle) || zoomPousse;
+
+    // Parkings autorisés : ceux déjà portés par recherche/sélection
+    // (parkingsAutorises, construit par appliquerFiltres) +, à fort zoom,
+    // ceux de TOUTES les falaises visibles — le mode "vue détaillée" par
+    // défaut. (À fort zoom sans filtre, falaisesVisibles contient toutes les
+    // falaises, donc tous leurs parkings s'affichent.)
+    const aMontrer = new Set(parkingsAutorises);
+    if (zoomPousse) {
+      entries.forEach((entree) => {
+        if (entree.cat === 'falaise' && falaisesVisibles.has(entree.cle)) {
+          entree.parkingAssocie.forEach((nom) => aMontrer.add(nom));
+        }
+      });
+    }
+
+    entries.forEach((entree) => {
+      if (entree.cat !== 'parking') return;
+      entree.marker.getElement().style.display = (montrerParkings && aMontrer.has(entree.nom)) ? '' : 'none';
+    });
+  }
+
   // NOTE portée : cette fonction est déplacée ICI, dans initCarte — depuis
   // la couche native elle utilise map et falaisesVisibles via la closure
   // (elle ne peut plus rester au niveau module, comme avant).
@@ -963,14 +1009,18 @@ export function initCarte(dataUrl) {
   // changer de thème réafficherait potentiellement des dizaines de parkings
   // d'un coup (l'un comme l'autre peuvent laisser beaucoup de falaises
   // visibles à la fois, contrairement à une recherche, quasi toujours
-  // ciblée sur une poignée de résultats). Deux déclencheurs positifs
-  // autorisent des parkings :
+  // ciblée sur une poignée de résultats). Trois déclencheurs positifs
+  // autorisent des parkings (voir appliquerVisibiliteParkings) :
   // - une recherche active (choix explicite ET ciblé) -> tous les parkings
   //   des falaises qui la passent ;
   // - la falaise sélectionnée (popup ouverte / cible d'une navigation), si
   //   elle reste effectivement visible sous le mode/la recherche/le temps
-  //   courants.
-  const parkingsAutorises = new Set();
+  //   courants ;
+  // - le zoom (>= ZOOM_PARKINGS) : à fort zoom, les parkings des falaises
+  //   visibles s'affichent par défaut — ce cas est traité dans
+  //   appliquerVisibiliteParkings (à fort zoom, les parkings ne passent pas
+  //   par ce set, réservé aux déclencheurs recherche/sélection).
+  parkingsAutorises = new Set();
 
   // Falaises (couche native) : pas de display DOM — on pose le FILTRE de la
   // couche (rendu GPU, expressions sur les properties de la source) et on
@@ -1009,14 +1059,10 @@ export function initCarte(dataUrl) {
     }
   }
 
-  // Masqués par défaut : visibles seulement si une recherche est active ou
-  // si une falaise est sélectionnée.
-  const montrerParkings = Boolean(filtres.recherche) || Boolean(falaiseSelectionneeCle);
-
-  entries.forEach((entree) => {
-    if (entree.cat !== 'parking') return;
-    entree.marker.getElement().style.display = (montrerParkings && parkingsAutorises.has(entree.nom)) ? '' : 'none';
-  });
+  // Visibilité des marqueurs parking : dépend aussi du zoom (voir
+  // appliquerVisibiliteParkings) — appelée ici après le calcul des parkings
+  // autorisés, et sur chaque zoom via map.on('zoom').
+  appliquerVisibiliteParkings();
 }
 } // fin de initCarte
 
