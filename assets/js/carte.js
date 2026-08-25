@@ -337,7 +337,9 @@ export function initCarte(dataUrl) {
       return;
     }
 
-    const lienSecteur = e.target.closest('.lien-secteur');
+    // Les lignes .parking-ligne (fiche falaise) empruntent le même chemin que
+    // les .lien-secteur : navigation + garde du panneau ouvert sur desktop.
+    const lienSecteur = e.target.closest('.lien-secteur, .parking-ligne');
     if (lienSecteur) {
       const popupEl = lienSecteur.closest('.popup');
       const origineCle = popupEl ? popupEl.dataset.cle : undefined;
@@ -609,9 +611,14 @@ export function initCarte(dataUrl) {
     // classique) — sa largeur n'est donc réservée en plus que quand une fiche
     // falaise sera ouverte au moment du cadrage : soit la cible EST une
     // falaise, soit le panneau droit est DÉJÀ ouvert (cas du lien parking
-    // depuis une fiche falaise, voir l'écouteur .lien-secteur — on garde la
-    // card ouverte et on cadre le parking sans le cacher derrière le panneau).
-    const reserverPanneauDroit = cible.cat === 'falaise' || (estDesktop() && popupOuverte && popupOuverte.estPanneauFalaise);
+    // depuis une fiche falaise — on garde la card ouverte et on cadre le
+    // parking sans le cacher derrière le panneau). L'état du panneau est lu
+    // dans le DOM (panneauFalaiseOuvert), PAS dans popupOuverte : un 2e clic
+    // sur le lien parking referme la popup parking (popupOuverte.remove())
+    // avant cet appel, popupOuverte n'est alors plus le panneau — sans ce
+    // garde, le 2e cadrage n'aurait plus réservé le panneau droit et perdait
+    // le centrage falaise+parking (bug réel constaté).
+    const reserverPanneauDroit = cible.cat === 'falaise' || panneauFalaiseOuvert();
     if (origine) {
       const bounds = new maplibregl.LngLatBounds();
       bounds.extend(pointDe(origine));
@@ -927,6 +934,10 @@ export function initCarte(dataUrl) {
       // voir .legende-toggle-icone) — le aria-label reste explicite pour le
       // lecteur d'écran (une icône seule ne l'est pas).
       legendeToggle.setAttribute('aria-label', vaOuvrir ? 'Réduire la légende' : 'Déplier la légende');
+      // Le libellé VISIBLE suit l'état (un chevron seul était illisible) :
+      // "Masquer" quand la légende est affichée, "Afficher" quand repliée.
+      const texteToggle = legendeToggle.querySelector('.legende-toggle-texte');
+      if (texteToggle) texteToggle.textContent = vaOuvrir ? 'Masquer' : 'Afficher';
     });
   }
 

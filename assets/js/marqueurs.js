@@ -152,6 +152,16 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
   });
 
   popup.on('open', () => {
+    // Une seule fiche flottante à la fois : le clic direct sur un marqueur
+    // (parking/gîte) n'emprunte pas le chemin popupOuverte.remove() de
+    // carte.js (ouvrirFalaise/allerVers) — on ferme ici toute popup
+    // flottante précédente, en laissant le panneau falaise desktop en place.
+    // suivrePopup(popup, false) retourne la popup actuellement suivie si elle
+    // est différente de celle-ci (sinon null).
+    const precedente = suivrePopup ? suivrePopup(popup, false) : null;
+    if (precedente && precedente !== popup && !precedente.estPanneauFalaise && precedente.remove) {
+      precedente.remove();
+    }
     if (suivrePopup) suivrePopup(popup, true);
     document.body.classList.add('fiche-ouverte');
     // Synchronise CETTE popup sur l'état replié/déplié partagé (voir
