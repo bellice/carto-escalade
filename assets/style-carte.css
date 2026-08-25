@@ -891,8 +891,11 @@
   gap: 2px;
 }
 .popup .col-label {
+  /* Même taille que les micro-titres de section (ex. "Accès", .fiche-groupe-titre) :
+     les labels des colonnes partagent la même voix typographique que le reste
+     de la fiche, sans dominer les valeurs. */
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #8a9088;
@@ -912,8 +915,10 @@
 .popup .legende-titre {
   display: block;
   margin-top: 12px;
+  /* Même taille que les micro-titres de section (ex. "Accès") et les labels
+     de colonnes — tout le vocabulaire de titres de la fiche à l'identique. */
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #8a9088;

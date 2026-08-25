@@ -43,13 +43,13 @@ function roseDesVents(orientation) {
   const pointes = POINTS_ROSE.map((d, i) => {
     const cardinal = i % 2 === 0;
     const actif = actifs.has(d);
-    // Pointes raccourcies (17/11 au lieu de 22/15) : à rayon 22, les pointes
-    // cardinales venaient chevaucher les libellés placés à rayon 25
-    // (enchevêtrement signalé au test). Les 4 cardinales restent nettement
-    // plus longues que les intercardinales, toujours bien à l'intérieur de
-    // l'anneau (r 24) — un net espace d'air entre la rose et les lettres.
-    const rayon = cardinal ? 17 : 11;
-    const demiL = cardinal ? 4 : 2.8;
+    // Pointes dimensionnées au juste milieu entre deux tests : à rayon 22,
+    // les cardinales chevauchaient les libellés (rayon 25) ; à rayon 17,
+    // la rose paraissait trop petite. 20/13 garde des pointes affirmées tout
+    // en laissant un net dégagement devant les lettres, bien à l'intérieur
+    // de l'anneau (r 24).
+    const rayon = cardinal ? 20 : 13;
+    const demiL = cardinal ? 4.8 : 3.2;
     const classe = actif ? 'rose-vents-pointe rose-vents-pointe-actif' : 'rose-vents-pointe';
     return `<polygon class="${classe}" points="${polygone(i, rayon, 6.5, demiL)}" />`;
   }).join('');
