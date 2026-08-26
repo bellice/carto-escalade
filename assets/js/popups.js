@@ -190,33 +190,40 @@ export function popupFalaise(p, lat, lon, cle) {
     // pied reste.
     rowsLogistique.push(champParkingAssocie(noms, approches));
   }
+  // Itinéraire + GPS rejoignent "Accès" (avant : isolés tout en bas dans
+  // .actions) — les deux répondent à la même question "comment j'y vais",
+  // pas de raison de les séparer par tout le reste de la fiche. Poids visuel
+  // inchangé (toujours .btn-primary, le bouton le plus utilisé sur le
+  // terrain selon le commentaire d'origine, voir style-carte.css) — seul
+  // l'EMPLACEMENT change. Groupe désormais TOUJOURS rendu (plus conditionné
+  // à rowsLogistique.length) : Itinéraire/GPS existent pour toute falaise,
+  // avec ou sans parking associé.
+  rowsLogistique.push(`<a class="btn-primary" href="${lienItineraire(lat, lon, p.nom)}" target="_blank" rel="noopener">Itinéraire</a>`);
+  rowsLogistique.push(boutonGps(lat, lon));
 
-  // Repère topo papier (voir escalade/db/schema/01_falaise.sql) : but affiché
-  // de retrouver ce secteur dans le topo qu'on a sous la main en préparant
-  // une sortie — texte brut, jamais un lien cliquable. p.topoUrl (résolu une
-  // fois dans carte.js, voir indexerSources) pointe en général vers une
-  // fiche catalogue (ex. BnF), pas le PDF lui-même : un lien laisserait
-  // croire à tort qu'on peut consulter le topo en un clic.
-  const rowsTopo = [];
+  const rows = [
+    contenuCaractere,
+    `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Accès</div>${rowsLogistique.join('')}</div>`,
+  ];
+
+  const secteur = secteurDistinct(p);
+  // Repère topo papier (voir escalade/db/schema/01_falaise.sql) : but de
+  // retrouver ce secteur dans le topo qu'on a sous la main en préparant une
+  // sortie. Regroupé avec Oblyk/Camptocamp ci-dessous : les 3 répondent à
+  // "où en apprendre plus", pas de raison de les séparer. <span>, PAS un
+  // lien : p.topoUrl pointe en général vers une fiche catalogue (ex. BnF),
+  // pas le PDF lui-même — un lien laisserait croire à tort qu'on peut
+  // consulter le topo en un clic. Nom complet du topo en title= (info-bulle)
+  // plutôt qu'en clair : la ligne reste aussi compacte que les 2 liens
+  // voisins, le nom (potentiellement long) reste consultable au survol.
+  let refTopo = '';
   if (p.topo_page) {
     // ';' : un secteur peut s'étaler sur plusieurs pages du topo (saisi tel
     // quel dans falaise.csv, ex. "284;286") — affiché en liste lisible.
     const pages = String(p.topo_page).split(';').join(', ');
-    const valeur = p.topoNom ? `${p.topoNom}, p. ${pages}` : `p. ${pages}`;
-    rowsTopo.push(champBloc('Topo', valeur));
+    const titre = p.topoNom ? ` title="${escapeHtml(p.topoNom)}"` : '';
+    refTopo = `<span${titre}>Topo p. ${escapeHtml(pages)}</span>`;
   }
-
-  const rows = [
-    contenuCaractere,
-    rowsLogistique.length ? `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Accès</div>${rowsLogistique.join('')}</div>` : '',
-    // Pas de fiche-groupe-titre ici (contrairement à "Accès") : le libellé
-    // "Topo" du champBloc lui-même identifie déjà le groupe, un titre de
-    // section répéterait le même mot juste au-dessus pour rien — la classe
-    // fiche-groupe-suivant seule suffit à donner l'espacement "nouveau sujet".
-    rowsTopo.length ? `<div class="fiche-groupe-suivant">${rowsTopo.join('')}</div>` : '',
-  ];
-
-  const secteur = secteurDistinct(p);
   const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
   const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Voir sur Camptocamp</a>` : '';
 
@@ -233,9 +240,7 @@ export function popupFalaise(p, lat, lon, cle) {
       </div>
       <div class="fiche-infos">${rows.join('')}</div>
       <div class="actions">
-        <a class="btn-primary" href="${lienItineraire(lat, lon, p.nom)}" target="_blank" rel="noopener">Itinéraire</a>
-        ${boutonGps(lat, lon)}
-        ${construireActionsSecondaires([lienOblyk, lienC2C])}
+        ${construireActionsSecondaires([refTopo, lienOblyk, lienC2C])}
       </div>
     </div>`;
 }
