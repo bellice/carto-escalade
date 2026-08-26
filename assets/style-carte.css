@@ -1457,6 +1457,13 @@
 .popup .actions-secondaires a:hover {
   color: var(--clay);
 }
+/* Référence topo (voir popups.js, refTopo) : seul élément non cliquable de
+   cette ligne — délibérément SANS le style lien ci-dessus (pas de
+   soulignement, encre neutre) pour ne pas laisser croire qu'on peut taper
+   dessus comme sur "Voir sur Oblyk"/"Voir sur Camptocamp" juste à côté. */
+.popup .actions-secondaires span {
+  color: var(--muted);
+}
 .popup .actions-secondaires .separateur {
   color: var(--stone-dark);
 }
