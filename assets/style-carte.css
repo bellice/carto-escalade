@@ -1099,44 +1099,47 @@
 }
 .btn-voir-detail-voies:hover { background: var(--stone); }
 
-/* "← Retour" + titre sur UNE seule ligne (pattern nav standard) plutôt que
-   le bouton seul au-dessus du titre sur sa propre ligne : lit comme un vrai
-   en-tête d'écran, coûte moins de hauteur (précieux sur la feuille mobile). */
-.detail-voies-entete {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-/* Même traitement que les liens secondaires de la fiche (.actions-secondaires
-   a — "Voir sur Oblyk"...) : couleur + soulignement, pas un bouton à cadre.
-   1er essai (texte --ink nu, sans soulignement) illisible comme lien — se
-   confondait avec le titre juste à côté, aucune affordance de clic visible. */
-.btn-retour-fiche {
-  min-height: 44px;
-  min-width: 44px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 10px;
-  margin-left: -10px; /* compense le padding : le TEXTE reste aligné avec le reste de la fiche, seule la cible tactile déborde à gauche */
-  border: none;
-  background: none;
-  color: var(--forest);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.btn-retour-fiche:hover { color: var(--clay); }
-
 .detail-voies-titre {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   color: var(--muted);
-  margin: 0;
+  margin: 0 0 10px;
 }
+
+/* "← Retour" ANCRÉ EN BAS (sticky), pas en haut à côté du titre (1er/2e jet,
+   abandonnés) : sur mobile, une fois la fiche quasi plein écran, un bouton
+   en haut se retrouve à l'opposé du pouce dans une liste de 40+ voies —
+   sticky le garde accessible en permanence, quelle que soit la position de
+   scroll. `position: sticky` s'accroche au conteneur qui défile réellement
+   (.maplibregl-popup-content mobile, .panneau-falaise-contenu desktop) sans
+   rien connaître de lui explicitement. Redevenu un vrai bouton à cadre
+   (comme "Voir le détail des voies"), pas un lien souligné : plus prononcé,
+   corrige aussi le manque d'affordance relevé sur la version précédente
+   (texte simple à côté du titre, trop discret). Fond opaque (--paper)
+   indispensable : le contenu qui défile doit disparaître SOUS le bouton,
+   pas se voir par transparence ; l'ombre au-dessus le détache visuellement
+   de ce contenu une fois collé en bas. */
+.btn-retour-fiche {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px;
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08);
+}
+.btn-retour-fiche:hover { background: var(--stone); }
 
 /* Grille (pas une simple liste flex) : chaque <li> passe en display:contents,
    ses enfants deviennent directement des items de CETTE grille — alignement
@@ -1149,7 +1152,14 @@
   padding: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-  column-gap: 8px;
+  /* PAS de column-gap : un vrai "trou" entre les colonnes de grille, jamais
+     peint par le fond d'aucune cellule — avec le zébrage 1 ligne sur 2 (voir
+     .detail-voie-impaire), ce trou coupait la bande de couleur (et la
+     bordure du bas) à chaque séparation de colonne, discontinue au lieu
+     d'une seule bande pleine largeur. L'espacement entre colonnes vient
+     maintenant du PADDING horizontal de chaque cellule (voir .detail-voie >
+     *) : les boîtes se touchent, mais chacune peint sa propre moitié de
+     l'espacement — plus aucun trou non peint entre elles. */
   /* stretch (valeur par défaut, plus "baseline") : chaque cellule occupe
      TOUTE la hauteur de sa ligne de grille, pas seulement celle de son
      propre contenu — indispensable pour que les bordures du bas tombent
@@ -1173,9 +1183,15 @@
 .detail-voie > * {
   display: flex;
   align-items: center;
-  padding: 6px 0;
+  padding: 6px 8px; /* remplace l'ex-column-gap (8px) : chaque cellule peint sa propre moitié de l'espacement inter-colonnes, plus de trou non peint */
   border-bottom: 1px solid var(--stone);
 }
+/* Fond alterné 1 ligne sur 2 : aide à suivre une ligne des yeux jusqu'à la
+   colonne Hauteur, la plus éloignée du nom — surtout utile sur les longues
+   listes (jusqu'à 40+ voies). Posé sur les CELLULES (pas .detail-voie-impaire
+   directement, sans boîte propre en display:contents — un fond dessus
+   n'aurait aucun effet visible). */
+.detail-voie-impaire > * { background: rgba(0, 0, 0, 0.03); }
 .detail-voie-type { justify-content: center; }
 .detail-voie-nom { overflow-wrap: anywhere; }
 .detail-voie-cotation { font-family: var(--font-mono); color: var(--muted); }
@@ -1420,10 +1436,19 @@
     max-height: min(25vh, 220px);
   }
   .maplibregl-popup-content.detail-voies-ouvert {
-    /* Plein viewport : lire une liste de voies n'a besoin d'aucune carte
-       visible en dessous, contrairement à la fiche compacte (45vh) qui
-       doit laisser deviner le contexte carte. */
-    max-height: 100vh;
+    /* PAS 100vh : sur mobile, "vh" se base sur la hauteur du viewport barre
+       d'adresse MASQUÉE (le maximum théorique) — tant que le navigateur
+       affiche encore sa barre (cas courant à l'ouverture), 100vh dépasse la
+       zone réellement visible et le haut de la fiche déborde hors écran
+       (constaté). "dvh" (dynamic viewport height) se recalcule sur la zone
+       RÉELLEMENT visible à tout instant — 1ère ligne gardée en repli pour
+       les rares navigateurs sans dvh (valeur ignorée par les autres).
+       calc(...- 44px) plutôt que 100% pile : laisse le bandeau d'en-tête
+       (← Sorties / nom de la sortie, voir .map-header) visible même en
+       plein détail, repère d'orientation constant — 44px = même valeur que
+       #map/#panneau-falaise (top:44px), pas une nouvelle constante. */
+    max-height: calc(100vh - 44px);
+    max-height: calc(100dvh - 44px);
   }
   .popup .poignee-fiche {
     display: flex;

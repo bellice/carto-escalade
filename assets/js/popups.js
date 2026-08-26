@@ -592,23 +592,29 @@ export function construireDetailVoies(voiesSportives) {
   // règle posée ailleurs (le "P" du marqueur parking) — texte plutôt
   // qu'icône, aucun pictogramme nulle part sur ce site, justement parce
   // qu'une icône est ambiguë (quel symbole désigne sans confusion "points
-  // d'assurage" ?) alors qu'un mot ne l'est jamais. Bouton Retour fusionné
-  // avec le titre sur la même ligne (pattern nav "← Titre" standard) plutôt
-  // qu'au-dessus sur sa propre ligne : lit comme un vrai en-tête d'écran,
-  // pas comme deux éléments disjoints, et coûte moins de hauteur (précieux
-  // sur la feuille mobile).
+  // d'assurage" ?) alors qu'un mot ne l'est jamais.
+  //
+  // "Retour" en bas, PAS en haut à côté du titre (1er jet, abandonné) :
+  // repéré au retour terrain — sur mobile, une fois la fiche quasi plein
+  // écran (voir style-carte.css, .detail-voies-ouvert), un bouton en haut se
+  // retrouve à l'opposé du pouce, inconfortable à atteindre à une main. En
+  // `position: sticky; bottom: 0` (CSS) DANS la liste qui défile : reste
+  // accessible en permanence, quelle que soit la position de scroll dans
+  // une liste de 40+ voies, sans avoir à remonter tout en haut. Redevenu un
+  // vrai bouton à cadre (comme "Voir le détail des voies") plutôt qu'un lien
+  // souligné : plus prononcé, plus facile à repérer d'un coup d'œil comme
+  // action possible — corrige aussi le "pas assez explicite" relevé sur la
+  // version précédente (texte simple à côté du titre, discret).
   return `
     <div class="fiche-voies-detail">
-      <div class="detail-voies-entete">
-        <button type="button" class="btn-retour-fiche" aria-label="Retour à la fiche"><span aria-hidden="true">←</span> Retour</button>
-        <h4 class="detail-voies-titre">${escapeHtml(titre)}</h4>
-      </div>
+      <h4 class="detail-voies-titre">${escapeHtml(titre)}</h4>
       <ul class="detail-voies-liste">
         <li class="detail-voie detail-voie-entete-colonnes" aria-hidden="true">
           <span class="detail-voie-type"></span><span>Voie</span><span>Cotation</span><span>Points</span><span>Hauteur</span>
         </li>
-        ${voiesTriees.map(ligneDetailVoie).join('')}
+        ${voiesTriees.map((v, i) => ligneDetailVoie(v, i)).join('')}
       </ul>
+      <button type="button" class="btn-retour-fiche" aria-label="Retour à la fiche"><span aria-hidden="true">←</span> Retour</button>
     </div>`;
 }
 
@@ -625,8 +631,16 @@ export function construireDetailVoies(voiesSportives) {
 // les mêmes proportions que dans la légende de l'histogramme juste au-dessus
 // (repéré en test : le padding de la cellule, appliqué directement sur un
 // carré de 8px avec box-sizing:border-box, l'écrasait en rectangle 8×13).
-function ligneDetailVoie(v) {
+function ligneDetailVoie(v, index) {
   const classe = v.type_voie === 'couenne' ? 'couenne' : 'gv';
+  // Fond alterné 1 ligne sur 2 (repéré comme utile pour suivre une ligne des
+  // yeux jusqu'à la colonne Hauteur, la plus éloignée du nom) : classe posée
+  // ici plutôt que déduite en CSS par nth-child — chaque voie émet 5
+  // cellules dans une grille aplatie par display:contents (voir CSS), et la
+  // ligne d'en-tête (elle aussi 5 cellules) décale tout calcul nth-child
+  // purement CSS ; un index explicite reste correct quel que soit le nombre
+  // de colonnes ou la présence de l'en-tête.
+  const impaire = index % 2 === 1;
   // nb_points rempli à 59,6% des voies seulement (jeu de données actuel) :
   // omission pure si absent (cellule vide, pas de texte) — jamais "0"/"N/A",
   // qui se lirait comme "aucun point" (faux signal de sécurité) plutôt que
@@ -649,7 +663,7 @@ function ligneDetailVoie(v) {
   // seulement si la demande se confirme sur cette minorité de voies.
   const hauteur = v.hauteur_estimee_m != null ? `${v.hauteur_estimee_m} m` : '';
   return `
-    <li class="detail-voie">
+    <li class="detail-voie${impaire ? ' detail-voie-impaire' : ''}">
       <span class="detail-voie-type"><span class="histo-swatch ${classe}"></span></span>
       <span class="detail-voie-nom">${escapeHtml(v.nom)}</span>
       <span class="detail-voie-cotation">${escapeHtml(libelleCotationAffichee(v.cotation))}</span>
