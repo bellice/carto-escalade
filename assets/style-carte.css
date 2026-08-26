@@ -1484,12 +1484,29 @@
    larges sur un texte de cette longueur (repéré en vrai : "... Diois (FFME
    26, 2020), p. 86, 88, 90" avait l'air troué). --font-body (proportionnel)
    règle ça sans rien changer à la charte : c'est déjà la police par défaut
-   de .maplibregl-popup-content, seulement écrasée ici par erreur au 1er jet. */
+   de .maplibregl-popup-content, seulement écrasée ici par erreur au 1er jet.
+   --fs-base (pas --fs-sm) : c'est du contenu à LIRE (comme "10 min à pied"
+   dans .parking-ligne, qui hérite --fs-base via .fiche-infos) — --fs-sm
+   reste réservé aux libellés d'action courts (Oblyk, GPS...), pas à de la
+   prose informative ; le confondre ici la faisait paraître trop petite. */
 .popup .topo-reference {
+  margin: 0 0 4px;
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  color: var(--muted);
+}
+/* Page(s) sur sa propre ligne, mise en avant (encre pleine + gras) : c'est
+   le repère le plus utile une fois qu'on a déjà le bon topo en main — voir
+   popups.js pour le raisonnement complet. Même taille que .topo-reference
+   (--fs-base) : l'emphase vient du poids/de la couleur, pas d'un texte plus
+   gros qui redeviendrait disproportionné (leçon du "Acheter ce topo" trop
+   gros du tour précédent). */
+.popup .topo-page {
   margin: 0 0 6px;
   font-family: var(--font-body);
-  font-size: var(--fs-sm);
-  color: var(--muted);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--ink);
 }
 /* Lien d'achat/téléchargement SÉPARÉ du texte de référence ci-dessus (pas le
    titre entier cliquable) : reste explicite sur ce qu'il fait ("Acheter ce
@@ -1498,8 +1515,9 @@
    hérite du corps de page (16px, --font-body) au lieu de l'échelle du
    popup — d'où le "beaucoup trop gros" repéré en vrai. Mono + --fs-sm,
    comme "Voir sur Oblyk" juste en dessous (.actions-secondaires a) : un
-   libellé court sans ponctuation interne n'a pas le problème d'espacement
-   de .topo-reference ci-dessus. */
+   libellé COURT SANS ponctuation interne n'a pas le problème d'espacement
+   de .topo-reference/.topo-page ci-dessus, et une action reste
+   volontairement plus discrète qu'une info à lire. */
 .popup .topo-achat {
   margin: 0;
   font-family: var(--font-mono);

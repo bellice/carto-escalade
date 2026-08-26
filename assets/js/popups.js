@@ -230,10 +230,13 @@ export function popupFalaise(p, lat, lon, cle) {
     const pages = p.topo_page ? String(p.topo_page).split(';').join(', ') : null;
     const editeurAnnee = [p.topoEditeur, p.topoAnnee].filter(Boolean).join(', ');
     const parentheses = editeurAnnee ? ` (${escapeHtml(editeurAnnee)})` : '';
-    const suffixePage = pages ? `, p. ${escapeHtml(pages)}` : '';
-    const reference = p.topoNom
-      ? `${escapeHtml(p.topoNom)}${parentheses}${suffixePage}`
-      : `p. ${escapeHtml(pages)}`;
+    // Page SUR SA PROPRE LIGNE, mise en valeur (voir .topo-page) : c'est
+    // l'info la plus utile au quotidien une fois qu'on a déjà le bon topo en
+    // main (le repère demandé, ex. "p. 34") — noyée en fin de phrase, elle se
+    // repère moins vite que le titre/auteur/année qui, eux, servent surtout à
+    // confirmer qu'on a le bon livre.
+    const identite = p.topoNom ? `<p class="topo-reference">${escapeHtml(p.topoNom)}${parentheses}</p>` : '';
+    const lignePage = pages ? `<p class="topo-page">p. ${escapeHtml(pages)}</p>` : '';
     // Le texte du lien dépend du type de source (jamais "Acheter" sur une
     // brochure gratuite, ce serait faux) — voir source.type,
     // escalade/data/raw/NOTICE.md.
@@ -243,7 +246,7 @@ export function popupFalaise(p, lat, lon, cle) {
     const lienAchat = p.topoUrl
       ? `<p class="topo-achat"><a href="${escapeHtml(p.topoUrl)}" target="_blank" rel="noopener">${libelleLien}</a></p>`
       : '';
-    groupeTopo = `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Topo papier</div><p class="topo-reference">${reference}</p>${lienAchat}</div>`;
+    groupeTopo = `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Topo papier</div>${identite}${lignePage}${lienAchat}</div>`;
   }
   const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
   const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Voir sur C2C</a>` : '';
