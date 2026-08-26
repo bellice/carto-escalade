@@ -1106,6 +1106,48 @@
   margin: 0 0 10px;
 }
 
+/* Bandeau de tri Cotation/Position (voir popups.js, construireDetailVoies) :
+   texte, pas des icônes (règle déjà posée ailleurs sur ce site) — l'état
+   actif reprend le remplissage plein utilisé pour .gps-copie.copied
+   (confirmation/état actif), plus adapté ici à un choix binaire persistant
+   qu'un simple soulignement (l'inactif, lui, reprend le style des liens
+   .actions-secondaires — même vocabulaire, cohérent avec le reste du site). */
+.detail-voies-tri {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+/* Libellé visible du groupe de tri : l'aria-labelledby (voir popups.js)
+   suffisait aux lecteurs d'écran mais laissait un utilisateur voyant sans
+   indice que "Cotation"/"Position" sont des tris (pourrait passer pour deux
+   onglets de contenu différent) — même voix que .col-label (Voies/Grimpe/
+   Roche de la fiche compacte), cohérent avec le reste du site plutôt qu'un
+   nouveau style de libellé. */
+.detail-voies-tri-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--fs-2xs);
+}
+.btn-tri-voies {
+  padding: 4px 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--forest);
+  font: inherit;
+  cursor: pointer;
+}
+.btn-tri-voies.actif {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: white;
+  cursor: default;
+}
+
 /* "← Retour" ANCRÉ EN BAS (sticky), pas en haut à côté du titre (1er/2e jet,
    abandonnés) : sur mobile, une fois la fiche quasi plein écran, un bouton
    en haut se retrouve à l'opposé du pouce dans une liste de 40+ voies —
@@ -1221,6 +1263,24 @@
 .detail-voie-entete-colonnes .detail-voie-points,
 .detail-voie-entete-colonnes .detail-voie-hauteur {
   font-size: var(--fs-2xs);
+}
+
+/* Sous-ligne "L1"/"L2"... d'une grande voie (mode Position uniquement, voir
+   popups.js/ligneDetailLongueur) : indentée pour signaler visuellement son
+   appartenance à la ligne "voie" juste au-dessus plutôt qu'une voie
+   indépendante de plus dans la liste ; taille réduite (même voix que
+   Points/Hauteur) car secondaire par rapport à cette ligne "voie". Le
+   zébrage (.detail-voie-impaire) est piloté par l'appelant au niveau du
+   GROUPE (voir construireListePosition) : une grande voie et toutes ses
+   longueurs partagent la même bande, jamais une alternance indépendante par
+   longueur qui casserait la lecture "ceci est une seule voie". */
+.detail-voie-longueur .detail-voie-nom {
+  padding-left: 20px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.detail-voie-longueur .detail-voie-cotation {
+  font-size: var(--fs-xs);
 }
 
 /* Liste de boutons .lien-secteur en flux (flex-wrap) : réutilisée pour la
