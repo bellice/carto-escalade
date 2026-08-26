@@ -574,7 +574,21 @@ function libelleCotationAffichee(cotation) {
   return estimee ? estimee.label : cotation;
 }
 
-export function construireDetailVoies(voiesSportives) {
+// Valeur numérique pour trier par position sur la paroi (gauche à droite) :
+// v.numero est la clé technique assignée côté CSV (voir NOTICE.md, dépôt
+// escalade) — jamais affichée telle quelle, seulement comme ordre de tri.
+// Une voie sans numero (secteur pas encore numéroté, faute de topo papier)
+// part en fin de liste (même motif Infinity que valeurCotationPourTri),
+// jamais mélangée au hasard parmi de vraies positions.
+function valeurPositionPourTri(v) {
+  return v.numero != null ? v.numero : Infinity;
+}
+
+function classeSwatch(v) {
+  return v.type_voie === 'couenne' ? 'couenne' : 'gv';
+}
+
+export function construireDetailVoies(voiesSportives, mode = 'cotation') {
   const n = voiesSportives.length;
   // Juste le compte (utile pour se repérer avant de faire défiler la liste),
   // sans répéter "(hors trad et artificielle)" : cette précision vient déjà
@@ -583,17 +597,22 @@ export function construireDetailVoies(voiesSportives) {
   // de nouveau, contrairement à sa 1ère apparition où elle évite une
   // confusion avec le total "Voies" de la fiche compacte.
   const titre = `${n} voie${n > 1 ? 's' : ''}`;
-  // Du plus facile en haut au plus dur en bas (pas l'ordre alphabétique du
-  // nom, celui renvoyé par défaut côté SQL — sans rapport avec la
-  // difficulté). sort() est stable (ES2019+) : à cotation égale, l'ordre
-  // alphabétique d'origine sert de sous-tri, sans code dédié pour ça.
-  const voiesTriees = [...voiesSportives].sort((a, b) => valeurCotationPourTri(a) - valeurCotationPourTri(b));
   // En-tête TEXTE (pas d'icône) pour "Points"/"Hauteur" : ce site a déjà une
   // règle posée ailleurs (le "P" du marqueur parking) — texte plutôt
   // qu'icône, aucun pictogramme nulle part sur ce site, justement parce
   // qu'une icône est ambiguë (quel symbole désigne sans confusion "points
   // d'assurage" ?) alors qu'un mot ne l'est jamais.
   //
+  // Deux tris, deux besoins différents (pas un mélange des deux dans une
+  // seule liste) : Cotation répond à "quoi de facile/dur", en une ligne par
+  // voie comme avant ; Position répond à "qu'y a-t-il en marchant le long de
+  // la paroi", et EXPOSE le détail longueur par longueur des grandes voies
+  // (v.longueurs, absent des voies à une seule longueur) — demandé pour
+  // préparer une sortie en amont, sans intérêt pour le tri Cotation qui n'a
+  // pas vocation à s'alourdir de ce détail.
+  const liste = mode === 'position' ? construireListePosition(voiesSportives) : construireListeCotation(voiesSportives);
+  const bascule = (valeur, libelle) =>
+    `<button type="button" class="btn-tri-voies${mode === valeur ? ' actif' : ''}" data-tri="${valeur}" aria-pressed="${mode === valeur}">${libelle}</button>`;
   // "Retour" en bas, PAS en haut à côté du titre (1er jet, abandonné) :
   // repéré au retour terrain — sur mobile, une fois la fiche quasi plein
   // écran (voir style-carte.css, .detail-voies-ouvert), un bouton en haut se
@@ -608,14 +627,61 @@ export function construireDetailVoies(voiesSportives) {
   return `
     <div class="fiche-voies-detail">
       <h4 class="detail-voies-titre">${escapeHtml(titre)}</h4>
-      <ul class="detail-voies-liste">
-        <li class="detail-voie detail-voie-entete-colonnes" aria-hidden="true">
-          <span class="detail-voie-type"></span><span>Voie</span><span>Cotation</span><span>Points</span><span>Hauteur</span>
-        </li>
-        ${voiesTriees.map((v, i) => ligneDetailVoie(v, i)).join('')}
-      </ul>
+      <div class="detail-voies-tri" role="group" aria-labelledby="detail-voies-tri-titre">
+        <span id="detail-voies-tri-titre" class="detail-voies-tri-label">Trier par</span>
+        ${bascule('cotation', 'Cotation')}
+        ${bascule('position', 'Position')}
+      </div>
+      ${liste}
       <button type="button" class="btn-retour-fiche" aria-label="Retour à la fiche"><span aria-hidden="true">←</span> Retour</button>
     </div>`;
+}
+
+// Mode Cotation (par défaut, inchangé) : du plus facile en haut au plus dur
+// en bas (pas l'ordre alphabétique du nom, celui renvoyé par défaut côté
+// SQL — sans rapport avec la difficulté). sort() est stable (ES2019+) : à
+// cotation égale, l'ordre alphabétique d'origine sert de sous-tri, sans code
+// dédié pour ça. Une ligne par voie, jamais de détail longueur par longueur
+// ici — voir construireDetailVoies pour pourquoi ce détail reste réservé au
+// mode Position.
+function construireListeCotation(voiesSportives) {
+  const voiesTriees = [...voiesSportives].sort((a, b) => valeurCotationPourTri(a) - valeurCotationPourTri(b));
+  return `
+    <ul class="detail-voies-liste">
+      <li class="detail-voie detail-voie-entete-colonnes" aria-hidden="true">
+        <span class="detail-voie-type"></span><span>Voie</span><span>Cotation</span><span>Points</span><span>Hauteur</span>
+      </li>
+      ${voiesTriees.map((v, i) => ligneDetailVoie(v, i)).join('')}
+    </ul>`;
+}
+
+// Mode Position : trié de gauche à droite sur la paroi (voir
+// valeurPositionPourTri) — le nom lui-même ne porte aucun repère de position
+// (pas de préfixe numéro : le badge actif "Position" du bandeau de tri
+// suffit déjà à signaler que ce tri est bien appliqué, voir
+// construireDetailVoies). Une grande voie (v.longueurs renseigné) devient un
+// GROUPE de lignes — une ligne "voie" (identique à ligneDetailVoie, valeurs
+// globales déjà connues du mode Cotation) suivie d'une ligne indentée par
+// longueur (cotation/points/hauteur DE cette longueur précise). La zébrure
+// suit le GROUPE (indexGroupe), pas la ligne brute, pour que l'en-tête et
+// ses sous-lignes restent visuellement une seule bande — sinon chaque
+// longueur alternerait indépendamment, cassant la lecture "ceci est une
+// seule voie" que le groupement est censé donner.
+function construireListePosition(voiesSportives) {
+  const voiesTriees = [...voiesSportives].sort((a, b) => valeurPositionPourTri(a) - valeurPositionPourTri(b));
+  const lignes = voiesTriees.map((v, indexGroupe) => {
+    const entete = ligneDetailVoie(v, indexGroupe);
+    if (!v.longueurs || !v.longueurs.length) return entete;
+    const sousLignes = v.longueurs.map(l => ligneDetailLongueur(l, indexGroupe)).join('');
+    return entete + sousLignes;
+  }).join('');
+  return `
+    <ul class="detail-voies-liste">
+      <li class="detail-voie detail-voie-entete-colonnes" aria-hidden="true">
+        <span class="detail-voie-type"></span><span>Voie</span><span>Cotation</span><span>Points</span><span>Hauteur</span>
+      </li>
+      ${lignes}
+    </ul>`;
 }
 
 // Une <li> par voie, mais display:contents en CSS (voir style-carte.css) :
@@ -631,8 +697,25 @@ export function construireDetailVoies(voiesSportives) {
 // les mêmes proportions que dans la légende de l'histogramme juste au-dessus
 // (repéré en test : le padding de la cellule, appliqué directement sur un
 // carré de 8px avec box-sizing:border-box, l'écrasait en rectangle 8×13).
+// nb_points rempli à 59,6% des voies seulement (jeu de données actuel) :
+// omission pure si absent (cellule vide, pas de texte) — jamais "0"/"N/A",
+// qui se lirait comme "aucun point" (faux signal de sécurité) plutôt que
+// "non renseigné". 0 est affiché tel quel quand IL EST réellement saisi (ex.
+// certaines traversées sans point fixe) : != null distingue bien les deux
+// cas. Partagé entre les 3 formes de ligne (voie/en-tête/longueur) : mêmes
+// champs nb_points/hauteur_estimee_m, qu'ils viennent d'une voie ou d'une
+// longueur individuelle (voir export_geojson.py, struct "longueurs").
+function formatPoints(nbPoints) {
+  return nbPoints != null ? `${nbPoints} pt${nbPoints > 1 ? 's' : ''}` : '';
+}
+// hauteur_estimee_m : affichée en chiffre nu (pas de "≈", jugé superflu à
+// l'usage) — reste malgré tout une estimation lue sur photo de topo, jamais
+// un métrage terrain.
+function formatHauteur(hauteurM) {
+  return hauteurM != null ? `${hauteurM} m` : '';
+}
+
 function ligneDetailVoie(v, index) {
-  const classe = v.type_voie === 'couenne' ? 'couenne' : 'gv';
   // Fond alterné 1 ligne sur 2 (repéré comme utile pour suivre une ligne des
   // yeux jusqu'à la colonne Hauteur, la plus éloignée du nom) : classe posée
   // ici plutôt que déduite en CSS par nth-child — chaque voie émet 5
@@ -641,33 +724,31 @@ function ligneDetailVoie(v, index) {
   // purement CSS ; un index explicite reste correct quel que soit le nombre
   // de colonnes ou la présence de l'en-tête.
   const impaire = index % 2 === 1;
-  // nb_points rempli à 59,6% des voies seulement (jeu de données actuel) :
-  // omission pure si absent (cellule vide, pas de texte) — jamais "0"/"N/A",
-  // qui se lirait comme "aucun point" (faux signal de sécurité) plutôt que
-  // "non renseigné". 0 est affiché tel quel quand IL EST réellement saisi
-  // (ex. certaines traversées sans point fixe) : != null distingue bien les
-  // deux cas.
-  const points = v.nb_points != null ? `${v.nb_points} pt${v.nb_points > 1 ? 's' : ''}` : '';
-  // hauteur_estimee_m : affichée en chiffre nu (pas de "≈", jugé superflu à
-  // l'usage) — reste malgré tout une estimation lue sur photo de topo, jamais
-  // un métrage terrain. Déjà sommée sur les longueurs côté SQL
-  // (export_geojson.py) ; le rappel du nombre de longueurs à côté (grandes
-  // voies) est volontairement laissé de côté pour l'instant (jugé peu
-  // lisible en "(nL)") — nb_longueur reste disponible dans la donnée si le
-  // besoin revient.
-  // TODO (pas planifié) : détail longueur par longueur (cotation/hauteur/
-  // points de CHAQUE relais) pour les grandes voies — actuellement seul le
-  // total agrégé est exporté (voir export_geojson.py, route CTE), le détail
-  // par longueur n'existe nulle part côté web. Seulement 12,6% des voies
-  // sont à plusieurs longueurs (197/1569, vérifié en base) — a du sens
-  // seulement si la demande se confirme sur cette minorité de voies.
-  const hauteur = v.hauteur_estimee_m != null ? `${v.hauteur_estimee_m} m` : '';
   return `
     <li class="detail-voie${impaire ? ' detail-voie-impaire' : ''}">
-      <span class="detail-voie-type"><span class="histo-swatch ${classe}"></span></span>
+      <span class="detail-voie-type"><span class="histo-swatch ${classeSwatch(v)}"></span></span>
       <span class="detail-voie-nom">${escapeHtml(v.nom)}</span>
       <span class="detail-voie-cotation">${escapeHtml(libelleCotationAffichee(v.cotation))}</span>
-      <span class="detail-voie-points">${points}</span>
-      <span class="detail-voie-hauteur">${hauteur}</span>
+      <span class="detail-voie-points">${formatPoints(v.nb_points)}</span>
+      <span class="detail-voie-hauteur">${formatHauteur(v.hauteur_estimee_m)}</span>
+    </li>`;
+}
+
+// Mode Position, sous-ligne d'une longueur (grande voie uniquement, voir
+// construireListePosition) : le repère couenne/gv ne se répète pas (déjà
+// porté par la ligne "voie" juste au-dessus, cellule laissée vide plutôt que
+// de dupliquer le même carré à chaque longueur), remplacé par "L1"/"L2"...
+// à la place du nom — indentée en CSS (voir style-carte.css,
+// .detail-voie-longueur) pour signaler visuellement son appartenance à la
+// voie précédente plutôt qu'une voie indépendante dans la liste.
+function ligneDetailLongueur(l, indexGroupe) {
+  const impaire = indexGroupe % 2 === 1;
+  return `
+    <li class="detail-voie detail-voie-longueur${impaire ? ' detail-voie-impaire' : ''}">
+      <span class="detail-voie-type"></span>
+      <span class="detail-voie-nom">L${l.numero_longueur}</span>
+      <span class="detail-voie-cotation">${escapeHtml(libelleCotationAffichee(l.cotation))}</span>
+      <span class="detail-voie-points">${formatPoints(l.nb_points)}</span>
+      <span class="detail-voie-hauteur">${formatHauteur(l.hauteur_estimee_m)}</span>
     </li>`;
 }

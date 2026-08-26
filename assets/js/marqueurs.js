@@ -99,6 +99,19 @@ export function afficherDetailVoies(popupEl, falaiseId) {
   if (scrollable) scrollable.scrollTop = 0;
 }
 
+// Bascule le tri du détail des voies (Cotation <-> Position, voir
+// popups.js/carte.js) : relit le tableau déjà en cache (jamais un nouveau
+// fetch, voir cacheVoiesParFalaise) et ré-injecte tout .fiche-voies-detail
+// avec le nouveau mode — plus simple qu'un patch partiel du DOM (en-tête,
+// liste ET bouton Retour dépendent tous du mode choisi) pour un coût
+// négligeable (quelques dizaines de lignes de HTML régénérées).
+export function basculerTriDetailVoies(popupEl, falaiseId, mode) {
+  const ancien = popupEl.querySelector('.fiche-voies-detail');
+  const voies = cacheVoiesParFalaise.get(falaiseId);
+  if (!ancien || !voies) return;
+  ancien.outerHTML = construireDetailVoies(voies, mode);
+}
+
 // Retour à la fiche resumée depuis le détail des voies — ficheReduite (l'état
 // PARTAGÉ, jamais modifié par afficherDetailVoies) est passé par l'appelant
 // (carte.js, seul propriétaire de cette variable) pour restaurer le bon état

@@ -9,7 +9,7 @@ import {
   estFalaiseVideDansMode, libelleFalaise,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
-import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee, afficherDetailVoies, masquerDetailVoies } from './marqueurs.js';
+import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee, afficherDetailVoies, masquerDetailVoies, basculerTriDetailVoies } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
 import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop } from './carte-utils.js';
 
@@ -369,6 +369,18 @@ export function initCarte(dataUrl) {
       // replié/déplié tel qu'il était AVANT l'ouverture du détail (jamais
       // modifié par afficherDetailVoies, voir marqueurs.js).
       if (popupEl) masquerDetailVoies(popupEl, ficheReduite);
+      return;
+    }
+    // Bascule Cotation/Position (voir popups.js, construireDetailVoies) :
+    // même chemin data-route-falaise que "Voir le détail des voies"
+    // ci-dessus, le bouton de tri vit dans le même .voies-histo-placeholder.
+    const btnTri = e.target.closest('.btn-tri-voies');
+    if (btnTri) {
+      const popupEl = btnTri.closest('.popup');
+      const placeholder = btnTri.closest('.voies-histo-placeholder');
+      if (popupEl && placeholder) {
+        basculerTriDetailVoies(popupEl, placeholder.dataset.routeFalaise, btnTri.dataset.tri);
+      }
       return;
     }
 
