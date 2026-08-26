@@ -2,6 +2,10 @@
 
 Site statique minimaliste : une carte par sortie (falaises + parkings), pas de backend.
 
+Palette, typographie et composants : voir [`charte-graphique.html`](charte-graphique.html)
+(ouvrir directement dans un navigateur — s'appuie sur les vraies feuilles de
+style du site, reste à jour tant que les tokens ne changent pas de nom).
+
 ## Structure
 
 ```

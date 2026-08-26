@@ -4,7 +4,7 @@
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 import { cleFalaise, libelleFalaise, secteurDistinct } from './donnees.js';
 import { poserTailleMarqueur } from './symboles.js';
-import { popupFalaise, popupParking, popupGite, construireHistogramme } from './popups.js';
+import { popupFalaise, popupParking, popupGite, construireHistogramme, construireDetailVoies } from './popups.js';
 import { reinitialiserPadding, margeAvantPopup, estPointVisible } from './carte-utils.js';
 
 // Détail des voies (routes/<slug-site>.json, généré par DuckDB, un fichier
@@ -12,7 +12,11 @@ import { reinitialiserPadding, margeAvantPopup, estPointVisible } from './carte-
 // chargé à la demande à l'ouverture de la popup : mis en cache en mémoire
 // pour les réouvertures, et pris en charge par le service worker pour
 // l'offline après une 1ère vue.
-const cacheVoiesParFalaise = new Map(); // id_falaise -> HTML déjà construit
+// id_falaise -> tableau BRUT voies_sportives (PAS du HTML pré-rendu) :
+// l'histogramme (construireHistogramme) ET le détail des voies
+// (construireDetailVoies) partagent la même donnée — cacher du HTML aurait
+// figé le premier des deux rendus à avoir été demandé.
+const cacheVoiesParFalaise = new Map();
 const cacheSitesRoutes = new Map(); // slug-site -> Promise<JSON du site>
 
 // Un seul fetch par SITE, dédupliqué via un cache de PROMESSES (pas juste de
@@ -37,22 +41,80 @@ function chargerDetailVoies(racineEl, urlRoute) {
   if (!placeholder || !urlRoute) return;
   const siteId = placeholder.dataset.route;
   const falaiseId = placeholder.dataset.routeFalaise;
+  const aAutresDisciplines = placeholder.dataset.autresDisciplines === '1';
+  const rendre = (voies) => {
+    // La fiche (popup ou panneau) peut avoir été refermée ou réutilisée
+    // entre-temps : on n'écrit que si ce placeholder est toujours dans le DOM.
+    if (placeholder.isConnected) placeholder.innerHTML = construireHistogramme(voies, aAutresDisciplines);
+  };
   if (cacheVoiesParFalaise.has(falaiseId)) {
-    placeholder.innerHTML = cacheVoiesParFalaise.get(falaiseId);
+    rendre(cacheVoiesParFalaise.get(falaiseId));
     return;
   }
   chargerJsonSite(siteId, urlRoute)
     .then(donneesSite => {
       const voies = (donneesSite[falaiseId] && donneesSite[falaiseId].voies_sportives) || [];
-      const html = construireHistogramme(voies);
-      cacheVoiesParFalaise.set(falaiseId, html);
-      // La fiche (popup ou panneau) peut avoir été refermée ou réutilisée
-      // entre-temps : on n'écrit que si ce placeholder est toujours dans le DOM.
-      if (placeholder.isConnected) placeholder.innerHTML = html;
+      cacheVoiesParFalaise.set(falaiseId, voies);
+      rendre(voies);
     })
     .catch(() => {
       if (placeholder.isConnected) placeholder.remove();
     });
+}
+
+// Bascule vers la liste détaillée des voies (drill-down depuis le bouton
+// "Voir le détail des voies" de construireHistogramme) : swap de contenu
+// DANS le même .popup, pas une 2e popup MapLibre — voir carte.js pour le
+// raisonnement (suivrePopup/popupOuverte ne suivent qu'UNE fiche flottante
+// à la fois, une 2e popup indépendante compliquerait ce suivi pour aucun
+// bénéfice réel). Construit la liste au premier appel seulement (le tableau
+// brut est déjà en cache, voir chargerDetailVoies/cacheVoiesParFalaise) —
+// falaiseId ne peut être absent du cache ici : ce bouton n'existe que dans
+// le HTML déjà renvoyé par construireHistogramme, donc après un chargement
+// réussi.
+export function afficherDetailVoies(popupEl, falaiseId) {
+  const placeholder = popupEl.querySelector('.voies-histo-placeholder');
+  if (!placeholder) return;
+  if (!placeholder.querySelector('.fiche-voies-detail')) {
+    const voies = cacheVoiesParFalaise.get(falaiseId);
+    if (!voies) return;
+    placeholder.insertAdjacentHTML('beforeend', construireDetailVoies(voies));
+  }
+  popupEl.classList.add('mode-detail-voies');
+  // .maplibregl-popup-content n'existe QUE côté mobile (le panneau desktop
+  // n'a pas cet ancêtre) — distinction fiable sans rappeler estDesktop().
+  const contenuMobile = popupEl.closest('.maplibregl-popup-content');
+  if (contenuMobile) {
+    // Incompatible avec .fiche-reduite (220px de haut, illisible pour une
+    // liste de voies) : dépliage LOCAL forcé, SANS toucher à la variable
+    // ficheReduite de carte.js — rouvrir une autre falaise ensuite doit
+    // respecter le dernier choix explicite de l'utilisateur sur la
+    // poignée, pas cet ajustement automatique du détail.
+    contenuMobile.classList.remove('fiche-reduite');
+    contenuMobile.classList.add('detail-voies-ouvert');
+  }
+  const poignee = popupEl.querySelector('.poignee-fiche');
+  if (poignee) synchroniserPoignee(poignee, false);
+  const scrollable = contenuMobile || popupEl.closest('.panneau-falaise-contenu');
+  if (scrollable) scrollable.scrollTop = 0;
+}
+
+// Retour à la fiche resumée depuis le détail des voies — ficheReduite (l'état
+// PARTAGÉ, jamais modifié par afficherDetailVoies) est passé par l'appelant
+// (carte.js, seul propriétaire de cette variable) pour restaurer le bon état
+// replié/déplié, plutôt qu'un état neutre fixe qui écraserait la préférence
+// de l'utilisateur.
+export function masquerDetailVoies(popupEl, ficheReduite) {
+  popupEl.classList.remove('mode-detail-voies');
+  const contenuMobile = popupEl.closest('.maplibregl-popup-content');
+  if (contenuMobile) {
+    contenuMobile.classList.remove('detail-voies-ouvert');
+    contenuMobile.classList.toggle('fiche-reduite', ficheReduite);
+    const poignee = popupEl.querySelector('.poignee-fiche');
+    if (poignee) synchroniserPoignee(poignee, ficheReduite);
+  }
+  const scrollable = contenuMobile || popupEl.closest('.panneau-falaise-contenu');
+  if (scrollable) scrollable.scrollTop = 0;
 }
 
 // Met à jour l'état visuel/accessible de la poignée (aria-expanded,

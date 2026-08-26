@@ -172,10 +172,13 @@ export function popupFalaise(p, lat, lon, cle) {
 
   if (p.nb_voie_total && p.routes) {
     // Histogramme des cotations, chargé à la demande (voir chargerDetailVoies) :
-    // il ne couvre que les SPORTIVES — le titre "Cotation voies sportives" et
-    // la colonne Grimpe (mixte, le cas échéant) signalent l'écart avec le
-    // total de la colonne Voies.
-    contenuCaractere += `<div class="voies-histo-placeholder" data-route="${escapeHtml(String(p.routes))}" data-route-falaise="${escapeHtml(String(p.routes_falaise))}"></div>`;
+    // il ne couvre que les SPORTIVES — le titre ("Cotation" ou "Cotation
+    // (hors trad et artificielle)", voir construireHistogramme) et la colonne
+    // Grimpe (mixte, le cas échéant) signalent l'écart avec le total de la
+    // colonne Voies. data-autres-disciplines : calculé ici (p est déjà
+    // disponible), relu par chargerDetailVoies au moment du rendu différé.
+    const autresDisciplines = (p.nb_voie_trad || p.nb_voie_artificielle) ? '1' : '0';
+    contenuCaractere += `<div class="voies-histo-placeholder" data-route="${escapeHtml(String(p.routes))}" data-route-falaise="${escapeHtml(String(p.routes_falaise))}" data-autres-disciplines="${autresDisciplines}"></div>`;
   }
   if (p.parking_associe && p.parking_associe.length) {
     const noms = p.parking_associe;
@@ -438,7 +441,7 @@ function styleGrimpe(p) {
 // exactes (essayé, puis retiré : un marquage pour un cas aussi marginal
 // faisait plus de bruit qu'autre chose) — une fois la règle posée, elle
 // s'applique sans réserve affichée.
-export function construireHistogramme(voiesSportives) {
+export function construireHistogramme(voiesSportives, aAutresDisciplines) {
   if (!voiesSportives || !voiesSportives.length) return '';
 
   // Regroupe par cotation EXACTE (6a et 6a+ n'ont jamais la même colonne).
@@ -497,34 +500,160 @@ export function construireHistogramme(voiesSportives) {
   ];
 
   // role="img" + un seul aria-label résumé sur l'histogramme entier (pas un
-  // par case) : le détail au tap sur une voie est reporté à une itération
-  // future, annoncer individuellement jusqu'à plusieurs dizaines de cases
-  // n'aiderait personne pour l'instant.
-  //
-  // TODO (en attente, pas de décision) : rendre chaque case cliquable pour
-  // afficher nom/cotation/nb_longueur en popup secondaire. Valeur incertaine
-  // à trancher avant de coder : utile sur les falaises à noms de voie
-  // distinctifs (ex. "ALINÉA"), quasi nul sur celles à voies numérotées
-  // ("1", "10"... — vieux topo). Et sans lien par voie vers un site
-  // communautaire (seul lien_oblyk/lien_camptocamp existe, au niveau
-  // falaise — voir donnees.js), le popup resterait pauvre. Ne pas
-  // implémenter tant que ce calcul valeur/coût n'a pas été retranché.
+  // par case) : le détail au clic est fourni par le bouton "Voir le détail
+  // des voies" ci-dessous (voir construireDetailVoies), pas par les cases
+  // elles-mêmes (8-13px, sous la règle des 44px de cible tactile déjà
+  // appliquée ailleurs sur ce site pour les marqueurs — poserTailleMarqueur,
+  // symboles.js) : annoncer individuellement jusqu'à plusieurs dizaines de
+  // cases n'aiderait personne de toute façon.
   // Titre "Cotation (hors trad et artificielle)" plutôt que "Cotation voies
-  // sportives" : au-delà de servir de rupture visuelle avant la légende
-  // couenne/grande voie (une classification différente qui s'enchaînerait
-  // sinon sans signal), la formulation par EXCLUSION prévient explicitement
-  // toute confusion avec le total "Voies" plus haut — l'histogramme ne
-  // couvre pas les voies trad/artificielle (non détaillées par voie dans les
-  // données, seulement comptées), contrairement à ce qu'un titre par
-  // inclusion ("voies sportives") laisse deviner seul. "trad"/"artificielle"
-  // sont déjà le vocabulaire affiché ailleurs dans cette même fiche (colonne
-  // "Grimpe", voir styleGrimpe) — pas une terminologie nouvelle.
+  // sportives" UNIQUEMENT quand la falaise a aussi des voies trad/artificielle
+  // (aAutresDisciplines, dérivé de nb_voie_trad/nb_voie_artificielle — voir
+  // l'attribut data-autres-disciplines posé par popupFalaise) : au-delà de
+  // servir de rupture visuelle avant la légende couenne/grande voie (une
+  // classification différente qui s'enchaînerait sinon sans signal), la
+  // formulation par EXCLUSION prévient explicitement toute confusion avec le
+  // total "Voies" plus haut — l'histogramme ne couvre pas les voies
+  // trad/artificielle (non détaillées par voie dans les données, seulement
+  // comptées), contrairement à ce qu'un titre par inclusion ("voies
+  // sportives") laisse deviner seul. "trad"/"artificielle" sont déjà le
+  // vocabulaire affiché ailleurs dans cette même fiche (colonne "Grimpe",
+  // voir styleGrimpe) — pas une terminologie nouvelle. Si la falaise est
+  // 100% sportive, cette précision n'exclut plus rien : la mention
+  // deviendrait du bruit ("hors" de quoi, puisqu'il n'y a que ça ?), simple
+  // "Cotation" suffit.
+  const titre = aAutresDisciplines ? 'Cotation (hors trad et artificielle)' : 'Cotation';
+  // .fiche-voies-resume : conteneur masqué en bloc quand le détail (plus bas)
+  // est ouvert (voir style-carte.css, .mode-detail-voies) — un seul swap de
+  // classe sur .popup bascule l'un pour l'autre, pas de logique JS dédiée.
   const histo = `
-    <span class="legende-titre">Cotation (hors trad et artificielle)</span>
-    <div class="voies-histo" role="img" aria-label="Répartition des ${voiesSportives.length} voies sportives par cotation${nonCotees.length ? `, dont ${nonCotees.length} non côtées` : ''}">
-      ${colonnesHtml}
-    </div>
-    <div class="histo-legende">${legende.join('')}</div>`;
+    <div class="fiche-voies-resume">
+      <span class="legende-titre">${titre}</span>
+      <div class="voies-histo" role="img" aria-label="Répartition des ${voiesSportives.length} voies sportives par cotation${nonCotees.length ? `, dont ${nonCotees.length} non côtées` : ''}">
+        ${colonnesHtml}
+      </div>
+      <div class="histo-legende">${legende.join('')}</div>
+      <button type="button" class="btn-voir-detail-voies">Voir le détail des voies</button>
+    </div>`;
 
   return histo;
+}
+
+// Liste détaillée des voies (nom, cotation, points d'assurage, hauteur
+// estimée) — drill-down depuis le bouton "Voir le détail des voies" de
+// construireHistogramme (même tableau voiesSportives, pas un 2e fetch : voir
+// afficherDetailVoies, marqueurs.js, qui relit le cache déjà rempli). Pas de
+// case cliquable individuelle (voir le commentaire dans construireHistogramme
+// sur la règle des 44px) ni de lien par voie vers un site communautaire (seul
+// lien_oblyk/lien_camptocamp existe, au niveau falaise) : nom + points +
+// hauteur suffisent à justifier l'écran sans ces deux ajouts.
+// Valeur numérique pour trier par cotation croissante (même logique
+// d'approximation que le regroupement en colonnes de l'histogramme,
+// réutilisée à l'identique pour que les deux vues restent cohérentes entre
+// elles). Une voie dont la cotation reste incalculable part en FIN de liste
+// (Infinity), jamais mélangée au hasard parmi de vraies valeurs.
+function valeurCotationPourTri(v) {
+  const direct = cotationVersValeur(v.cotation);
+  if (direct != null) return direct;
+  const estimee = approximerCotation(v.cotation);
+  return estimee ? cotationVersValeur(estimee.label) : Infinity;
+}
+
+// Texte de cotation à AFFICHER — même règle d'approximation que ci-dessus et
+// que l'histogramme (colonnesHtml, plus haut dans ce fichier) : une cotation
+// non standard mais déductible ("4-", "5"...) doit s'afficher sous sa forme
+// normalisée ("4a", "5b") ici AUSSI, pas seulement pour le tri/regroupement
+// en interne — sinon la MÊME voie affiche 2 cotations différentes selon
+// qu'on la lit dans l'histogramme (déjà normalisé) ou dans cette liste
+// (texte brut de la donnée), une incohérence repérée en relisant les deux
+// vues côte à côte. Une cotation ni standard ni approximable reste affichée
+// telle quelle : rien de mieux à montrer.
+function libelleCotationAffichee(cotation) {
+  if (cotationVersValeur(cotation) != null) return cotation;
+  const estimee = approximerCotation(cotation);
+  return estimee ? estimee.label : cotation;
+}
+
+export function construireDetailVoies(voiesSportives) {
+  const n = voiesSportives.length;
+  // Juste le compte (utile pour se repérer avant de faire défiler la liste),
+  // sans répéter "(hors trad et artificielle)" : cette précision vient déjà
+  // d'être lue à l'instant sur l'écran précédent (titre de l'histogramme,
+  // voir construireHistogramme) — la redire ici alourdit sans rien apporter
+  // de nouveau, contrairement à sa 1ère apparition où elle évite une
+  // confusion avec le total "Voies" de la fiche compacte.
+  const titre = `${n} voie${n > 1 ? 's' : ''}`;
+  // Du plus facile en haut au plus dur en bas (pas l'ordre alphabétique du
+  // nom, celui renvoyé par défaut côté SQL — sans rapport avec la
+  // difficulté). sort() est stable (ES2019+) : à cotation égale, l'ordre
+  // alphabétique d'origine sert de sous-tri, sans code dédié pour ça.
+  const voiesTriees = [...voiesSportives].sort((a, b) => valeurCotationPourTri(a) - valeurCotationPourTri(b));
+  // En-tête TEXTE (pas d'icône) pour "Points"/"Hauteur" : ce site a déjà une
+  // règle posée ailleurs (le "P" du marqueur parking) — texte plutôt
+  // qu'icône, aucun pictogramme nulle part sur ce site, justement parce
+  // qu'une icône est ambiguë (quel symbole désigne sans confusion "points
+  // d'assurage" ?) alors qu'un mot ne l'est jamais. Bouton Retour fusionné
+  // avec le titre sur la même ligne (pattern nav "← Titre" standard) plutôt
+  // qu'au-dessus sur sa propre ligne : lit comme un vrai en-tête d'écran,
+  // pas comme deux éléments disjoints, et coûte moins de hauteur (précieux
+  // sur la feuille mobile).
+  return `
+    <div class="fiche-voies-detail">
+      <div class="detail-voies-entete">
+        <button type="button" class="btn-retour-fiche" aria-label="Retour à la fiche"><span aria-hidden="true">←</span> Retour</button>
+        <h4 class="detail-voies-titre">${escapeHtml(titre)}</h4>
+      </div>
+      <ul class="detail-voies-liste">
+        <li class="detail-voie detail-voie-entete-colonnes" aria-hidden="true">
+          <span class="detail-voie-type"></span><span>Voie</span><span>Cotation</span><span>Points</span><span>Hauteur</span>
+        </li>
+        ${voiesTriees.map(ligneDetailVoie).join('')}
+      </ul>
+    </div>`;
+}
+
+// Une <li> par voie, mais display:contents en CSS (voir style-carte.css) :
+// ses enfants deviennent des items du grid porté par .detail-voies-liste —
+// alignement en vraies colonnes sur TOUTE la liste (nom/cotation/points/
+// hauteur), pas juste au sein d'une ligne. Chaque ligne émet TOUJOURS ses 5
+// cellules, même vides (points/hauteur en particulier) : une grille a besoin
+// d'un nombre de cellules fixe par ligne pour que l'alignement colonne par
+// colonne reste correct d'une voie à l'autre. Le repère couenne/grande voie
+// est enveloppé dans .detail-voie-type (pas directement .histo-swatch en
+// cellule de grille) : la cellule porte le padding/la bordure de séparation
+// de ligne, le carré lui-même doit en rester indemne pour garder EXACTEMENT
+// les mêmes proportions que dans la légende de l'histogramme juste au-dessus
+// (repéré en test : le padding de la cellule, appliqué directement sur un
+// carré de 8px avec box-sizing:border-box, l'écrasait en rectangle 8×13).
+function ligneDetailVoie(v) {
+  const classe = v.type_voie === 'couenne' ? 'couenne' : 'gv';
+  // nb_points rempli à 59,6% des voies seulement (jeu de données actuel) :
+  // omission pure si absent (cellule vide, pas de texte) — jamais "0"/"N/A",
+  // qui se lirait comme "aucun point" (faux signal de sécurité) plutôt que
+  // "non renseigné". 0 est affiché tel quel quand IL EST réellement saisi
+  // (ex. certaines traversées sans point fixe) : != null distingue bien les
+  // deux cas.
+  const points = v.nb_points != null ? `${v.nb_points} pt${v.nb_points > 1 ? 's' : ''}` : '';
+  // hauteur_estimee_m : affichée en chiffre nu (pas de "≈", jugé superflu à
+  // l'usage) — reste malgré tout une estimation lue sur photo de topo, jamais
+  // un métrage terrain. Déjà sommée sur les longueurs côté SQL
+  // (export_geojson.py) ; le rappel du nombre de longueurs à côté (grandes
+  // voies) est volontairement laissé de côté pour l'instant (jugé peu
+  // lisible en "(nL)") — nb_longueur reste disponible dans la donnée si le
+  // besoin revient.
+  // TODO (pas planifié) : détail longueur par longueur (cotation/hauteur/
+  // points de CHAQUE relais) pour les grandes voies — actuellement seul le
+  // total agrégé est exporté (voir export_geojson.py, route CTE), le détail
+  // par longueur n'existe nulle part côté web. Seulement 12,6% des voies
+  // sont à plusieurs longueurs (197/1569, vérifié en base) — a du sens
+  // seulement si la demande se confirme sur cette minorité de voies.
+  const hauteur = v.hauteur_estimee_m != null ? `${v.hauteur_estimee_m} m` : '';
+  return `
+    <li class="detail-voie">
+      <span class="detail-voie-type"><span class="histo-swatch ${classe}"></span></span>
+      <span class="detail-voie-nom">${escapeHtml(v.nom)}</span>
+      <span class="detail-voie-cotation">${escapeHtml(libelleCotationAffichee(v.cotation))}</span>
+      <span class="detail-voie-points">${points}</span>
+      <span class="detail-voie-hauteur">${hauteur}</span>
+    </li>`;
 }
