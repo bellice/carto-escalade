@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Charte graphique — Sorties escalade</title>
+
+<!--
+  Charte graphique du site, générée à la main mais BRANCHÉE sur les vraies
+  feuilles de style (liens ci-dessous) plutôt que sur des valeurs recopiées :
+  les couleurs affichent leur valeur réelle lue en JS (getComputedStyle), les
+  échantillons de composants réutilisent les vraies classes CSS. Si un token
+  change dans assets/style.css, cette page suit automatiquement — seule
+  l'AUDIT des tailles de police (section 2) est une liste figée à la main
+  (elle documente un état constaté à une date donnée, pas une valeur vivante).
+  À rouvrir/mettre à jour après un futur passage d'harmonisation des tailles.
+-->
+<link rel="stylesheet" href="assets/style.css" />
+<link rel="stylesheet" href="assets/style-carte.css" />
+<style>
+  body {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+    background: var(--paper);
+  }
+  h1 {
+    font-size: 1.6rem;
+    color: var(--forest);
+    margin: 0 0 4px;
+  }
+  .intro {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0 0 40px;
+    max-width: 640px;
+  }
+  h2 {
+    font-size: 1.1rem;
+    color: var(--ink);
+    border-bottom: 1px solid var(--stone-dark);
+    padding-bottom: 8px;
+    margin: 56px 0 20px;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    margin: 28px 0 12px;
+  }
+  p.note {
+    font-size: 0.85rem;
+    color: var(--muted);
+    max-width: 640px;
+    line-height: 1.5;
+  }
+
+  /* --- Palette --- */
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .swatch {
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--paper);
+  }
+  .swatch-couleur { height: 56px; }
+  .swatch-info {
+    padding: 8px 10px;
+    font-size: 0.78rem;
+  }
+  .swatch-var {
+    display: block;
+    font-family: var(--font-mono);
+    font-weight: 600;
+  }
+  .swatch-hex {
+    display: block;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    font-size: 0.72rem;
+    margin: 2px 0 4px;
+  }
+  .swatch-usage { color: var(--muted); font-size: 0.72rem; }
+
+  /* --- Typo --- */
+  .fontfam-sample {
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .fontfam-sample .var { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); display: block; margin-bottom: 6px; }
+  .fontfam-sample .demo { font-size: 1.05rem; }
+
+  table.tailles { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.tailles th, table.tailles td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--stone-dark); vertical-align: middle; }
+  table.tailles th { font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+  table.tailles td.rem { font-family: var(--font-mono); color: var(--muted); white-space: nowrap; }
+
+  /* --- Composants --- */
+  .composants-grille {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px 32px;
+    align-items: flex-start;
+  }
+  .composant-bloc {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .composant-legende {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+  .mini-popup {
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    background: var(--paper);
+    padding: 12px 14px;
+    width: 220px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  footer {
+    margin-top: 60px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    border-top: 1px solid var(--stone-dark);
+    padding-top: 14px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Charte graphique</h1>
+<p class="intro">
+  Référence visuelle des tokens et composants définis dans <code>assets/style.css</code>
+  et <code>assets/style-carte.css</code>. Les couleurs et échantillons de composants
+  ci-dessous sont rendus avec les vraies feuilles de style du site (pas des copies) —
+  cette page suit automatiquement tout changement de <code>:root</code>.
+</p>
+
+<h2>1. Palette</h2>
+<p class="note">
+  Contrastes vérifiés (formule WCAG, luminance relative) sur les usages texte réels.
+  Toutes les combinaisons texte/fond du site passent le seuil AA (4.5:1 pour du texte
+  normal) — <code>--muted-light</code> (une variante encore plus discrète que
+  <code>--muted</code>) a été retirée en cours de route : 3.13:1 sur <code>--paper</code>,
+  en-dessous du seuil, alors qu'elle portait entre autres les cotations de
+  l'histogramme (<code>.histo-label</code>) — une information à lire, pas un simple
+  ornement.
+</p>
+<div class="palette" id="palette"></div>
+
+<h2>2. Typographie</h2>
+
+<h3>Familles</h3>
+<div class="fontfam-sample">
+  <span class="var">--font-body</span>
+  <span class="demo" style="font-family: var(--font-body);">Rocher des Amayères — 12 voies sportives, 3 trad</span>
+</div>
+<div class="fontfam-sample">
+  <span class="var">--font-mono</span>
+  <span class="demo" style="font-family: var(--font-mono);">Rocher des Amayères — 12 voies sportives, 3 trad</span>
+</div>
+
+<h3>Échelle</h3>
+<p class="note">
+  8 paliers nommés (<code>--fs-2xs</code> à <code>--fs-2xl</code>), chacun avec un rôle
+  propre — remplace un état antérieur à 18 valeurs quasi arbitraires (0.62 à 1.6rem,
+  dont 6 tassées entre 0.70 et 0.78rem à un pixel près les unes des autres, sans
+  justification fonctionnelle). Valeurs lues en direct depuis <code>:root</code>.
+</p>
+<table class="tailles" id="tailles">
+  <thead><tr><th>Token</th><th>Valeur</th><th>Rendu</th><th>Rôle</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h2>3. Espacements &amp; rayons</h2>
+<table class="tailles">
+  <thead><tr><th>Token</th><th>Valeur</th><th>Usage</th></tr></thead>
+  <tbody>
+    <tr><td class="rem">--radius</td><td class="rem" id="val-radius"></td><td>Rayon de bordure standard (boutons, cartes, badges).</td></tr>
+    <tr><td class="rem">--largeur-panneau-gauche</td><td class="rem" id="val-largeur-gauche"></td><td>Largeur du panneau recherche + légende (desktop).</td></tr>
+    <tr><td class="rem">--largeur-panneau-droit</td><td class="rem" id="val-largeur-droit"></td><td>Largeur du panneau fiche falaise (desktop).</td></tr>
+  </tbody>
+</table>
+
+<h2>4. Composants</h2>
+
+<h3>Étiquettes de catégorie (popup)</h3>
+<!-- .cat-tag n'a de mise en forme (couleur, padding...) que sous .popup :
+     wrapper réel (sans styles propres, voir style-carte.css) plutôt qu'une
+     copie manuelle des règles ici. -->
+<div class="popup composants-grille">
+  <div class="composant-bloc">
+    <span class="cat-tag falaise">Falaise</span>
+    <span class="composant-legende">.cat-tag.falaise</span>
+  </div>
+  <div class="composant-bloc">
+    <span class="cat-tag parking">Parking</span>
+    <span class="composant-legende">.cat-tag.parking</span>
+  </div>
+  <div class="composant-bloc">
+    <span class="cat-tag gite">Gîte</span>
+    <span class="composant-legende">.cat-tag.gite</span>
+  </div>
+</div>
+
+<h3>Puces de légende (carte)</h3>
+<!-- .dot n'a sa taille/forme que sous .legende, et .cle son alignement que
+     sous .legende-cats : position réinitialisée en style inline (.legende
+     est position:absolute par défaut, pensé pour flotter sur la carte). -->
+<div class="legende" style="position:static;">
+  <div class="legende-cats">
+    <div class="composant-bloc">
+      <span class="cle"><span class="dot"></span> Falaises</span>
+      <span class="composant-legende">.dot</span>
+    </div>
+    <div class="composant-bloc">
+      <span class="cle"><span class="dot parking"></span> Parkings</span>
+      <span class="composant-legende">.dot.parking</span>
+    </div>
+    <div class="composant-bloc">
+      <span class="cle"><span class="dot gite"></span> Gîte</span>
+      <span class="composant-legende">.dot.gite</span>
+    </div>
+  </div>
+</div>
+
+<h3>Légende histogramme des voies</h3>
+<div class="composants-grille">
+  <div class="composant-bloc">
+    <span class="histo-cle"><span class="histo-swatch couenne"></span>couenne</span>
+    <span class="composant-legende">.histo-swatch.couenne</span>
+  </div>
+  <div class="composant-bloc">
+    <span class="histo-cle"><span class="histo-swatch gv"></span>grande voie</span>
+    <span class="composant-legende">.histo-swatch.gv</span>
+  </div>
+</div>
+
+<h3>Boutons</h3>
+<!-- .btn-primary n'a sa mise en forme que sous .popup (a.btn-primary précisément). -->
+<div class="popup composants-grille">
+  <div class="composant-bloc">
+    <a class="btn-primary" href="#" onclick="return false;" style="display:inline-block;">Itinéraire</a>
+    <span class="composant-legende">.btn-primary (popup)</span>
+  </div>
+  <div class="composant-bloc">
+    <button type="button" class="btn-tout-voir">Tout voir</button>
+    <span class="composant-legende">.btn-tout-voir</span>
+  </div>
+  <div class="composant-bloc">
+    <button type="button" class="btn-centrer">Voir</button>
+    <span class="composant-legende">.btn-centrer</span>
+  </div>
+</div>
+
+<h3>Colonnes Voies / Grimpe / Roche (fiche falaise)</h3>
+<!-- .fiche-infos-cols/.col-label/.col-valeur n'ont leur mise en forme que
+     sous .popup — .mini-popup n'ajoute que le cadre visuel de démonstration. -->
+<div class="popup mini-popup">
+  <div class="fiche-infos-cols">
+    <div class="col"><span class="col-label">Voies</span><span class="col-valeur">12</span></div>
+    <div class="col"><span class="col-label">Grimpe</span><span class="col-valeur">sportive</span></div>
+    <div class="col"><span class="col-label">Roche</span><span class="col-valeur">calcaire</span></div>
+  </div>
+</div>
+<span class="composant-legende">.fiche-infos-cols / .col / .col-label / .col-valeur</span>
+
+<footer>
+  Généré manuellement — à mettre à jour si de nouveaux tokens ou composants
+  apparaissent dans assets/style.css ou assets/style-carte.css.
+</footer>
+
+<script>
+  const PALETTE = [
+    ['--stone', 'Fond de page général.'],
+    ['--stone-dark', 'Bordures discrètes, séparateurs.'],
+    ['--ink', 'Texte principal ; aussi couleur du tag "Gîte".'],
+    ['--forest', 'Liens, titres, accent principal.'],
+    ['--clay', 'Accent falaise (tag, cercles), boutons primaires de recherche.'],
+    ['--clay-dark', 'Variante foncée de --clay (survols).'],
+    ['--teal', 'Accent parking (tag, marqueur "P").'],
+    ['--teal-dark', 'Variante foncée de --teal (survols de boutons parking).'],
+    ['--paper', 'Fond des cartes/popups/panneaux.'],
+    ['--gv', 'Case "grande voie" de l\'histogramme des cotations.'],
+    ['--couenne', 'Case "couenne" de l\'histogramme des cotations.'],
+    ['--muted', 'Texte secondaire (libellés, notes) — 6.19:1 sur --paper, largement au-dessus du seuil AA 4.5:1.'],
+  ];
+
+  const cs = getComputedStyle(document.documentElement);
+  const palette = document.getElementById('palette');
+  PALETTE.forEach(([nom, usage]) => {
+    const hex = cs.getPropertyValue(nom).trim();
+    const div = document.createElement('div');
+    div.className = 'swatch';
+    div.innerHTML = `
+      <div class="swatch-couleur" style="background:${hex}"></div>
+      <div class="swatch-info">
+        <span class="swatch-var">${nom}</span>
+        <span class="swatch-hex">${hex}</span>
+        <span class="swatch-usage">${usage}</span>
+      </div>`;
+    palette.appendChild(div);
+  });
+
+  const TAILLES = [
+    ['--fs-2xs', 'Micro-labels : badges, libellés de colonnes, titres d\'histogramme.'],
+    ['--fs-xs', 'Petits labels secondaires ; aussi le palier mobile de --fs-2xs.'],
+    ['--fs-sm', 'Texte technique standard (mono) : légende, libellés de popup.'],
+    ['--fs-base', 'Corps de texte lisible : valeurs, listes, champs, boutons.'],
+    ['--fs-md', 'En-tête de page.'],
+    ['--fs-lg', 'Titre de fiche (popup h3).'],
+    ['--fs-xl', 'Icônes de fermeture (×) : panneau falaise, popup MapLibre, recherche.'],
+    ['--fs-2xl', 'Titre de la page d\'accueil.'],
+  ];
+  const tbody = document.querySelector('#tailles tbody');
+  TAILLES.forEach(([nom, role]) => {
+    const valeur = cs.getPropertyValue(nom).trim();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rem">${nom}</td>
+      <td class="rem">${valeur}</td>
+      <td style="font-size:var(${nom})">Rocher des Amayères</td>
+      <td>${role}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('val-radius').textContent = cs.getPropertyValue('--radius').trim();
+  document.getElementById('val-largeur-gauche').textContent = cs.getPropertyValue('--largeur-panneau-gauche').trim();
+  document.getElementById('val-largeur-droit').textContent = cs.getPropertyValue('--largeur-panneau-droit').trim();
+</script>
+
+</body>
+</html>

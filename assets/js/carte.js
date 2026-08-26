@@ -9,7 +9,7 @@ import {
   estFalaiseVideDansMode, libelleFalaise,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
-import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee } from './marqueurs.js';
+import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee, afficherDetailVoies, masquerDetailVoies } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
 import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop } from './carte-utils.js';
 
@@ -296,8 +296,29 @@ export function initCarte(dataUrl) {
   // l'écouteur délégué ci-dessous, lu par addMarker (voir estFicheReduite) à
   // chaque ouverture de popup pour synchroniser SON contenu sur cet état.
   let ficheReduite = false;
+
+  // Élément .popup actuellement affiché, qu'il vive dans une popup flottante
+  // MapLibre (mobile/parking/gîte) ou dans le panneau desktop (panneauFacade,
+  // sans .getElement() propre) — les deux cas donnent un point d'entrée DOM
+  // différent, factorisé ici pour ne pas le refaire à chaque appelant.
+  const popupElementCourant = () => {
+    if (!popupOuverte) return null;
+    if (popupOuverte.estPanneauFalaise) return document.getElementById('panneau-falaise')?.querySelector('.popup') || null;
+    return popupOuverte.getElement ? popupOuverte.getElement().querySelector('.popup') : null;
+  };
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      // Échap ferme d'abord le NIVEAU LE PLUS PROFOND, comme "← Retour"/la
+      // croix : le détail des voies s'il est ouvert (retour à la fiche,
+      // popup/panneau gardé ouvert), sinon la fiche/popup elle-même — jamais
+      // les deux d'un coup. Un 2e Échap juste après ferme alors le niveau
+      // suivant normalement.
+      const popupEl = popupElementCourant();
+      if (popupEl && popupEl.classList.contains('mode-detail-voies')) {
+        masquerDetailVoies(popupEl, ficheReduite);
+        return;
+      }
       // Ferme d'abord une éventuelle popup flottante (parking/gîte), puis le
       // panneau falaise s'il reste ouvert. L'état du panneau est lu dans le
       // DOM (panneauFalaiseOuvert), pas dans popupOuverte : une popup
@@ -326,6 +347,28 @@ export function initCarte(dataUrl) {
       if (!contenu) return;
       ficheReduite = contenu.classList.toggle('fiche-reduite');
       synchroniserPoignee(poignee, ficheReduite);
+      return;
+    }
+
+    // "Voir le détail des voies" / "Retour" : swap de contenu dans le même
+    // .popup (mobile ou panneau desktop), voir afficherDetailVoies/
+    // masquerDetailVoies (marqueurs.js) pour la mécanique DOM complète.
+    const btnDetail = e.target.closest('.btn-voir-detail-voies');
+    if (btnDetail) {
+      const popupEl = btnDetail.closest('.popup');
+      const placeholder = btnDetail.closest('.voies-histo-placeholder');
+      if (popupEl && placeholder) {
+        afficherDetailVoies(popupEl, placeholder.dataset.routeFalaise);
+      }
+      return;
+    }
+    const btnRetour = e.target.closest('.btn-retour-fiche');
+    if (btnRetour) {
+      const popupEl = btnRetour.closest('.popup');
+      // ficheReduite (variable de module, plus haut) : restaure l'état
+      // replié/déplié tel qu'il était AVANT l'ouverture du détail (jamais
+      // modifié par afficherDetailVoies, voir marqueurs.js).
+      if (popupEl) masquerDetailVoies(popupEl, ficheReduite);
       return;
     }
 
