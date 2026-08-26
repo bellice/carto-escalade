@@ -815,6 +815,10 @@ export function initCarte(dataUrl) {
           const topo = entree.p.topo_id ? sourcesIndex.get(entree.p.topo_id) : null;
           entree.p.topoNom = topo ? topo.nom : null;
           entree.p.topoUrl = topo ? topo.url : null;
+          // Année (pas la date complète) : distingue 2 éditions du même topo
+          // si une plus récente arrive un jour -- une pagination de topo n'a
+          // de sens que rattachée à UNE édition précise.
+          entree.p.topoAnnee = topo && topo.millesime ? topo.millesime.slice(0, 4) : null;
 
           const cleSecteur = entree.secteur || entree.nom;
           if (!entriesParSecteur.has(cleSecteur)) entriesParSecteur.set(cleSecteur, []);
