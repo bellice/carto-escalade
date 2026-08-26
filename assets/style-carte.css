@@ -1472,37 +1472,52 @@
   color: var(--stone-dark);
 }
 
-/* Référence topo (voir popups.js, refTopo) : titre + année TOUJOURS en
-   clair (jamais caché derrière un title=, invisible au tactile) — sur sa
-   propre ligne, pas mélangée à .actions-secondaires ci-dessus : le titre
-   complet d'un topo est trop long pour rester aussi compact que "Voir sur
-   Oblyk". Cliquable (même style lien que ci-dessus) dès qu'une URL existe :
-   au minimum une fiche catalogue, au mieux un pas vers l'achat du topo —
-   l'achat finance l'entretien des falaises, pas une simple commodité. */
+/* Groupe "Topo papier" (voir popups.js, groupeTopo) : même gabarit que
+   "Accès" (.fiche-groupe-suivant/.fiche-groupe-titre) — cohérence visuelle
+   entre les groupes de la fiche, pas de style bis. Alignement à gauche
+   (pas centré, contrairement à l'ancienne rangée compacte) pour matcher le
+   reste de .fiche-infos/.actions. */
 .popup .topo-reference {
-  margin: 0 0 8px;
-  text-align: center;
+  margin: 0 0 6px;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   color: var(--muted);
 }
-.popup .topo-reference a {
+/* Lien d'achat/téléchargement SÉPARÉ du texte de référence ci-dessus (pas le
+   titre entier cliquable) : reste explicite sur ce qu'il fait ("Acheter ce
+   topo" finance l'entretien des falaises, pas une simple commodité perso). */
+.popup .topo-achat {
+  margin: 0;
+}
+.popup .topo-achat a {
   color: var(--forest);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.popup .topo-reference a:hover {
+.popup .topo-achat a:hover {
   color: var(--clay);
 }
-/* Repère inline ("Topo"/"Sites") distinguant les 2 rangées de référence en
-   bas de fiche — même voix que .gps-label (mono, petit, muet, majuscules) :
-   pas un nouveau vocabulaire visuel, juste réappliqué ici. */
-.popup .ref-label {
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
+/* Partager cette fiche : action secondaire (même voix que les liens
+   .actions-secondaires ci-dessus), pas un bouton encadré — ne rivalise pas
+   avec Itinéraire (la seule action "forte" de la fiche, voir plus haut). */
+.popup .btn-partager {
+  display: block;
+  margin-top: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-align: center;
+  width: 100%;
+  cursor: pointer;
+}
+.popup .btn-partager:hover {
+  color: var(--clay);
 }
 
 /* ===== Fiche mobile : feuille du bas ===== */

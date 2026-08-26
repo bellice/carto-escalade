@@ -401,6 +401,27 @@ export function initCarte(dataUrl) {
       return;
     }
 
+    // Partager cette falaise (voir popups.js, popupFalaise) : construit le
+    // même lien profond que lit le handler ?falaise= plus haut (initCarte) —
+    // navigator.share() sur les navigateurs qui le supportent (feuille de
+    // partage native, mobile surtout), repli presse-papiers sinon, même
+    // mécanique de confirmation que .gps-copie ci-dessus (texte du bouton
+    // lui-même, pas de mot-action séparé à gérer ici).
+    const btnPartager = e.target.closest('.btn-partager');
+    if (btnPartager) {
+      const url = `${location.origin}${location.pathname}?falaise=${encodeURIComponent(btnPartager.dataset.cle)}`;
+      if (navigator.share) {
+        navigator.share({ title: btnPartager.dataset.nom, url }).catch(() => {});
+      } else {
+        const texteOriginal = btnPartager.textContent;
+        navigator.clipboard.writeText(url).then(() => {
+          btnPartager.textContent = 'Lien copié !';
+          setTimeout(() => { btnPartager.textContent = texteOriginal; }, 1500);
+        });
+      }
+      return;
+    }
+
     // Les lignes .parking-ligne (fiche falaise) empruntent le même chemin que
     // les .lien-secteur : navigation + garde du panneau ouvert sur desktop.
     const lienSecteur = e.target.closest('.lien-secteur, .parking-ligne');
@@ -813,12 +834,18 @@ export function initCarte(dataUrl) {
           // fonction ne dépend que de ses paramètres") — pas d'accès à
           // geojson.sources depuis là-bas.
           const topo = entree.p.topo_id ? sourcesIndex.get(entree.p.topo_id) : null;
-          entree.p.topoNom = topo ? topo.nom : null;
+          // trim() : au moins un nom de source.csv porte un espace de fin
+          // parasite (saisie manuelle) -- corrigé ici plutôt que de compter
+          // sur une donnée toujours propre.
+          entree.p.topoNom = topo ? topo.nom.trim() : null;
           entree.p.topoUrl = topo ? topo.url : null;
-          // Année (pas la date complète) : distingue 2 éditions du même topo
-          // si une plus récente arrive un jour -- une pagination de topo n'a
-          // de sens que rattachée à UNE édition précise.
-          entree.p.topoAnnee = topo && topo.millesime ? topo.millesime.slice(0, 4) : null;
+          entree.p.topoEditeur = topo ? topo.auteur : null;
+          entree.p.topoType = topo ? topo.type : null;
+          // Année déjà résolue côté export (geojson.sources[].annee, voir
+          // export_geojson.py/annee_depuis_millesime) : évite de re-parser un
+          // format de date ici, notamment le format "JJ/MM/AA" qui ne se
+          // laisse pas trivialement découper par simple slice().
+          entree.p.topoAnnee = topo ? topo.annee : null;
 
           const cleSecteur = entree.secteur || entree.nom;
           if (!entriesParSecteur.has(cleSecteur)) entriesParSecteur.set(cleSecteur, []);
@@ -853,6 +880,16 @@ export function initCarte(dataUrl) {
           chargerFalaises();
           appliquerFiltresEtSecteurs();
         });
+      }
+
+      // Lien profond (?falaise=<cle>, voir .btn-partager plus bas) : ouvre
+      // directement la fiche d'une falaise précise au chargement — réutilise
+      // allerVers (même mécanique que "Voir" après une recherche, ligne
+      // ~1008), pas de nouveau code de navigation. cle absente/inconnue :
+      // comportement normal, inchangé.
+      const cleLienProfond = new URLSearchParams(location.search).get('falaise');
+      if (cleLienProfond && index.has(cleLienProfond)) {
+        allerVers(cleLienProfond);
       }
 
       // Clic sur un label de site : cadre sur l'étendue de toutes ses
