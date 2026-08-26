@@ -227,16 +227,19 @@ export function popupFalaise(p, lat, lon, cle) {
     // s'omet alors gracieusement, jamais "p. undefined" ni tout le groupe
     // caché pour autant — le nom du topo et le lien d'achat restent utiles
     // sans elle.
-    const pages = p.topo_page ? String(p.topo_page).split(';').join(', ') : null;
     const editeurAnnee = [p.topoEditeur, p.topoAnnee].filter(Boolean).join(', ');
     const parentheses = editeurAnnee ? ` (${escapeHtml(editeurAnnee)})` : '';
-    // Page SUR SA PROPRE LIGNE, mise en valeur (voir .topo-page) : c'est
-    // l'info la plus utile au quotidien une fois qu'on a déjà le bon topo en
-    // main (le repère demandé, ex. "p. 34") — noyée en fin de phrase, elle se
-    // repère moins vite que le titre/auteur/année qui, eux, servent surtout à
-    // confirmer qu'on a le bon livre.
+    // Un badge PAR page (pas "p. 86, 88, 90" en un seul bloc) : reste petit
+    // et lisible quel que soit le nombre de pages, plutôt qu'un pavé qui
+    // s'allongerait au même rythme — même vocabulaire visuel que
+    // .badge-parking/.cat-tag déjà utilisés ailleurs sur le site, pas un
+    // nouveau motif. flex-wrap (CSS) : les badges passent à la ligne
+    // d'eux-mêmes si jamais trop nombreux pour la largeur du popup.
+    const badgesPage = p.topo_page
+      ? String(p.topo_page).split(';').map(pg => `<span class="topo-page-badge">p. ${escapeHtml(pg.trim())}</span>`).join('')
+      : '';
     const identite = p.topoNom ? `<p class="topo-reference">${escapeHtml(p.topoNom)}${parentheses}</p>` : '';
-    const lignePage = pages ? `<p class="topo-page">p. ${escapeHtml(pages)}</p>` : '';
+    const lignePage = badgesPage ? `<p class="topo-page">${badgesPage}</p>` : '';
     // Le texte du lien dépend du type de source (jamais "Acheter" sur une
     // brochure gratuite, ce serait faux) — voir source.type,
     // escalade/data/raw/NOTICE.md.

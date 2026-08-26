@@ -1495,17 +1495,26 @@
   font-size: var(--fs-base);
   color: var(--muted);
 }
-/* Page(s) sur sa propre ligne, mise en avant (encre pleine + gras) : c'est
-   le repère le plus utile une fois qu'on a déjà le bon topo en main — voir
-   popups.js pour le raisonnement complet. Même taille que .topo-reference
-   (--fs-base) : l'emphase vient du poids/de la couleur, pas d'un texte plus
-   gros qui redeviendrait disproportionné (leçon du "Acheter ce topo" trop
-   gros du tour précédent). */
+/* Page(s) en badges (voir popups.js, badgesPage) : c'est le repère le plus
+   utile une fois qu'on a déjà le bon topo en main, mis en avant sans pour
+   autant reprendre une ligne de texte de plus (essayé puis écarté : une 2e
+   ligne "p. 34" juste sous la référence faisait doublon). Un badge PAR page
+   (jamais "p. 86, 88, 90" en un seul badge) : reste compact quel que soit
+   le nombre de pages. */
 .popup .topo-page {
   margin: 0 0 6px;
-  font-family: var(--font-body);
-  font-size: var(--fs-base);
-  font-weight: 700;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.popup .topo-page-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: var(--stone);
   color: var(--ink);
 }
 /* Lien d'achat/téléchargement SÉPARÉ du texte de référence ci-dessus (pas le
