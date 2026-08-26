@@ -96,6 +96,17 @@ export function calculerTempsDepuisGite(geojson) {
   return temps;
 }
 
+// Table de référence des sources (voir export_geojson.py, sources_lookup) :
+// une falaise ne porte qu'un topo_id/source_id (texte court), résolu ici en
+// {nom, url, ...} une seule fois au chargement plutôt que de dupliquer ces
+// champs sur chaque falaise côté export — même géojson.sources déjà exporté,
+// jusqu'ici jamais lu côté site.
+export function indexerSources(geojson) {
+  const index = new Map();
+  (geojson.sources || []).forEach(s => index.set(s.id, s));
+  return index;
+}
+
 export function calculerMaxima(geojson) {
   const totaux = [], couennes = [], gvs = [], faciles = [];
   geojson.features.forEach(f => {

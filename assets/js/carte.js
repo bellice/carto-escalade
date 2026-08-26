@@ -5,7 +5,7 @@
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 import { escapeHtml } from './utils.js';
 import {
-  indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite,
+  indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite, indexerSources,
   estFalaiseVideDansMode, libelleFalaise,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
@@ -801,12 +801,20 @@ export function initCarte(dataUrl) {
       const parkingInfos = indexerParkingInfos(geojson);
       maxima = calculerMaxima(geojson);
       const tempsDepuisGite = calculerTempsDepuisGite(geojson);
+      const sourcesIndex = indexerSources(geojson);
       geojson.features.forEach(f => {
         const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, () => ficheReduite, (id) => baseRoutes + id + '.json');
         entries.push(entree);
         index.set(entree.cle, entree);
         if (entree.cat === 'falaise') {
           entree.tempsGite = tempsDepuisGite.get(entree.cle) ?? null;
+          // Résolu une fois ici (topo_id -> {nom, url}) plutôt que dans
+          // popups.js : ce module ne connaît que p (voir son en-tête, "chaque
+          // fonction ne dépend que de ses paramètres") — pas d'accès à
+          // geojson.sources depuis là-bas.
+          const topo = entree.p.topo_id ? sourcesIndex.get(entree.p.topo_id) : null;
+          entree.p.topoNom = topo ? topo.nom : null;
+          entree.p.topoUrl = topo ? topo.url : null;
 
           const cleSecteur = entree.secteur || entree.nom;
           if (!entriesParSecteur.has(cleSecteur)) entriesParSecteur.set(cleSecteur, []);
