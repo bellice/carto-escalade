@@ -191,9 +191,29 @@ export function popupFalaise(p, lat, lon, cle) {
     rowsLogistique.push(champParkingAssocie(noms, approches));
   }
 
+  // Repère topo papier (voir escalade/db/schema/01_falaise.sql) : but affiché
+  // de retrouver ce secteur dans le topo qu'on a sous la main en préparant
+  // une sortie — texte brut, jamais un lien cliquable. p.topoUrl (résolu une
+  // fois dans carte.js, voir indexerSources) pointe en général vers une
+  // fiche catalogue (ex. BnF), pas le PDF lui-même : un lien laisserait
+  // croire à tort qu'on peut consulter le topo en un clic.
+  const rowsTopo = [];
+  if (p.topo_page) {
+    // ';' : un secteur peut s'étaler sur plusieurs pages du topo (saisi tel
+    // quel dans falaise.csv, ex. "284;286") — affiché en liste lisible.
+    const pages = String(p.topo_page).split(';').join(', ');
+    const valeur = p.topoNom ? `${p.topoNom}, p. ${pages}` : `p. ${pages}`;
+    rowsTopo.push(champBloc('Topo', valeur));
+  }
+
   const rows = [
     contenuCaractere,
     rowsLogistique.length ? `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Accès</div>${rowsLogistique.join('')}</div>` : '',
+    // Pas de fiche-groupe-titre ici (contrairement à "Accès") : le libellé
+    // "Topo" du champBloc lui-même identifie déjà le groupe, un titre de
+    // section répéterait le même mot juste au-dessus pour rien — la classe
+    // fiche-groupe-suivant seule suffit à donner l'espacement "nouveau sujet".
+    rowsTopo.length ? `<div class="fiche-groupe-suivant">${rowsTopo.join('')}</div>` : '',
   ];
 
   const secteur = secteurDistinct(p);
