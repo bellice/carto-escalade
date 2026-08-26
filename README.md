@@ -10,9 +10,9 @@ style du site, reste à jour tant que les tokens ne changent pas de nom).
 
 ```
 index.html          → page d'accueil, liste des sorties
-sw.js                → service worker : pré-cache de la coquille + cache-first
-                       local + stale-while-revalidate pour les données +
-                       cache-first pour les tuiles du fond (voir "Hors-ligne")
+sw.js                → service worker : pré-cache de la coquille + données,
+                       stale-while-revalidate pour les deux + cache-first
+                       pour les tuiles du fond (voir "Hors-ligne")
 assets/
   style.css          → tokens (palette, polices) + page d'accueil uniquement
   style-carte.css    → marqueurs, popups, légende, feuille mobile, impression
@@ -151,9 +151,13 @@ CRS : **EPSG:4326** obligatoire.
 
 `sw.js` applique une stratégie par type de ressource :
 
-- **Coquille** (pages, CSS, JS, `maplibre-gl`, `data.geojson`) : **pré-cachée
-  à l'install** puis servie en **cache-first** → l'app (HTML, JS, styles,
-  données, lib de carte) démarre **offline dès la première ouverture**.
+- **Coquille + données** (pages, CSS, JS, `maplibre-gl`, `data.geojson`,
+  `routes/<slug-site>.json`) : **pré-cachées à l'install** puis servies en
+  **stale-while-revalidate** → l'app (HTML, JS, styles, données, lib de
+  carte, détail des voies) démarre **offline dès la première ouverture**, en
+  servant le cache instantanément (aucun aller-retour réseau, important en
+  contexte faible réseau) tout en se rafraîchissant en arrière-plan pour la
+  visite suivante.
 - **`maplibre-gl` reste servi par le CDN** (et non vendu en local) : le build
   ESM 6.4.1 ne charge pas ses tuiles vectorielles quand il est servi depuis le
   **même domaine** que la page (constaté en test : `styleLoaded` reste faux,
@@ -162,22 +166,22 @@ CRS : **EPSG:4326** obligatoire.
   `-worker`, `.css`) sont **ajoutés au pré-cache** du service worker : ils
   sont donc disponibles hors-ligne dès l'install, sans dépendre du CDN au
   moment de l'usage.
-- **`routes/<slug-site>.json`** (détail des voies) : **pré-cachés à l'install** (les
-  identifiants sont lus depuis `data.geojson` — total ~170 Ko par sortie),
-  puis servis en **stale-while-revalidate** : l'histogramme d'une fiche sort
-  du cache instantanément, sans aller-retour réseau (important en contexte
-  faible réseau), même à la première ouverture.
 - **Tuiles / fond de carte** (OpenFreeMap, cross-origin) : **cache d'abord**
   → les tuiles sont versionnées (immuables, le numéro de modèle est dans
   l'URL) : une fois affichées, elles sont servies du cache **instantanément
   et sans bande passante** aux visites suivantes (l'objectif premier du site,
-  contexte réseau faible). Le style du fond seul est rafraîchi en arrière-plan
+  contexte réseau faible). Le style du fond seul suit stale-while-revalidate
   (petit fichier, il porte le modèle du jour). L'offline couvre ce qui a déjà
   été affiché en ligne.
 
-Quand une sortie est mise à jour (nouveau `data.geojson`, `routes/`), il faut
-**bumper `CACHE_NAME`** dans `sw.js` pour forcer le renouvellement du cache,
-et re-pré-cacher la coquille.
+Une mise à jour (code ou données : nouveau `data.geojson`, `routes/`) finit
+toujours par arriver toute seule grâce au stale-while-revalidate — au pire
+2 rechargements (le 1er sert encore l'ancien contenu tout en déclenchant le
+rafraîchissement en arrière-plan, le 2e sert la version fraîche). **Bumper
+`CACHE_NAME`** dans `sw.js` reste utile pour forcer un renouvellement
+**immédiat** (ex. correctif urgent), mais n'est plus une obligation pour
+qu'une mise à jour de routine finisse par atteindre les visiteurs déjà
+passés.
 
 > **Dev avec Vite** : le service worker est volontairement désactivé (et
 > désenregistré) quand la page est servie par Vite — son cache-first

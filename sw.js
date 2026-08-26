@@ -1,18 +1,25 @@
 // sw.js — stratégie par type de ressource : coquille offline + faible bande
 // passante (contexte réseau lent en falaise) :
-// - sous-ressources locales (CSS, JS) : PRÉ-CACHÉES à l'install puis servies
-//   en cache-first — l'app démarre sans attendre le réseau ;
+// - sous-ressources locales (CSS, JS) + data.geojson + routes/<id>.json :
+//   PRÉ-CACHÉES à l'install puis servies en stale-while-revalidate — l'app
+//   démarre sans attendre le réseau (réponse cache immédiate), tout en se
+//   rafraîchissant en arrière-plan à chaque visite (voir repondreEnRevalidant) ;
 // - navigations (pages HTML) : réseau d'abord avec repli cache — indispensable
 //   avec un serveur de dev qui transforme le HTML (Vite et ses html-proxy),
 //   et l'offline sert le HTML déjà vu ;
-// - data.geojson + routes/<id>.json : stale-while-revalidate — servi depuis
-//   le cache immédiatement (pas de latence réseau), rafraîchi en arrière-plan ;
 // - fond de carte (cross-origin OpenFreeMap) : cache d'abord — les tuiles
 //   sont versionnées (immuables) : une fois vues, plus aucun octet réseau aux
 //   visites suivantes (le principal gain de bande passante du site). Le style
-//   seul est rafraîchi en arrière-plan (voir le fetch handler).
-// Bump CACHE_NAME pour forcer un renouvellement complet après un déploiement.
-const CACHE_NAME = 'sorties-escalade-v5';
+//   seul suit stale-while-revalidate (voir le fetch handler).
+// Bump CACHE_NAME pour forcer un renouvellement IMMÉDIAT (utile pour un
+// correctif urgent) — plus une obligation à chaque déploiement de routine
+// depuis que toute la coquille locale passe en stale-while-revalidate (voir
+// repondreEnRevalidant plus bas) : un simple cache-first sans revalidation
+// la servait indéfiniment tant que CACHE_NAME ne changeait pas, ce qui a
+// fini par arriver (plusieurs vagues de JS/CSS déployées sans y penser —
+// bug réel constaté : les visiteurs déjà passés ne recevaient plus AUCUNE
+// mise à jour tant qu'ils ne vidaient pas leur cache à la main).
+const CACHE_NAME = 'sorties-escalade-v6';
 
 // Coquille pré-cachée à l'install. Liste manuelle : une entrée par dossier
 // sortie/ (page + data.geojson). maplibre-gl reste servi par le CDN (voir
@@ -130,6 +137,31 @@ function mettreEnCache(request, response) {
   return caches.open(CACHE_NAME).then((cache) => cache.put(request, copie));
 }
 
+// Sert le cache immédiatement (latence nulle, hors-ligne inclus) tout en
+// rafraîchissant en arrière-plan pour la PROCHAINE visite — même mécanique
+// pour 3 catégories de ressources (coquille locale, données, style du fond
+// de carte, voir le fetch handler plus bas), qui ne diffèrent que par CE QUI
+// déclenche cette stratégie, jamais par son comportement. Factorisé ici
+// plutôt que dupliqué 3 fois : avant, seules data.geojson/routes en
+// bénéficiaient — la coquille locale (JS/CSS) restait en cache-first PUR,
+// sans jamais se rafraîchir tant que CACHE_NAME n'était pas bumpé à la main
+// (oubli constaté en pratique : des visiteurs déjà passés ne recevaient plus
+// aucune mise à jour de code tant qu'ils ne vidaient pas leur cache).
+function repondreEnRevalidant(event) {
+  // cache: 'no-cache' force la revalidation reseau (avec le serveur, pas
+  // avec le cache HTTP du navigateur) : sans ça, le HTTP cache du navigateur
+  // (Cache-Control/heuristique sur Last-Modified — GitHub Pages en envoie)
+  // peut renvoyer une reponse deja obsolete sans le moindre aller-retour
+  // reseau, ce qui annulerait le rafraichissement voulu ici.
+  const rafraichir = fetch(event.request, { cache: 'no-cache' })
+    .then((reponse) => mettreEnCache(event.request, reponse).then(() => reponse))
+    .catch(() => null);
+  event.waitUntil(rafraichir);
+  event.respondWith(
+    caches.match(event.request).then((enCache) => enCache || rafraichir)
+  );
+}
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
@@ -150,24 +182,12 @@ self.addEventListener('fetch', (event) => {
       );
       return;
     }
-    // Données : stale-while-revalidate — on sert le cache immédiatement
-    // (offline OK, pas de latence réseau) et on rafraîchit en arrière-plan.
-    if (url.pathname.endsWith('/data.geojson') || url.pathname.includes('/routes/')) {
-      const rafraichir = fetch(event.request)
-        .then((reponse) => mettreEnCache(event.request, reponse).then(() => reponse))
-        .catch(() => null);
-      event.waitUntil(rafraichir);
-      event.respondWith(
-        caches.match(event.request).then((enCache) => enCache || rafraichir)
-      );
-      return;
-    }
-    // Le reste de la coquille (CSS, JS, maplibre local) : cache-first
-    // pur — tout est pré-caché à l'install ; le réseau ne sert que de secours
-    // au tout premier passage, avant que le service worker ne prenne la main.
-    event.respondWith(
-      caches.match(event.request).then((enCache) => enCache || fetch(event.request))
-    );
+    // Données ET reste de la coquille (CSS, JS, maplibre local) :
+    // stale-while-revalidate pour les deux (voir repondreEnRevalidant) — la
+    // coquille suivait avant un cache-first PUR, sans jamais se rafraîchir
+    // tant que CACHE_NAME n'était pas bumpé à la main (voir le commentaire
+    // sur CACHE_NAME en tête de fichier pour le pourquoi de ce changement).
+    repondreEnRevalidant(event);
     return;
   }
 
@@ -189,14 +209,8 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-  // Style : cache-first + rafraîchissement en arrière-plan (petit fichier,
-  // il porte le modèle courant du fond) — l'affichage ne bloque pas, et les
-  // tuiles du nouveau modèle seront téléchargées aux prochaines visites.
-  const requeteReseau = fetch(event.request).then((response) =>
-    mettreEnCache(event.request, response).then(() => response)
-  );
-  event.waitUntil(requeteReseau.catch(() => {}));
-  event.respondWith(
-    caches.match(event.request).then((enCache) => enCache || requeteReseau)
-  );
+  // Style : stale-while-revalidate (petit fichier, il porte le modèle
+  // courant du fond) — l'affichage ne bloque pas, et les tuiles du nouveau
+  // modèle seront téléchargées aux prochaines visites.
+  repondreEnRevalidant(event);
 });
