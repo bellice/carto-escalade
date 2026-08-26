@@ -1325,6 +1325,17 @@
   gap: 6px;
   margin-top: 2px;
 }
+/* Itinéraire + GPS, une fois déplacés dans "Accès" (voir popups.js,
+   popupFalaise) : simples <a>/<div> frères de .parkings-list, SANS le
+   gap:8px que fournissait avant .actions en display:flex — collés l'un à
+   l'autre sans cette marge (repéré en test réel : "trop collé" entre la
+   liste de parkings et le bouton Itinéraire). Ciblé sur .fiche-groupe-suivant
+   uniquement : popupParking/popupGite gardent Itinéraire+GPS dans .actions,
+   dont le gap flex reste inchangé, pas concerné par cette règle. */
+.popup .fiche-groupe-suivant .btn-primary,
+.popup .fiche-groupe-suivant .gps-copie {
+  margin-top: 8px;
+}
 .popup .parking-ligne {
   display: flex;
   align-items: center;
@@ -1457,15 +1468,41 @@
 .popup .actions-secondaires a:hover {
   color: var(--clay);
 }
-/* Référence topo (voir popups.js, refTopo) : seul élément non cliquable de
-   cette ligne — délibérément SANS le style lien ci-dessus (pas de
-   soulignement, encre neutre) pour ne pas laisser croire qu'on peut taper
-   dessus comme sur "Voir sur Oblyk"/"Voir sur Camptocamp" juste à côté. */
-.popup .actions-secondaires span {
-  color: var(--muted);
-}
 .popup .actions-secondaires .separateur {
   color: var(--stone-dark);
+}
+
+/* Référence topo (voir popups.js, refTopo) : titre + année TOUJOURS en
+   clair (jamais caché derrière un title=, invisible au tactile) — sur sa
+   propre ligne, pas mélangée à .actions-secondaires ci-dessus : le titre
+   complet d'un topo est trop long pour rester aussi compact que "Voir sur
+   Oblyk". Cliquable (même style lien que ci-dessus) dès qu'une URL existe :
+   au minimum une fiche catalogue, au mieux un pas vers l'achat du topo —
+   l'achat finance l'entretien des falaises, pas une simple commodité. */
+.popup .topo-reference {
+  margin: 0 0 8px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.popup .topo-reference a {
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.popup .topo-reference a:hover {
+  color: var(--clay);
+}
+/* Repère inline ("Topo"/"Sites") distinguant les 2 rangées de référence en
+   bas de fiche — même voix que .gps-label (mono, petit, muet, majuscules) :
+   pas un nouveau vocabulaire visuel, juste réappliqué ici. */
+.popup .ref-label {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* ===== Fiche mobile : feuille du bas ===== */
