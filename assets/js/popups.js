@@ -122,15 +122,11 @@ function lienItineraire(lat, lon, nom) {
 // à partir d'une liste où certaines entrées peuvent être vides (Oblyk
 // absent...) — filtre les vides et joint seulement ce qui reste, pour ne
 // jamais laisser un séparateur orphelin en tête/fin, et n'affiche rien du
-// tout si la liste entière est vide. libelle (optionnel) : petit repère
-// inline (voir .ref-label) distinguant cette rangée d'une autre du même
-// style juste au-dessus (ex. "Sites" vs "Topo", popupFalaise) — omis si
-// aucune entrée n'est présente, comme le reste de la rangée.
-function construireActionsSecondaires(liens, libelle) {
+// tout si la liste entière est vide.
+function construireActionsSecondaires(liens) {
   const presents = liens.filter(Boolean);
   if (!presents.length) return '';
-  const prefixe = libelle ? `<span class="ref-label">${escapeHtml(libelle)}</span> ` : '';
-  return `<div class="actions-secondaires">${prefixe}${presents.join('<span class="separateur" aria-hidden="true">·</span>')}</div>`;
+  return `<div class="actions-secondaires">${presents.join('<span class="separateur" aria-hidden="true">·</span>')}</div>`;
 }
 
 // Coordonnées GPS : affichées en clair (pas cachées derrière un intitulé
@@ -211,37 +207,50 @@ export function popupFalaise(p, lat, lon, cle) {
   ];
 
   const secteur = secteurDistinct(p);
-  // Repère topo papier (voir escalade/db/schema/01_falaise.sql) : but de
-  // retrouver ce secteur dans le topo qu'on a sous la main en préparant une
-  // sortie — ET de faire savoir qu'un topo payant existe (l'achat finance
-  // l'entretien des falaises/équipement, pas juste une commodité perso) :
-  // titre + année TOUJOURS en clair (jamais caché dans un title= — invisible
-  // au tactile, donc sur mobile) ; cliquable dès que p.topoUrl existe, même
-  // si ce n'est "que" une fiche catalogue (ex. BnF) plutôt qu'un achat direct
-  // — ça reste un pas vers "où se procurer ce topo", pas rien. Sur sa PROPRE
-  // ligne (pas mélangée à Oblyk/Camptocamp, voir plus bas) : le titre complet
-  // est trop long pour rester aussi compact que ces deux liens courts.
-  // .ref-label ("Topo"/"Sites" ci-dessous) : distingue les deux rangées de
-  // référence l'une de l'autre (papier, qui finance l'entretien des
-  // falaises, VS sites communautaires gratuits) — même repère inline que
-  // .gps-label, pas un nouveau vocabulaire visuel.
-  let refTopo = '';
-  if (p.topo_page) {
+  // Groupe "Topo papier" (voir escalade/db/schema/01_falaise.sql, 00_source.sql) :
+  // but de retrouver ce secteur dans le topo qu'on a sous la main en
+  // préparant une sortie — ET de faire savoir qu'un topo payant existe
+  // (l'achat finance l'entretien des falaises/équipement, pas juste une
+  // commodité perso). Réutilise .fiche-groupe-suivant/.fiche-groupe-titre
+  // (même voix que "Accès" plus haut) plutôt qu'un style bis, maintenant
+  // qu'il y a 2 lignes à porter (référence + lien d'achat) et pas juste un
+  // repère compact. Titre + auteur + année TOUJOURS en clair (jamais caché
+  // dans un title=, invisible au tactile) ; le lien d'achat est SÉPARÉ du
+  // texte (pas le titre entier cliquable) pour rester explicite sur ce
+  // qu'il fait.
+  let groupeTopo = '';
+  if (p.topo_page || p.topoNom) {
     // ';' : un secteur peut s'étaler sur plusieurs pages du topo (saisi tel
     // quel dans falaise.csv, ex. "284;286") — affiché en liste lisible.
-    const pages = String(p.topo_page).split(';').join(', ');
-    const annee = p.topoAnnee ? ` (${p.topoAnnee})` : '';
-    const texte = p.topoNom ? `${escapeHtml(p.topoNom)}${annee}, p. ${escapeHtml(pages)}` : `p. ${escapeHtml(pages)}`;
-    const contenu = p.topoUrl
-      ? `<a href="${escapeHtml(p.topoUrl)}" target="_blank" rel="noopener">${texte}</a>`
-      : texte;
-    refTopo = `<p class="topo-reference"><span class="ref-label">Topo</span> ${contenu}</p>`;
+    // topo_page peut manquer alors que le topo (topo_id) est déjà identifié
+    // (saisie en cours, vu en pratique sur plusieurs secteurs) : la page
+    // s'omet alors gracieusement, jamais "p. undefined" ni tout le groupe
+    // caché pour autant — le nom du topo et le lien d'achat restent utiles
+    // sans elle.
+    const pages = p.topo_page ? String(p.topo_page).split(';').join(', ') : null;
+    const editeurAnnee = [p.topoEditeur, p.topoAnnee].filter(Boolean).join(', ');
+    const parentheses = editeurAnnee ? ` (${escapeHtml(editeurAnnee)})` : '';
+    const suffixePage = pages ? `, p. ${escapeHtml(pages)}` : '';
+    const reference = p.topoNom
+      ? `${escapeHtml(p.topoNom)}${parentheses}${suffixePage}`
+      : `p. ${escapeHtml(pages)}`;
+    // Le texte du lien dépend du type de source (jamais "Acheter" sur une
+    // brochure gratuite, ce serait faux) — voir source.type,
+    // escalade/data/raw/NOTICE.md.
+    let libelleLien = 'Voir ce topo';
+    if (p.topoType === 'topo payant') libelleLien = 'Acheter ce topo';
+    else if (p.topoType === 'brochure_gratuite') libelleLien = 'Télécharger cette brochure';
+    const lienAchat = p.topoUrl
+      ? `<p class="topo-achat"><a href="${escapeHtml(p.topoUrl)}" target="_blank" rel="noopener">${libelleLien}</a></p>`
+      : '';
+    groupeTopo = `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Topo papier</div><p class="topo-reference">${reference}</p>${lienAchat}</div>`;
   }
-  // Libellés raccourcis ("Oblyk"/"Camptocamp" plutôt que "Voir sur Oblyk...") :
-  // le label "Sites" (construireActionsSecondaires) porte déjà le "vous
-  // pouvez consulter ces sites", plus besoin de le répéter par lien.
-  const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Oblyk</a>` : '';
-  const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Camptocamp</a>` : '';
+  const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
+  const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Voir sur C2C</a>` : '';
+  const rangeeSecondaires = construireActionsSecondaires([lienOblyk, lienC2C]);
+  const groupePlusLoin = rangeeSecondaires
+    ? `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Pour aller plus loin</div>${rangeeSecondaires}</div>`
+    : '';
 
   return `
     <div class="popup" data-cle="${escapeHtml(cle)}">
@@ -256,8 +265,9 @@ export function popupFalaise(p, lat, lon, cle) {
       </div>
       <div class="fiche-infos">${rows.join('')}</div>
       <div class="actions">
-        ${refTopo}
-        ${construireActionsSecondaires([lienOblyk, lienC2C], 'Sites')}
+        ${groupeTopo}
+        ${groupePlusLoin}
+        <button type="button" class="btn-partager" data-cle="${escapeHtml(cle)}" data-nom="${escapeHtml(p.nom)}">Partager cette fiche</button>
       </div>
     </div>`;
 }
