@@ -1495,14 +1495,26 @@
   font-size: var(--fs-base);
   color: var(--muted);
 }
-/* Page(s) en badges (voir popups.js, badgesPage) : c'est le repère le plus
-   utile une fois qu'on a déjà le bon topo en main, mis en avant sans pour
-   autant reprendre une ligne de texte de plus (essayé puis écarté : une 2e
-   ligne "p. 34" juste sous la référence faisait doublon). Un badge PAR page
-   (jamais "p. 86, 88, 90" en un seul badge) : reste compact quel que soit
-   le nombre de pages. */
-.popup .topo-page {
+/* Page(s) + lien d'achat sur la MÊME ligne (voir popups.js,
+   lignePageEtAchat) : badges à gauche, lien à droite — même motif que
+   .gps-copie (valeur à gauche, "Copier" à droite) : économise une ligne de
+   hauteur plutôt que d'empiler. flex-wrap : si les deux ne tiennent pas
+   côte à côte (plusieurs badges + lien dans une popup de 260px), le lien
+   repasse sous les badges de lui-même au lieu de les compresser. */
+.popup .topo-page-ligne {
   margin: 0 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+/* Page(s) en badges : c'est le repère le plus utile une fois qu'on a déjà
+   le bon topo en main, mis en avant sans reprendre une ligne de texte de
+   plus (essayé puis écarté : une 2e ligne "p. 34" faisait doublon avec la
+   référence juste au-dessus). Un badge PAR page (jamais "p. 86, 88, 90" en
+   un seul badge) : reste compact quel que soit le nombre de pages. */
+.popup .topo-page {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -1525,19 +1537,18 @@
    popup — d'où le "beaucoup trop gros" repéré en vrai. Mono + --fs-sm,
    comme "Voir sur Oblyk" juste en dessous (.actions-secondaires a) : un
    libellé COURT SANS ponctuation interne n'a pas le problème d'espacement
-   de .topo-reference/.topo-page ci-dessus, et une action reste
-   volontairement plus discrète qu'une info à lire. */
+   de .topo-reference ci-dessus, et une action reste volontairement plus
+   discrète qu'une info à lire. white-space: nowrap : ne coupe jamais au
+   milieu de "Acheter ce topo" quand il repasse à côté/sous les badges. */
 .popup .topo-achat {
-  margin: 0;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-}
-.popup .topo-achat a {
   color: var(--forest);
   text-decoration: underline;
   text-underline-offset: 2px;
+  white-space: nowrap;
 }
-.popup .topo-achat a:hover {
+.popup .topo-achat:hover {
   color: var(--clay);
 }
 /* Partager cette fiche : action secondaire (même voix que les liens
