@@ -7,7 +7,7 @@
 // reste privé au module.
 
 import { escapeHtml, urlSure } from './utils.js';
-import { secteurDistinct, cotationVersValeur } from './donnees.js';
+import { secteurDistinct, cotationVersValeur, approximerCotation } from './donnees.js';
 
 // Rose des vents miniature pour l'orientation d'une falaise. Un point (pastille)
 // par direction cardinale/intercardinale sur un anneau, plutôt qu'un
@@ -417,45 +417,6 @@ function champLiensFalaises(falaises) {
   return `<div class="info-ligne"><span class="info-label">Falaises</span></div><div class="liens-detail">${groupes}</div>`;
 }
 
-// Histogramme "1 case = 1 voie" par cotation. Remplace le 1er jet (nuage en
-// miroir sur une échelle 3a→9b fixe et globale) : testé en vrai, une falaise
-// typique ne couvre que 2-3 crans sur les ~39 possibles, donc l'échelle
-// globale compressait ses points dans une toute petite tranche du popup —
-// des cotations voisines finissaient à quelques pixels les unes des autres,
-// illisible (confirmé sur capture d'écran réelle, pas en théorie).
-//
-// Ici, une colonne par cotation RÉELLEMENT présente sur CETTE falaise (pas
-// les ~39 crans possibles) : la largeur du popup reste toujours bien
-// utilisée, quelle que soit l'étendue de la falaise, aucun risque de
-// chevauchement (positions de grille, pas de pixels calculés en continu).
-// Contrepartie assumée : la position d'une colonne n'est plus comparable
-// d'une fiche à l'autre — priorité donnée à la lisibilité individuelle.
-// Best-effort de placement pour 3 formes de cotation non standard mais
-// raisonnablement déductibles — UNIQUEMENT pour positionner une voie sur ce
-// graphique, jamais pour une valeur affichée ailleurs (cotationVersValeur,
-// donnees.js, reste strict — utilisée entre autres pour le mode "Voies
-// faciles" du sélecteur "Cercles", où une estimation n'a pas sa place). Les
-// cases qui en résultent ne sont PAS distinguées visuellement des cotations
-// exactes (essayé, puis retiré : un marquage pour un cas aussi marginal
-// faisait plus de bruit qu'autre chose) — une fois la règle posée, elle
-// s'applique sans réserve affichée.
-function approximerCotation(cotation) {
-  if (!cotation) return null;
-  const texte = String(cotation).trim();
-  // Lettrée + "-" (ex. "6a-") : le "-" est ignoré plutôt que de basculer
-  // vers le cran précédent (6a- rejoint la colonne 6a, pas 5c+ — reste dans
-  // SA lettre, pas dans une colonne qui semblerait être une autre cotation
-  // réelle).
-  let m = /^(\d)([abc])-$/.exec(texte);
-  if (m) return { label: `${m[1]}${m[2]}` };
-  // Chiffre seul + "-" (ex. "4-", ancienne cotation) : bas de fourchette.
-  m = /^(\d)-$/.exec(texte);
-  if (m) return { label: `${m[1]}a` };
-  // Chiffre seul (ex. "4", ancienne cotation) : milieu de fourchette.
-  m = /^(\d)$/.exec(texte);
-  if (m) return { label: `${m[1]}b` };
-  return null;
-}
 
 // Synthèse "Voies" (total + répartition sportives/autres) : n'utilise que les
 // compteurs du fichier principal, pas le détail des voies — affichée tout de

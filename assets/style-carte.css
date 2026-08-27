@@ -1841,3 +1841,38 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Fourchette de cotation (mode « Nombre de voies par cotation »).
+   Deux <select> natifs plutôt qu'un curseur à deux poignées : accessibles au
+   clavier, cible tactile correcte, et rien à maintenir — voir le commentaire
+   dans carte.js. */
+.legende-cotation {
+  margin-top: 8px;
+}
+.legende-cotation[hidden] { display: none; }
+.legende-cotation-bornes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.legende-cotation-bornes select {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 32px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  padding: 2px 4px;
+}
+.legende-cotation-resume {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}

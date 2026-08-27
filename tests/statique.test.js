@@ -104,6 +104,27 @@ describe('Données exportées', () => {
     }
   });
 
+  // Le filtre par fourchette lit ce résumé au chargement : sans lui, il
+  // faudrait télécharger routes/*.json (350 Ko) juste pour savoir quelles
+  // falaises afficher.
+  test('chaque falaise sportive embarque sa répartition de cotations', async () => {
+    const geo = JSON.parse(await lire('sorties/2026-10-drome-saou/data.geojson'));
+    const sportives = geo.features.filter((f) => (f.properties.nb_voie_sportive || 0) > 0);
+
+    assert.ok(sportives.length > 0, 'Aucune falaise sportive dans data.geojson');
+    for (const f of sportives) {
+      const p = f.properties;
+      assert.ok(p.cotations && Object.keys(p.cotations).length,
+        `${p.nom} : champ "cotations" absent — le filtre par fourchette n'aurait rien à lire`);
+      const somme = Object.values(p.cotations).reduce((a, b) => a + b, 0);
+      // Inférieur ou égal, pas égal : une poignée de voies sportives n'ont
+      // aucune cotation renseignée (8 falaises concernées) et sont donc
+      // absentes du résumé. Les compter serait faux ; les exiger aussi.
+      assert.ok(somme <= p.nb_voie_sportive,
+        `${p.nom} : ${somme} voies cotées pour ${p.nb_voie_sportive} sportives — incohérent`);
+    }
+  });
+
   test('chaque falaise avec des voies pointe vers un fichier routes existant', async () => {
     const geo = JSON.parse(await lire('sorties/2026-10-drome-saou/data.geojson'));
     const fichiers = new Set(await readdir(join(RACINE, 'sorties/2026-10-drome-saou/routes')));

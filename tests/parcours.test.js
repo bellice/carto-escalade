@@ -86,6 +86,62 @@ describe('Démarrage', () => {
   });
 });
 
+describe('Filtre par fourchette de cotation', () => {
+  test('restreint les falaises et suit les bornes choisies', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+
+      // Les bornes ne s'affichent que dans leur mode : ailleurs, elles
+      // laisseraient croire qu'elles filtrent.
+      assert.equal(await page.evaluate(() => document.getElementById('legende-cotation').hidden), true,
+        'La fourchette ne doit pas être visible hors du mode cotation');
+
+      await page.selectOption('#mode-figure', 'cotation');
+      await page.waitForTimeout(600);
+
+      const complet = await page.evaluate(() => ({
+        visible: !document.getElementById('legende-cotation').hidden,
+        crans: document.querySelectorAll('#cotation-min option').length,
+        falaises: window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length,
+      }));
+      assert.equal(complet.visible, true);
+      assert.ok(complet.crans > 5,
+        'Les listes doivent être peuplées avec les cotations réellement présentes');
+
+      // Fourchette débutant : doit réduire nettement. Sur ce jeu de données,
+      // filtrer par PRÉSENCE laisserait ~100 falaises sur 107 ; c'est le
+      // comptage par fourchette qui donne du signal.
+      await page.selectOption('#cotation-min', { label: '4a' });
+      await page.selectOption('#cotation-max', { label: '5c' });
+      await page.waitForTimeout(600);
+
+      const restreint = await page.evaluate(() => ({
+        falaises: window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length,
+        resume: document.getElementById('cotation-resume').textContent,
+      }));
+      assert.ok(restreint.falaises < complet.falaises,
+        `La fourchette doit masquer des falaises (${restreint.falaises} vs ${complet.falaises})`);
+      assert.match(restreint.resume, /\d+ voies? sur \d+ falaises?/,
+        'Le résumé doit annoncer le volume concerné');
+
+      // Bornes croisées : on corrige au lieu de refuser.
+      await page.selectOption('#cotation-min', { label: '7a' });
+      await page.waitForTimeout(600);
+      const croise = await page.evaluate(() => ({
+        min: Number(document.getElementById('cotation-min').value),
+        max: Number(document.getElementById('cotation-max').value),
+      }));
+      assert.ok(croise.min <= croise.max,
+        'Choisir un minimum supérieur au maximum doit pousser l\'autre borne, pas produire une plage vide');
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
 describe('Fiche falaise', () => {
   test('affiche les métadonnées, l\'histogramme et la référence topo', { timeout: 90000 }, async () => {
     const { contexte, page } = await nouveauContexte(navigateur);

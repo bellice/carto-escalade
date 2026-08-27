@@ -7,6 +7,8 @@ import { escapeHtml } from './utils.js';
 import {
   indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite, indexerSources,
   estFalaiseVideDansMode, libelleFalaise,
+  compterDansFourchette, maximaFourchette, valeurCotationApprochee,
+  cotationVersValeur, approximerCotation,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
 import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee, afficherDetailVoies, masquerDetailVoies, basculerTriDetailVoies, remplirPlaceholderVoies } from './marqueurs.js';
@@ -103,6 +105,7 @@ export function initCarte(dataUrl) {
   // de référence "aucun filtre actif" (voir appliquerFiltres/reinitialiserFiltreTemps),
   // pas de sentinelle séparée à garder synchronisée ailleurs.
   const filtres = { recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity };
+  const blocCotation = document.getElementById('legende-cotation');
   let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
   let falaiseSelectionneeCle = null; // falaise dont la popup est ouverte (ou origine/cible d'une navigation) — voir appliquerFiltres()
 
@@ -620,6 +623,12 @@ export function initCarte(dataUrl) {
   function definirModeFigure(nouveauMode) {
     modeFigureActuel = nouveauMode;
     if (selectFigure) selectFigure.value = nouveauMode;
+    // Les bornes de cotation n'ont de sens que dans leur mode : les afficher
+    // en permanence laisserait croire qu'elles filtrent alors qu'elles ne
+    // pilotent rien (même principe que le filtre de trajet, masqué tant
+    // qu'aucun temps n'est calculable).
+    if (blocCotation) blocCotation.hidden = nouveauMode !== 'cotation';
+    if (nouveauMode === 'cotation') majFourchette();
     // Couche native : remplace les features (un mode en exclut certaines,
     // voir construireSourceFalaises) et la couleur du thème. setData
     // remplace l'ancien dessinerFalaise + trierCerclesParTaille : le tri par
@@ -1019,6 +1028,10 @@ export function initCarte(dataUrl) {
       // qui déterminent les tuiles à télécharger. Placé dans la légende,
       // avec le reste des réglages de la carte. Idempotent : ne fait rien si
       // le bloc existe déjà (rechargement après un "Réessayer").
+      // Les listes de cotations se peuplent depuis les entries : ne peut se
+      // faire qu'une fois data.geojson lu.
+      preparerFourchette();
+
       const contenuLegende = document.getElementById('legende-contenu');
       if (contenuLegende && !contenuLegende.querySelector('.preparation')) {
         monterPreparationHorsLigne({
@@ -1158,6 +1171,94 @@ export function initCarte(dataUrl) {
       // affiché seul, sans rien à proposer.
       appliquerFiltresEtSecteurs();
     });
+  }
+
+  // --- Fourchette de cotation ---
+  // Deux <select> plutôt qu'un curseur à deux poignées : aucun élément natif
+  // ne fait ça, et une version maison serait à la fois du code à maintenir et
+  // un piège d'accessibilité (cible tactile minuscule, inutilisable au
+  // clavier). Deux listes déroulantes sont natives, accessibles et lisibles
+  // au doigt — cohérent avec le parti « texte plutôt qu'icône » du site.
+  const selectCotationMin = document.getElementById('cotation-min');
+  const selectCotationMax = document.getElementById('cotation-max');
+  const resumeCotation = document.getElementById('cotation-resume');
+
+  // Recalcule nbDansFourchette pour chaque falaise, puis les maxima du mode.
+  // Fait ICI, une seule fois par changement de bornes, plutôt qu'à la volée
+  // dans estFalaiseVideDansMode/valeurPourMode : ces deux fonctions sont
+  // appelées pour chaque falaise à chaque rendu de la couche.
+  function majFourchette() {
+    if (!selectCotationMin || !selectCotationMax) return;
+    const min = Number(selectCotationMin.value);
+    const max = Number(selectCotationMax.value);
+    entries.forEach((entree) => {
+      if (entree.cat !== 'falaise') return;
+      entree.nbDansFourchette = compterDansFourchette(entree.cotations, min, max);
+    });
+    Object.assign(maxima, maximaFourchette(entries));
+
+    if (resumeCotation) {
+      const concernees = entries.filter(e => e.cat === 'falaise' && e.nbDansFourchette > 0).length;
+      const voies = entries.reduce((s, e) => s + (e.cat === 'falaise' ? e.nbDansFourchette : 0), 0);
+      resumeCotation.textContent = concernees
+        ? `${voies} voie${voies > 1 ? 's' : ''} sur ${concernees} falaise${concernees > 1 ? 's' : ''}`
+        : 'Aucune voie dans cette fourchette';
+    }
+  }
+
+  // Peuple les deux listes avec les cotations RÉELLEMENT présentes dans la
+  // sortie, triées par difficulté. Proposer l'échelle complète 3a→9c+
+  // afficherait une quarantaine de crans dont la plupart ne correspondent à
+  // aucune voie ici — autant de choix qui ne feraient rien.
+  function preparerFourchette() {
+    if (!selectCotationMin || !selectCotationMax) return;
+    const parValeur = new Map();
+    entries.forEach((entree) => {
+      if (entree.cat !== 'falaise' || !entree.cotations) return;
+      for (const cotation of Object.keys(entree.cotations)) {
+        const valeur = valeurCotationApprochee(cotation);
+        if (valeur == null) continue;
+        // Une même valeur peut venir de plusieurs écritures ("4-" et "4a") :
+        // on ne garde qu'un libellé par valeur, le plus standard (le plus
+        // court une fois normalisé).
+        const libelle = cotationVersValeur(cotation) != null
+          ? cotation
+          : approximerCotation(cotation).label;
+        if (!parValeur.has(valeur)) parValeur.set(valeur, libelle);
+      }
+    });
+    const crans = [...parValeur.entries()].sort((a, b) => a[0] - b[0]);
+    if (!crans.length) {
+      const bloc = document.getElementById('legende-cotation');
+      if (bloc) bloc.remove();
+      const option = selectFigure?.querySelector('option[value="cotation"]');
+      if (option) option.remove();
+      return;
+    }
+    const options = crans.map(([valeur, libelle]) =>
+      `<option value="${valeur}">${escapeHtml(libelle)}</option>`).join('');
+    selectCotationMin.innerHTML = options;
+    selectCotationMax.innerHTML = options;
+    selectCotationMin.value = String(crans[0][0]);
+    selectCotationMax.value = String(crans[crans.length - 1][0]);
+
+    // Bornes croisées : plutôt que de refuser la saisie, on pousse l'autre
+    // borne — l'utilisateur obtient toujours une fourchette valide sans avoir
+    // à comprendre pourquoi son choix a été rejeté.
+    const corriger = (deplace) => {
+      const min = Number(selectCotationMin.value);
+      const max = Number(selectCotationMax.value);
+      if (min > max) {
+        if (deplace === 'min') selectCotationMax.value = String(min);
+        else selectCotationMin.value = String(max);
+      }
+      majFourchette();
+      definirModeFigure('cotation');
+      appliquerFiltresEtSecteurs();
+    };
+    selectCotationMin.addEventListener('change', () => corriger('min'));
+    selectCotationMax.addEventListener('change', () => corriger('max'));
+    majFourchette();
   }
 
   // Parkings : visibles par défaut à fort zoom (>= ZOOM_PARKINGS), et
