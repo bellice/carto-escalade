@@ -125,6 +125,22 @@ export function calculerMaxima(geojson) {
   };
 }
 
+// Maxima du mode fourchette. À part de calculerMaxima : celui-ci ne dépend
+// que du GeoJSON et se calcule une fois au chargement, alors que ceux-ci
+// changent à chaque déplacement des bornes. Ne compte QUE les falaises ayant
+// au moins une voie dans la fourchette : inclure les zéros écraserait la
+// médiane et rendrait les cercles de référence inutilisables dès qu'une
+// fourchette étroite ne concerne qu'une poignée de falaises.
+export function maximaFourchette(entries) {
+  const valeurs = entries
+    .filter(e => e.cat === 'falaise' && e.nbDansFourchette > 0)
+    .map(e => e.nbDansFourchette);
+  return {
+    fourchette: Math.max(0, ...valeurs),
+    fourchetteMedian: mediane(valeurs),
+  };
+}
+
 function mediane(valeurs) {
   const tri = [...valeurs].sort((a, b) => a - b);
   const n = tri.length;
@@ -146,6 +162,57 @@ export function cotationVersValeur(cotation) {
   return (chiffre - 3) * 3 + lettre + plus;
 }
 
+// Rattrape 3 formes non standard mais raisonnablement déductibles, présentes
+// dans les topos les plus anciens (~2,5% des voies réelles — ex. certaines
+// voies des Roches à Crest, issues d'une brochure plus ancienne que le reste).
+// Vivait auparavant dans popups.js, à l'usage exclusif de l'histogramme.
+// Remontée ici quand le filtre par fourchette a eu besoin exactement de la
+// même règle : deux copies auraient signifié deux vérités à maintenir, et un
+// écart possible entre ce que le filtre compte et ce que la fiche affiche.
+export function approximerCotation(cotation) {
+  if (!cotation) return null;
+  const texte = String(cotation).trim();
+  // Lettrée + "-" (ex. "6a-") : le "-" est ignoré plutôt que de basculer vers
+  // le cran précédent (6a- rejoint 6a, pas 5c+ — reste dans SA lettre, pas
+  // dans une colonne qui semblerait être une autre cotation réelle).
+  let m = /^(\d)([abc])-$/.exec(texte);
+  if (m) return { label: `${m[1]}${m[2]}` };
+  // Chiffre seul + "-" (ex. "4-", ancienne cotation) : bas de fourchette.
+  m = /^(\d)-$/.exec(texte);
+  if (m) return { label: `${m[1]}a` };
+  // Chiffre seul (ex. "4") : milieu de fourchette.
+  m = /^(\d)$/.exec(texte);
+  if (m) return { label: `${m[1]}b` };
+  return null;
+}
+
+// Valeur numérique d'une cotation, forme non standard comprise. C'est la
+// fonction à utiliser dès qu'on POSITIONNE une voie (histogramme, filtre par
+// fourchette) ; cotationVersValeur reste stricte et sert là où une estimation
+// n'aurait pas sa place.
+export function valeurCotationApprochee(cotation) {
+  const directe = cotationVersValeur(cotation);
+  if (directe != null) return directe;
+  const estimee = approximerCotation(cotation);
+  return estimee ? cotationVersValeur(estimee.label) : null;
+}
+
+// Nombre de voies d'une falaise dont la cotation tombe dans [min, max]
+// (bornes incluses, exprimées en valeurs numériques). Lit le résumé compact
+// `cotations` embarqué dans data.geojson — pas besoin de routes/*.json, qui
+// n'est chargé qu'à l'ouverture d'une fiche.
+export function compterDansFourchette(cotations, min, max) {
+  if (!cotations) return 0;
+  let total = 0;
+  for (const [cotation, nombre] of Object.entries(cotations)) {
+    const valeur = valeurCotationApprochee(cotation);
+    // Cotation illisible (ex. "A1", "V4") : jamais comptée dans une
+    // fourchette, faute de savoir où la placer.
+    if (valeur != null && valeur >= min && valeur <= max) total += nombre;
+  }
+  return total;
+}
+
 // En mode thématique (tout sauf "aucun"), une falaise sans donnée pour la
 // grandeur affichée (0 ou absente) n'a rien à montrer sur ce thème : un
 // petit cercle laisserait croire à une petite quantité plutôt qu'à une
@@ -156,7 +223,11 @@ export function cotationVersValeur(cotation) {
 export function estFalaiseVideDansMode(entree, mode) {
   if (mode === 'couenne') return !entree.nbCouenne;
   if (mode === 'gv') return !entree.nbGrandeVoie;
-  if (mode === 'faciles') return !entree.nbFaciles;
+  // nbDansFourchette est recalculé à chaque changement de fourchette (voir
+  // majFourchette, carte.js) plutôt qu'ici : le calcul dépend de bornes que
+  // cette fonction ne connaît pas, et le refaire pour chaque falaise à chaque
+  // rendu serait du gaspillage.
+  if (mode === 'cotation') return !entree.nbDansFourchette;
   return false;
 }
 

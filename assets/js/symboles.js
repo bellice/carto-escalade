@@ -67,7 +67,10 @@ function calculerRayon(valeur, max) {
 function remplissagePourMode(mode) {
   if (mode === 'couenne') return 'var(--couenne)';
   if (mode === 'gv') return 'var(--gv)';
-  if (mode === 'faciles') return 'var(--forest)'; // vert = facile, convention courante en sports outdoor
+  // Mode fourchette : même vert que l'ancien mode « voies faciles » qu'il
+  // remplace — la grandeur reste « des voies à ma portée », seule la borne
+  // change (réglable au lieu de figée à 6a+).
+  if (mode === 'cotation') return 'var(--forest)';
   return 'var(--clay)';
 }
 
@@ -76,7 +79,7 @@ export function infosLegendePourMode(mode, maxima) {
   const remplissage = remplissagePourMode(mode);
   if (mode === 'couenne') return { max: maxima.couenne, median: maxima.couenneMedian, remplissage };
   if (mode === 'gv') return { max: maxima.gv, median: maxima.gvMedian, remplissage };
-  if (mode === 'faciles') return { max: maxima.faciles, median: maxima.facilesMedian, remplissage };
+  if (mode === 'cotation') return { max: maxima.fourchette, median: maxima.fourchetteMedian, remplissage };
   return { max: maxima.total, median: maxima.totalMedian, remplissage };
 }
 
@@ -97,7 +100,7 @@ export function infosLegendePourMode(mode, maxima) {
 export function valeurPourMode(entree, mode) {
   return mode === 'couenne' ? entree.nbCouenne
     : mode === 'gv' ? entree.nbGrandeVoie
-    : mode === 'faciles' ? entree.nbFaciles
+    : mode === 'cotation' ? entree.nbDansFourchette
     : entree.nbVoies;
 }
 

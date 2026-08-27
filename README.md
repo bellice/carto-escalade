@@ -139,8 +139,19 @@ d'abord plutôt que supposer qu'une clé existe.
 position à position — même à 1 seul parking), `nb_voie_total`,
 `nb_voie_sportive`, `nb_voie_autres` (invariant : total = sportive + autres),
 `nb_couenne`, `nb_gv`, `nb_faciles` (compteurs **précalculés** à la
-génération — voir `export_geojson.py` ; le client ne les calcule plus), et
-`routes` (id_falaise si la falaise a des voies sportives, sinon `null`).
+génération — voir `export_geojson.py` ; le client ne les calcule plus),
+`cotations` (voir ci-dessous), et `routes` (id_falaise si la falaise a des
+voies sportives, sinon `null`).
+
+`cotations` est un résumé compact `{cotation: nombre de voies}` des voies
+**sportives** de la falaise, cotations laissées **brutes** (les formes non
+standard comme `4-` ou `5` sont normalisées côté site, voir
+`approximerCotation` dans `donnees.js` — une seule règle, pas deux). Il
+alimente le filtre par fourchette de cotation : sans lui, il faudrait
+télécharger tout `routes/` (350 Ko) rien que pour savoir quelles falaises
+afficher. Coût mesuré : +1,6 Ko gzip. La somme de ses valeurs peut être
+**inférieure** à `nb_voie_sportive` — quelques voies n'ont aucune cotation
+renseignée et n'y figurent donc pas.
 
 Une feature par **secteur**, pas par sommet : un même `nom` (sommet) peut
 apparaître plusieurs fois, une fois par `secteur`. `nom` seul n'est donc plus

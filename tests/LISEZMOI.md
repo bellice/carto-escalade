@@ -23,13 +23,14 @@ pas à une couverture théorique. Les trois plus coûteuses :
 ## Ce que couvre chaque niveau
 
 **`statique.test.js`** — lecture des fichiers, sans navigateur. Cohérence du
-pré-cache, intégrité des données exportées, seuils de contraste WCAG calculés
+pré-cache, intégrité des données exportées (temps de trajet, répartition des
+cotations, fichiers `routes/` référencés), seuils de contraste WCAG calculés
 sur les jetons réels, échappement HTML et filtrage d'URL, structure des pages
 (un seul `<h1>`, CSP présente, aucun script inline).
 
 **`parcours.test.js`** — comportement réel dans Chromium. Démarrage sans
-erreur ni violation CSP, contenu des fiches, bascule des tris du détail des
-voies, résilience réseau (échec, rattrapage, bandeau hors-ligne, rechargement
+erreur ni violation CSP, filtre par fourchette de cotation, contenu des
+fiches, bascule des tris du détail des voies, résilience réseau (échec, rattrapage, bandeau hors-ligne, rechargement
 hors ligne complet), focus clavier, respect de `prefers-reduced-motion`, et
 injection via des données piégées.
 

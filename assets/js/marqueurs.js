@@ -203,6 +203,10 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
       recherche: libelleFalaise(p).toLowerCase(),
       nbVoies: p.nb_voie_total ?? 0,
       nbFaciles: p.nb_faciles ?? 0,
+      // Résumé compact {cotation: nombre} (voir export_geojson.py) : sert au
+      // filtre par fourchette sans télécharger routes/*.json.
+      cotations: p.cotations || null,
+      nbDansFourchette: 0, // recalculé par majFourchette (carte.js)
       nbGrandeVoie: p.nb_gv ?? 0,
       nbCouenne: p.nb_couenne ?? 0,
     };

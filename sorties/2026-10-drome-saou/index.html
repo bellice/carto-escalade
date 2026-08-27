@@ -118,10 +118,23 @@
         <div class="legende-figure">
           <select id="mode-figure" aria-label="Grandeur utilisée pour la taille des cercles">
             <option value="aucun">Nombre de voies</option>
-            <option value="faciles">Nombre de voies 5-6a+</option>
+            <option value="cotation">Nombre de voies par cotation</option>
             <option value="couenne" id="option-couenne">Nombre de couennes</option>
             <option value="gv" id="option-gv">Nombre de grandes voies</option>
           </select>
+        </div>
+        <!-- Fourchette de cotation : visible uniquement en mode "cotation"
+             (même principe que le filtre de trajet ci-dessous, affiché
+             seulement quand la donnée existe). Remplace l'ancienne option
+             "Nombre de voies 5-6a+", qui figeait ces bornes en dur. -->
+        <div class="legende-cotation" id="legende-cotation" hidden>
+          <div class="legende-cotation-bornes">
+            <label for="cotation-min">De</label>
+            <select id="cotation-min"></select>
+            <label for="cotation-max">à</label>
+            <select id="cotation-max"></select>
+          </div>
+          <p class="legende-cotation-resume" id="cotation-resume" aria-live="polite"></p>
         </div>
         <div class="legende-falaises" id="legende-falaises"></div>
         <div class="legende-temps" id="legende-temps" hidden>
