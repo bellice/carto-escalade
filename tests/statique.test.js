@@ -156,6 +156,23 @@ describe('Accessibilité : jetons de couleur', () => {
       'Ces deux seuils se contredisent : ne pas assombrir --couenne davantage.');
   });
 
+  // Les modes du sélecteur ne s'affichent jamais ensemble, mais on doit voir
+  // que la carte a changé en basculant de l'un à l'autre. --cotation valait
+  // d'abord --forest : 1.04:1 face à --gv, soit une luminance identique au
+  // brun des grandes voies — le changement de mode passait inaperçu.
+  test('les couleurs de mode se distinguent les unes des autres', async () => {
+    const t = await jetons();
+    const paires = [['cotation', 'gv'], ['cotation', 'couenne'], ['gv', 'couenne']];
+    for (const [a, b] of paires) {
+      const r = contraste(t[a], t[b]);
+      assert.ok(r >= 1.6,
+        `--${a} vs --${b} : ${r.toFixed(2)}:1 — trop proche pour qu'un changement de mode se voie`);
+    }
+    const surFond = contraste(t.cotation, t.paper);
+    assert.ok(surFond >= 3,
+      `--cotation sur --paper : ${surFond.toFixed(2)}:1, seuil 3:1 (WCAG 1.4.11)`);
+  });
+
   test('les couleurs de texte atteignent AA sur leurs fonds', async () => {
     const t = await jetons();
     const paires = [
@@ -189,6 +206,29 @@ describe('Lisibilité : échelle typographique', () => {
       assert.ok(px >= mini,
         `--fs-${nom} = ${px}px, sous le plancher de ${mini}px retenu pour l'usage en extérieur`);
     }
+  });
+
+  // Sur un écran tactile, :hover ne se « dé-survole » jamais après un tap :
+  // l'élément touché reste affiché comme sélectionné jusqu'à ce qu'on tape
+  // ailleurs. Constaté sur le bouton Masquer/Afficher de la légende.
+  test('aucun état de survol hors de @media (hover: hover)', async () => {
+    const css = (await lire('assets/style-carte.css')).replace(/\/\*[\s\S]*?\*\//g, '');
+    const garde = css.indexOf('@media (hover: hover)');
+    assert.ok(garde > 0, 'Bloc @media (hover: hover) absent');
+    const avant = css.slice(0, garde);
+    const orphelines = [...avant.matchAll(/^[^{}\n]*:hover[^{}\n]*\{/gm)].map(m => m[0].trim());
+    assert.deepEqual(orphelines, [],
+      'Ces règles :hover resteraient collées après un tap sur mobile — ' +
+      'les déplacer dans le bloc @media (hover: hover) en fin de feuille.');
+  });
+
+  test('le bouton de la légende respecte la cible tactile de 44 px', async () => {
+    const css = await lire('assets/style-carte.css');
+    const regle = /\.legende-toggle\s*\{([\s\S]*?)\}/.exec(css);
+    assert.ok(regle, 'Règle .legende-toggle introuvable');
+    assert.match(regle[1], /min-height:\s*44px/,
+      'Ce bouton est le seul moyen de rouvrir la légende repliée : il doit ' +
+      'respecter la même cible tactile que le reste du site.');
   });
 
   // iOS Safari zoome la page au focus d'un champ dont la police fait moins de
