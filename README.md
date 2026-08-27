@@ -50,6 +50,23 @@ sorties/
 `maplibre-gl` 6.4.1 est chargé depuis le CDN jsDelivr (pas vendu en local —
 voir « Hors-ligne » pour la raison) mais **pré-caché par le service worker**.
 
+## Tests
+
+```sh
+npm install             # une fois (Playwright, dépendance de TEST uniquement)
+npm run test:statique   # ~0,1 s, sans navigateur
+npm test                # + parcours navigateur (~40 s, connexion requise)
+```
+
+Chaque test correspond à une régression réellement survenue, pas à une
+couverture théorique — détail et raisons dans [`tests/LISEZMOI.md`](tests/LISEZMOI.md).
+Le réflexe le plus rentable : lancer `npm run test:statique` avant un commit,
+il attrape à lui seul la perte des temps de trajet, un module oublié au
+pré-cache et une régression de contraste.
+
+Playwright n'est utilisé que par les tests : **le site reste sans dépendance
+et sans étape de build**, GitHub Pages le sert tel quel.
+
 ## Rendu des falaises (couche native, phase 3)
 
 Les falaises ne sont **pas** des marqueurs DOM mais une **couche MapLibre**

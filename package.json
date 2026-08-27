@@ -1,5 +1,13 @@
 {
   "type": "module",
   "private": true,
-  "description": "Marqueur pour les outils locaux (ex. node --check) : ces fichiers sont des modules ES. Aucune dépendance npm, aucune étape de build — le site reste servi tel quel par GitHub Pages."
+  "description": "Le SITE reste sans dépendance et sans étape de build : GitHub Pages le sert tel quel. Playwright n'est utilisé QUE par les tests (devDependencies) et n'est jamais chargé par les pages.",
+  "scripts": {
+    "test": "npm run test:statique && npm run test:parcours",
+    "test:statique": "node --test tests/statique.test.js",
+    "test:parcours": "node --test --test-concurrency=1 tests/parcours.test.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
 }
