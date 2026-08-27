@@ -150,42 +150,50 @@ function ecrireEtatPreparation(etat) {
   }
 }
 
-// Monte l'interface (bouton + progression) dans `conteneur`.
+// Monte l'interface (un seul bouton) dans `conteneur`.
+//
+// Un bouton SEUL, dont le libellé porte l'état, plutôt qu'un bouton plus une
+// ligne de statut : le bloc vit désormais dans l'en-tête de page (où il ne
+// recouvre rien), et une seconde ligne n'y tiendrait pas sur un téléphone.
+// L'état complet est de toute façon binaire à l'usage — préparé ou non — et
+// la date suffit à le qualifier.
 export function monterPreparationHorsLigne({ map, points, conteneur }) {
   if (!conteneur || !points.length) return;
-
-  const bloc = document.createElement('div');
-  bloc.className = 'preparation';
 
   const bouton = document.createElement('button');
   bouton.type = 'button';
   bouton.className = 'btn-preparer';
-
-  const etatTexte = document.createElement('p');
-  etatTexte.className = 'preparation-etat';
-  etatTexte.setAttribute('role', 'status');
-
-  bloc.append(bouton, etatTexte);
-  conteneur.appendChild(bloc);
+  conteneur.appendChild(bouton);
 
   const signal = { annule: false, controleur: new AbortController() };
   let enCours = false;
 
+  // aria-label toujours explicite : le libellé visible est volontairement
+  // court pour tenir dans l'en-tête, mais un lecteur d'écran doit entendre
+  // l'action complète, pas « Hors-ligne ».
+  const poser = (texte, description) => {
+    bouton.textContent = texte;
+    bouton.setAttribute('aria-label', description);
+  };
+
   const majLibelle = () => {
     const etat = lireEtatPreparation();
-    bouton.textContent = etat ? 'Remettre à jour le hors-ligne' : 'Préparer le hors-ligne';
     if (!etat) {
-      etatTexte.textContent = '';
+      poser('Hors-ligne', 'Préparer la carte pour une utilisation hors ligne');
+      bouton.classList.remove('pret');
       return;
     }
-    const quand = new Date(etat.date).toLocaleDateString('fr-FR');
-    etatTexte.textContent = `Zone téléchargée le ${quand} (${etat.nbTuiles} tuiles).`;
+    const quand = new Date(etat.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    poser(`Hors-ligne ${quand}`,
+      `Carte préparée pour le hors-ligne le ${new Date(etat.date).toLocaleDateString('fr-FR')} `
+      + `(${etat.nbTuiles} tuiles). Activer pour remettre à jour.`);
+    bouton.classList.add('pret');
   };
 
   async function preparer() {
     if (enCours) {
-      // 2e clic = annulation. Ce qui est déjà téléchargé reste en cache :
-      // une préparation interrompue n'est pas perdue, juste incomplète.
+      // 2e activation = annulation. Ce qui est déjà téléchargé reste en
+      // cache : une préparation interrompue n'est pas perdue, juste partielle.
       signal.annule = true;
       signal.controleur.abort();
       return;
@@ -194,8 +202,7 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
     enCours = true;
     signal.annule = false;
     signal.controleur = new AbortController();
-    bouton.textContent = 'Annuler';
-    etatTexte.textContent = 'Préparation…';
+    poser('Annuler', 'Annuler la préparation hors ligne en cours');
 
     try {
       const gabarit = await gabaritTuiles(map);
@@ -215,9 +222,9 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
         const { quota = 0, usage = 0 } = await navigator.storage.estimate();
         const besoin = urls.length * 45 * 1024; // ~45 Ko/tuile, mesuré sur la zone
         if (quota && quota - usage < besoin) {
-          etatTexte.textContent = 'Espace de stockage insuffisant pour préparer la zone.';
+          poser('Espace insuffisant', 'Espace de stockage insuffisant pour préparer la zone');
           enCours = false;
-          majLibelle();
+          setTimeout(majLibelle, 4000);
           return;
         }
       }
@@ -226,47 +233,45 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
       const { faits, echecs } = await telechargerLot(urls, {
         signal,
         onProgres: (n) => {
-          if (n % 10 === 0 || n === total) {
-            etatTexte.textContent = `Téléchargement ${n} / ${total}…`;
-          }
+          const pct = Math.round((100 * n) / total);
+          poser(`${pct} %`, `Préparation hors ligne : ${n} sur ${total} fichiers`);
         },
       });
 
-      if (signal.annule) {
-        etatTexte.textContent = `Préparation interrompue (${faits} / ${total} téléchargés, conservés).`;
-      } else {
+      if (!signal.annule) {
         ecrireEtatPreparation({
           date: new Date().toISOString(),
           modele: modeleDeGabarit(gabarit),
           nbTuiles: tuiles.size,
         });
-        etatTexte.textContent = echecs
-          ? `Zone prête, avec ${echecs} tuile(s) manquante(s).`
-          : 'Zone prête pour le hors-ligne.';
+        if (echecs) console.warn(`Préparation hors ligne : ${echecs} tuile(s) manquante(s) sur ${total}`);
       }
+      void faits;
     } catch (err) {
       console.error('Préparation hors-ligne', err);
-      etatTexte.textContent = 'Préparation impossible (réseau ?).';
-    } finally {
+      poser('Échec', 'La préparation hors ligne a échoué (réseau ?)');
       enCours = false;
-      const etat = lireEtatPreparation();
-      bouton.textContent = etat ? 'Remettre à jour le hors-ligne' : 'Préparer le hors-ligne';
+      setTimeout(majLibelle, 4000);
+      return;
     }
+    enCours = false;
+    majLibelle();
   }
 
   bouton.addEventListener('click', preparer);
   majLibelle();
 
   // Le fond a-t-il été reconstruit depuis la préparation ? Si oui, les tuiles
-  // en cache pointent vers un chemin qui n'est plus servi : la préparation
-  // est caduque même si le cache paraît plein. On le signale plutôt que de
-  // laisser découvrir le problème sur le terrain.
+  // en cache pointent vers un chemin qui n'est plus servi : la préparation est
+  // caduque même si le cache paraît plein. On le signale plutôt que de laisser
+  // découvrir le problème sur le terrain.
   const etat = lireEtatPreparation();
   if (etat && etat.modele) {
     gabaritTuiles(map)
       .then((gabarit) => {
-        if (modeleDeGabarit(gabarit) !== etat.modele) {
-          etatTexte.textContent = 'Le fond de carte a été mis à jour : à repréparer.';
+        if (modeleDeGabarit(gabarit) !== etat.modele && !enCours) {
+          poser('À repréparer', 'Le fond de carte a été mis à jour : préparation à refaire');
+          bouton.classList.remove('pret');
         }
       })
       .catch(() => { /* hors ligne : on garde l'état connu, sans alarmer */ });

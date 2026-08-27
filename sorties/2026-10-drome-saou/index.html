@@ -87,6 +87,11 @@
   <header class="map-header">
     <a href="../../index.html">← Sorties</a>
     <h1 class="titre">Drôme - forêt de Saoû</h1>
+    <!-- Préparation hors-ligne : action de PRÉPARATION ponctuelle (avant de
+         partir, sur wifi), pas un réglage de carte — elle occupait 53px dans
+         la légende, qui couvrait déjà 49% du viewport mobile. Ici elle reste
+         atteignable en permanence sans rien recouvrir. -->
+    <div id="preparation-hors-ligne"></div>
   </header>
 
   <div id="panneau-lateral" role="region" aria-label="Recherche et légende de la carte">
@@ -134,7 +139,6 @@
             <label for="cotation-max">à</label>
             <select id="cotation-max"></select>
           </div>
-          <p class="legende-cotation-resume" id="cotation-resume" aria-live="polite"></p>
         </div>
         <div class="legende-falaises" id="legende-falaises"></div>
         <div class="legende-temps" id="legende-temps" hidden>

@@ -222,13 +222,20 @@ describe('Lisibilité : échelle typographique', () => {
       'les déplacer dans le bloc @media (hover: hover) en fin de feuille.');
   });
 
-  test('le bouton de la légende respecte la cible tactile de 44 px', async () => {
+  // 44 px est une contrainte TACTILE (largeur d'un doigt), pas une règle
+  // universelle : à la souris le pointeur est précis et l'imposer ne fait
+  // qu'alourdir un réglage secondaire. D'où le garde (pointer: coarse) —
+  // le test vérifie donc la cible LÀ OÙ elle s'applique, pas partout.
+  test('la cible tactile de 44 px est garantie sur pointeur grossier', async () => {
     const css = await lire('assets/style-carte.css');
-    const regle = /\.legende-toggle\s*\{([\s\S]*?)\}/.exec(css);
-    assert.ok(regle, 'Règle .legende-toggle introuvable');
-    assert.match(regle[1], /min-height:\s*44px/,
-      'Ce bouton est le seul moyen de rouvrir la légende repliée : il doit ' +
-      'respecter la même cible tactile que le reste du site.');
+    const bloc = /@media \(pointer: coarse\)\s*\{([\s\S]*?)\n\}/.exec(css);
+    assert.ok(bloc, 'Bloc @media (pointer: coarse) introuvable');
+    for (const selecteur of ['.legende-toggle', '.btn-preparer']) {
+      const regle = new RegExp(`\\${selecteur}[^{]*\\{[^}]*min-height:\\s*44px`).exec(bloc[1]);
+      assert.ok(regle,
+        `${selecteur} n'a pas de cible tactile de 44px sous (pointer: coarse). ` +
+        'Le bouton de légende est le seul moyen de rouvrir la légende repliée.');
+    }
   });
 
   // iOS Safari zoome la page au focus d'un champ dont la police fait moins de
