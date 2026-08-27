@@ -171,6 +171,39 @@ describe('Accessibilité : jetons de couleur', () => {
   });
 });
 
+describe('Lisibilité : échelle typographique', () => {
+  // Le site s'utilise dehors, écran à bout de bras, en plein soleil. Ces
+  // planchers ne sont pas des seuils WCAG (la norme n'impose aucune taille)
+  // mais des minima retenus pour ce contexte : les repasser sous ces valeurs
+  // doit être un choix explicite, pas une dérive.
+  test('aucun palier ne repasse sous les minima retenus', async () => {
+    const css = await lire('assets/style.css');
+    const rem = (nom) => {
+      const m = new RegExp(`--fs-${nom}:\\s*([\\d.]+)rem`).exec(css);
+      assert.ok(m, `Palier --fs-${nom} introuvable`);
+      return Number.parseFloat(m[1]) * 16;
+    };
+    const planchers = { '2xs': 11, xs: 12, sm: 13, base: 14 };
+    for (const [nom, mini] of Object.entries(planchers)) {
+      const px = rem(nom);
+      assert.ok(px >= mini,
+        `--fs-${nom} = ${px}px, sous le plancher de ${mini}px retenu pour l'usage en extérieur`);
+    }
+  });
+
+  // iOS Safari zoome la page au focus d'un champ dont la police fait moins de
+  // 16 px : la carte saute et il faut pincer pour revenir. Défaut objectif,
+  // indépendant de l'échelle choisie.
+  test('les champs de saisie font 16 px sur mobile', async () => {
+    const css = await lire('assets/style-carte.css');
+    const bloc = /\.recherche-champ input,[\s\S]*?\{([\s\S]*?)\}/.exec(css);
+    assert.ok(bloc, 'Règle mobile des contrôles de saisie introuvable');
+    assert.match(bloc[1], /font-size:\s*16px/,
+      'Sous 16px, iOS zoome automatiquement au focus — utiliser 16px en dur, ' +
+      'pas un jeton qui pourrait redescendre.');
+  });
+});
+
 describe('Sécurité : échappement', () => {
   test('escapeHtml échappe aussi les guillemets (contexte attribut)', async () => {
     const { escapeHtml } = await import('../assets/js/utils.js');

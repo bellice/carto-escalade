@@ -1876,3 +1876,21 @@
   font-size: var(--fs-xs);
   color: var(--muted);
 }
+
+/* ===== Champs de saisie sur mobile : 16 px minimum =====
+   iOS Safari ZOOME automatiquement la page quand on met le focus sur un
+   champ dont la police fait moins de 16 px — la carte saute, et l'utilisateur
+   doit pincer pour revenir. Ce n'est pas un réglage qu'on peut désactiver
+   proprement (`user-scalable=no` le ferait, mais en supprimant AUSSI le zoom
+   volontaire, ce qui est un vrai recul d'accessibilité en extérieur).
+   La seule solution correcte est de passer ces contrôles à 16 px.
+   Uniquement sous 640 px : sur desktop le problème n'existe pas, et la
+   densité de la colonne y est bien réglée. */
+@media (max-width: 640px) {
+  .recherche-champ input,
+  #mode-figure,
+  #cotation-min,
+  #cotation-max {
+    font-size: 16px;
+  }
+}
