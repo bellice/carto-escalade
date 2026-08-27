@@ -6,7 +6,7 @@
 // (par marqueurs.js) — tout le reste (champ*, jauge*, rose des vents...)
 // reste privé au module.
 
-import { escapeHtml } from './utils.js';
+import { escapeHtml, urlSure } from './utils.js';
 import { secteurDistinct, cotationVersValeur } from './donnees.js';
 
 // Rose des vents miniature pour l'orientation d'une falaise. Un point (pastille)
@@ -246,8 +246,12 @@ export function popupFalaise(p, lat, lon, cle) {
     let libelleLien = 'Voir ce topo';
     if (p.topoType === 'topo payant') libelleLien = 'Acheter ce topo';
     else if (p.topoType === 'brochure_gratuite') libelleLien = 'Télécharger cette brochure';
-    const lienAchat = p.topoUrl
-      ? `<a class="topo-achat" href="${escapeHtml(p.topoUrl)}" target="_blank" rel="noopener">${libelleLien}</a>`
+    // urlSure : les URL viennent des données (source.csv). escapeHtml seul ne
+    // protégerait pas d'un `javascript:` — voir utils.js. Chaîne vide = pas
+    // de lien affiché du tout plutôt qu'un lien inerte trompeur.
+    const urlTopo = urlSure(p.topoUrl);
+    const lienAchat = urlTopo
+      ? `<a class="topo-achat" href="${escapeHtml(urlTopo)}" target="_blank" rel="noopener">${libelleLien}</a>`
       : '';
     // Page(s) et lien d'achat sur la MÊME ligne (badges à gauche, lien à
     // droite, voir .topo-page-ligne) — même motif que .gps-copie (valeur à
@@ -259,8 +263,10 @@ export function popupFalaise(p, lat, lon, cle) {
       : '';
     groupeTopo = `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Topo papier</div>${identite}${lignePageEtAchat}</div>`;
   }
-  const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
-  const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Voir sur C2C</a>` : '';
+  const urlOblyk = urlSure(p.lien_oblyk);
+  const urlC2C = urlSure(p.lien_camptocamp);
+  const lienOblyk = urlOblyk ? `<a href="${escapeHtml(urlOblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
+  const lienC2C = urlC2C ? `<a href="${escapeHtml(urlC2C)}" target="_blank" rel="noopener">Voir sur C2C</a>` : '';
   const rangeeSecondaires = construireActionsSecondaires([lienOblyk, lienC2C]);
   const groupePlusLoin = rangeeSecondaires
     ? `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Pour aller plus loin</div>${rangeeSecondaires}</div>`
@@ -589,13 +595,29 @@ export function construireHistogramme(voiesSportives, aAutresDisciplines) {
   // deviendrait du bruit ("hors" de quoi, puisqu'il n'y a que ça ?), simple
   // "Cotation" suffit.
   const titre = aAutresDisciplines ? 'Cotation (hors trad et artificielle)' : 'Cotation';
+  // Répartition couenne/grande voie ÉNONCÉE DANS L'aria-label : dans le
+  // graphique, cette distinction ne repose que sur la couleur des cases
+  // (WCAG 1.4.1). L'encodage par la couleur est le bon choix sémiologique
+  // pour une différence de nature — y ajouter une 2e variable visuelle
+  // (forme) entrerait en concurrence avec la lecture "1 case = 1 voie", qui
+  // est justement quantitative. La redondance passe donc par le TEXTE, où
+  // elle ne coûte rien à la lisibilité du graphique.
+  const nbCouenne = voiesSportives.filter(v => v.type_voie === 'couenne').length;
+  const nbGv = voiesSportives.length - nbCouenne;
+  const repartition = [
+    nbCouenne ? `${nbCouenne} couenne${nbCouenne > 1 ? 's' : ''}` : '',
+    nbGv ? `${nbGv} grande${nbGv > 1 ? 's' : ''} voie${nbGv > 1 ? 's' : ''}` : '',
+  ].filter(Boolean).join(' et ');
+  const resumeAria = `Répartition des ${voiesSportives.length} voies sportives par cotation`
+    + (nonCotees.length ? `, dont ${nonCotees.length} non côtées` : '')
+    + (repartition ? ` — ${repartition}` : '');
   // .fiche-voies-resume : conteneur masqué en bloc quand le détail (plus bas)
   // est ouvert (voir style-carte.css, .mode-detail-voies) — un seul swap de
   // classe sur .popup bascule l'un pour l'autre, pas de logique JS dédiée.
   const histo = `
     <div class="fiche-voies-resume">
       <span class="legende-titre">${titre}</span>
-      <div class="voies-histo" role="img" aria-label="Répartition des ${voiesSportives.length} voies sportives par cotation${nonCotees.length ? `, dont ${nonCotees.length} non côtées` : ''}">
+      <div class="voies-histo" role="img" aria-label="${escapeHtml(resumeAria)}">
         ${colonnesHtml}
       </div>
       <div class="histo-legende">${legende.join('')}</div>

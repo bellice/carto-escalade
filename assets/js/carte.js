@@ -9,9 +9,10 @@ import {
   estFalaiseVideDansMode, libelleFalaise,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
-import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee, afficherDetailVoies, masquerDetailVoies, basculerTriDetailVoies } from './marqueurs.js';
+import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee, afficherDetailVoies, masquerDetailVoies, basculerTriDetailVoies, remplirPlaceholderVoies } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
 import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop } from './carte-utils.js';
+import { monterPreparationHorsLigne } from './hors-ligne.js';
 
 // Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
 // point uniforme (voir appliquerSimplificationZoom dans initCarte) — à
@@ -374,6 +375,16 @@ export function initCarte(dataUrl) {
     // Bascule Cotation/Position (voir popups.js, construireDetailVoies) :
     // même chemin data-route-falaise que "Voir le détail des voies"
     // ci-dessus, le bouton de tri vit dans le même .voies-histo-placeholder.
+    // "Réessayer" après un échec de chargement du détail des voies (voir
+    // marqueurs.js) : on repart du placeholder lui-même, qui porte encore ses
+    // data-route/data-route-falaise.
+    const btnReessayer = e.target.closest('.btn-reessayer-voies');
+    if (btnReessayer) {
+      const placeholder = btnReessayer.closest('.voies-histo-placeholder');
+      if (placeholder) remplirPlaceholderVoies(placeholder, (id) => baseRoutes + id + '.json');
+      return;
+    }
+
     const btnTri = e.target.closest('.btn-tri-voies');
     if (btnTri) {
       const popupEl = btnTri.closest('.popup');
@@ -744,8 +755,21 @@ export function initCarte(dataUrl) {
 
   const etatChargement = document.getElementById('etat-chargement');
 
-  fetch(dataUrl)
-    .then(r => r.json())
+  // Enveloppé dans une fonction rappelable (au lieu d'un fetch nu) pour que
+  // le bouton "Réessayer" puisse relancer exactement la même séquence : sans
+  // ça, un échec au chargement initial était définitif et n'offrait que le
+  // rechargement manuel de la page — inconfortable sur un réseau qui va et
+  // vient, et perdant si la page elle-même n'est plus servie.
+  function chargerDonnees() {
+    if (etatChargement) {
+      etatChargement.textContent = 'Chargement de la carte…';
+      etatChargement.classList.remove('erreur');
+    }
+    return fetch(dataUrl)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status} sur ${dataUrl}`);
+      return r.json();
+    })
     .then(geojson => {
       // Cadrage initial AVANT de créer la carte : les bounds réelles des
       // marqueurs sont connues ici (data.geojson est préchargé via
@@ -989,14 +1013,63 @@ export function initCarte(dataUrl) {
 
       appliquerFiltresEtSecteurs();
       if (etatChargement) etatChargement.remove();
+
+      // « Préparer le hors-ligne » : monté ici, une fois qu'on connaît les
+      // points réels de la sortie (falaises + parkings + gîte) — ce sont eux
+      // qui déterminent les tuiles à télécharger. Placé dans la légende,
+      // avec le reste des réglages de la carte. Idempotent : ne fait rien si
+      // le bloc existe déjà (rechargement après un "Réessayer").
+      const contenuLegende = document.getElementById('legende-contenu');
+      if (contenuLegende && !contenuLegende.querySelector('.preparation')) {
+        monterPreparationHorsLigne({
+          map,
+          points: geojson.features.map(f => f.geometry.coordinates),
+          conteneur: contenuLegende,
+        });
+      }
     })
     .catch(err => {
       console.error('Erreur de chargement des données', err);
-      if (etatChargement) {
-        etatChargement.textContent = 'Impossible de charger les données de la sortie.';
-        etatChargement.classList.add('erreur');
-      }
+      if (!etatChargement) return;
+      etatChargement.textContent = '';
+      etatChargement.classList.add('erreur');
+      const message = document.createElement('span');
+      message.textContent = navigator.onLine
+        ? 'Impossible de charger les données de la sortie.'
+        : 'Hors ligne, et ces données ne sont pas encore en cache.';
+      const bouton = document.createElement('button');
+      bouton.type = 'button';
+      bouton.className = 'btn-reessayer';
+      bouton.textContent = 'Réessayer';
+      bouton.addEventListener('click', chargerDonnees);
+      etatChargement.append(message, bouton);
     });
+  }
+
+  chargerDonnees();
+
+  // Indicateur hors-ligne : sans lui, rien ne distingue une carte servie
+  // depuis le cache d'une carte à jour — or c'est précisément l'information
+  // dont on a besoin en falaise pour savoir si l'on peut se fier à ce qu'on
+  // lit. Purement passif (aucun blocage) : le site reste utilisable hors
+  // ligne, on le signale simplement.
+  const bandeauReseau = document.createElement('div');
+  bandeauReseau.className = 'bandeau-hors-ligne';
+  bandeauReseau.setAttribute('role', 'status');
+  bandeauReseau.textContent = 'Hors ligne — données en cache';
+  bandeauReseau.hidden = navigator.onLine;
+  document.body.appendChild(bandeauReseau);
+  const majReseau = () => {
+    bandeauReseau.hidden = navigator.onLine;
+    // Le réseau revient : on retente automatiquement ce qui avait échoué au
+    // chargement initial, sans attendre un clic.
+    if (navigator.onLine && etatChargement && etatChargement.isConnected
+        && etatChargement.classList.contains('erreur')) {
+      chargerDonnees();
+    }
+  };
+  window.addEventListener('online', majReseau);
+  window.addEventListener('offline', majReseau);
 
   // --- Recherche par nom (et secteur) ---
   if (recherche) {

@@ -4,6 +4,41 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
+
+  <!-- CSP en <meta> : GitHub Pages ne permet pas d'en-têtes HTTP personnalisés.
+       Défense en profondeur — le site injecte du HTML construit à partir des
+       données (innerHTML dans popups.js) ; si une valeur douteuse passait un
+       jour les échappements (voir escapeHtml/urlSure, utils.js), la CSP
+       empêcherait encore l'exécution.
+       - script-src SANS 'unsafe-inline' : possible parce que les scripts
+         inline ont été externalisés (demarrer-sortie.js).
+       - style-src AVEC 'unsafe-inline' : MapLibre pose des styles en ligne
+         sur ses éléments (marqueurs, popups) ; l'interdire casserait la carte.
+         L'injection de style est par ailleurs sans commune mesure avec celle
+         de script.
+       - worker-src DOIT inclure jsdelivr : MapLibre v6 charge son worker de
+         tuiles directement depuis l'URL du CDN (maplibre-gl-worker.mjs), pas
+         depuis un blob — vérifié en test, l'omettre bloque le worker et la
+         carte reste vide sans lever la moindre violation dans la page (une
+         violation survenue dans un worker ne remonte pas au document).
+       - connect-src : data.geojson + routes/*.json (self) et le fond de carte.
+       - frame-ancestors est volontairement absent : cette directive est
+         ignorée en <meta> (elle exige un vrai en-tête HTTP, impossible sur
+         GitHub Pages). L'anti-clickjacking reste donc hors de portée ici. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://cdn.jsdelivr.net;
+    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+    img-src 'self' data: blob: https://tiles.openfreemap.org;
+    font-src 'self' data:;
+    connect-src 'self' https://tiles.openfreemap.org https://cdn.jsdelivr.net;
+    worker-src 'self' blob: https://cdn.jsdelivr.net;
+    child-src 'self' blob: https://cdn.jsdelivr.net;
+    base-uri 'none';
+    form-action 'none';
+    object-src 'none'
+  " />
+
   <title>Sortie escalade - Drôme, forêt de Saoû</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
 
@@ -29,6 +64,7 @@
   <link rel="modulepreload" href="../../assets/js/symboles.js" />
   <link rel="modulepreload" href="../../assets/js/labels.js" />
   <link rel="modulepreload" href="../../assets/js/donnees.js" />
+  <link rel="modulepreload" href="../../assets/js/hors-ligne.js" />
   <link rel="modulepreload" href="../../assets/js/utils.js" />
 
   <!-- data.geojson (falaises + parkings) ne dépend d'aucun des modules
@@ -50,7 +86,7 @@
 
   <header class="map-header">
     <a href="../../index.html">← Sorties</a>
-    <span class="titre">Drôme - forêt de Saoû</span>
+    <h1 class="titre">Drôme - forêt de Saoû</h1>
   </header>
 
   <div id="panneau-lateral" role="region" aria-label="Recherche et légende de la carte">
@@ -110,32 +146,19 @@
     </div>
   </aside>
 
-  <div id="map"></div>
+  <!-- data-donnees : lu par demarrer-sortie.js. Le chemin reste relatif à
+       CETTE page, chaque sortie ayant son propre data.geojson. -->
+  <div id="map" data-donnees="data.geojson"></div>
 
   <div id="etat-chargement" class="etat-chargement">Chargement de la carte…</div>
 
   <!-- Un script type="module" s'exécute déjà après la fin du parsing HTML
        (même garantie que "defer"), donc strictement AVANT que DOMContentLoaded
-       ne se déclenche — attendre cet évènement ici n'apportait rien, juste un
+       ne se déclenche — attendre cet évènement n'apporterait rien, juste un
        aller-retour de plus dans la boucle d'évènements avant que le fetch de
-       data.geojson (voir initCarte, carte.js) ne parte réellement. -->
-  <script type="module">
-    import { initCarte } from '../../assets/js/carte.js';
-    initCarte('data.geojson');
-  </script>
-  <script>
-    // Service worker : enregistré SAUF en dev via Vite (voir index.html racine
-    // pour le pourquoi). Ici scope = racine du site (il contrôle aussi
-    // l'accueil et les autres sorties).
-    if ('serviceWorker' in navigator) {
-      const estVite = Array.from(document.querySelectorAll('script[src]'))
-        .some((s) => (s.getAttribute('src') || '').includes('/@vite/'));
-      if (estVite) {
-        navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
-      } else {
-        navigator.serviceWorker.register('../../sw.js', { scope: '../../' });
-      }
-    }
-  </script>
+       data.geojson (voir initCarte, carte.js) ne parte réellement.
+       Externalisé (plus de code inline) pour que la CSP ci-dessus puisse
+       refuser 'unsafe-inline' sur les scripts. -->
+  <script type="module" src="../../assets/js/demarrer-sortie.js"></script>
 </body>
 </html>

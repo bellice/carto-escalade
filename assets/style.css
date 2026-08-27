@@ -10,7 +10,18 @@
   --teal-dark: #204d4a;
   --paper: #fbfaf6;
   --gv: #5c3a21;
-  --couenne: #c9932f;
+  /* Ocre assombri depuis #c9932f (teinte conservée, H=39°) : l'ancienne
+     valeur ne faisait que 2.61:1 sur --paper, sous le seuil de 3:1 exigé
+     pour un élément porteur d'information non textuelle (WCAG 1.4.11) —
+     les cases de l'histogramme et la pastille de légende en dépendent.
+     #b8872b est le point d'équilibre calculé : 3.08:1 sur --paper ET
+     3.14:1 face à --gv. Assombrir davantage améliorerait le fond mais
+     ferait passer la distinction couenne / grande voie SOUS 3:1 — on
+     échangerait un critère contre l'autre. La distinction reste portée par
+     la couleur seule (variable visuelle correcte pour une différence de
+     nature) ; sa redondance est textuelle, dans l'aria-label de
+     l'histogramme (voir construireHistogramme, popups.js). */
+  --couenne: #b8872b;
   /* Texte secondaire (libellés, notes) : seule couleur de texte du site à
      rester en littéral hexadécimal ailleurs plutôt que passer par une
      variable comme --ink/--forest/--clay. Avait une variante --muted-light

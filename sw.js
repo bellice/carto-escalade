@@ -19,7 +19,23 @@
 // fini par arriver (plusieurs vagues de JS/CSS déployées sans y penser —
 // bug réel constaté : les visiteurs déjà passés ne recevaient plus AUCUNE
 // mise à jour tant qu'ils ne vidaient pas leur cache à la main).
-const CACHE_NAME = 'sorties-escalade-v6';
+const CACHE_PREFIXE = 'sorties-escalade-v';
+// v7 : ajout des modules hors-ligne.js, sw-client.js et demarrer-*.js à la
+// coquille. Un nouveau module ne peut PAS attendre le rafraîchissement
+// paresseux — s'il n'est pas pré-caché, le premier chargement hors ligne
+// échoue à l'import et fait tomber toute la carte (constaté en test). C'est
+// le cas type qui justifie encore un bump.
+const CACHE_NAME = `${CACHE_PREFIXE}7`;
+
+// Cache SÉPARÉ pour le fond de carte (tuiles, glyphes, sprites). Deux
+// raisons de ne pas le mélanger à la coquille :
+// - il n'est PAS versionné par CACHE_NAME : bumper la coquille pour livrer du
+//   code ne doit pas effacer une zone pré-chargée avant une sortie (voir
+//   l'activate plus bas) ;
+// - il grossit sans limite (chaque tuile vue s'y ajoute), alors que la
+//   coquille a une taille fixe et connue — les surveiller ensemble ne
+//   permettait de raisonner ni sur l'une ni sur l'autre.
+const CACHE_TUILES = 'sorties-escalade-tuiles-v1';
 
 // Coquille pré-cachée à l'install. Liste manuelle : une entrée par dossier
 // sortie/ (page + data.geojson). maplibre-gl reste servi par le CDN (voir
@@ -38,8 +54,12 @@ const PRECACHE = [
   './assets/style-carte.css',
   './assets/js/carte.js',
   './assets/js/carte-utils.js',
+  './assets/js/demarrer-accueil.js',
+  './assets/js/demarrer-sortie.js',
   './assets/js/donnees.js',
+  './assets/js/hors-ligne.js',
   './assets/js/labels.js',
+  './assets/js/sw-client.js',
   './assets/js/marqueurs.js',
   './assets/js/popups.js',
   './assets/js/symboles.js',
@@ -107,10 +127,21 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// Le ménage à l'activation ne touche QUE les anciennes versions de la
+// coquille (préfixe CACHE_PREFIXE). Avant, il supprimait tout cache dont le
+// nom différait de CACHE_NAME — donc aussi les tuiles du fond, qui vivaient
+// dans le même cache : bumper la version pour livrer une correction de code
+// effaçait au passage la zone que l'utilisateur avait pré-chargée avant de
+// partir. Un déploiement de routine ne doit jamais coûter la préparation
+// hors-ligne de quelqu'un.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIXE) && k !== CACHE_NAME)
+          .map((k) => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });
@@ -131,10 +162,21 @@ function reponseCachable(response) {
 // event.waitUntil (garder le service worker vivant jusqu'à l'écriture
 // réelle, pas juste jusqu'à l'appel de cache.open) et pour renvoyer la
 // réponse une fois cette écriture lancée.
+// Aiguille chaque ressource vers son cache. Seul le fond de carte PROPREMENT
+// DIT (tuiles, glyphes, sprites) part dans CACHE_TUILES ; le style JSON reste
+// avec la coquille, dont il partage le cycle de vie (il est dans PRECACHE et
+// tient en quelques Ko).
+function cachePour(request) {
+  const url = new URL(request.url);
+  const estFondDeCarte = url.hostname === 'tiles.openfreemap.org'
+    && !url.pathname.startsWith('/styles/');
+  return estFondDeCarte ? CACHE_TUILES : CACHE_NAME;
+}
+
 function mettreEnCache(request, response) {
   if (!reponseCachable(response)) return Promise.resolve();
   const copie = response.clone();
-  return caches.open(CACHE_NAME).then((cache) => cache.put(request, copie));
+  return caches.open(cachePour(request)).then((cache) => cache.put(request, copie));
 }
 
 // Sert le cache immédiatement (latence nulle, hors-ligne inclus) tout en

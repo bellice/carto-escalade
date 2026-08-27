@@ -20,7 +20,13 @@ assets/
                        besoin, pas de raison de le lui faire charger)
   js/                → logique carte, en modules ES natifs (import/export,
                        aucun bundler) — chargés via <script type="module">
-    carte.js         → point d'entrée : initCarte(dataUrl), orchestration
+    demarrer-accueil.js → point d'entrée de la page d'accueil
+    demarrer-sortie.js  → point d'entrée d'une page sortie (initCarte + SW).
+                       Ces deux fichiers remplacent les anciens <script>
+                       inline : sans code inline, la CSP peut refuser
+                       'unsafe-inline' (voir la meta dans les pages)
+    sw-client.js     → enregistrement du service worker (garde-fou Vite)
+    carte.js         → initCarte(dataUrl), orchestration
     carte-utils.js   → cadrage caméra, contrôle "Tout voir"
     marqueurs.js     → marqueurs DOM parking/gîte + popup native des falaises
     popups.js        → HTML des popups (rose des vents, beeswarm des voies, GPS...)
@@ -28,7 +34,10 @@ assets/
                        couleurFalaisePourMode (couche native), légende
     labels.js        → libellés de site/secteur sur la carte
     donnees.js       → lecture GeoJSON, agrégats, prédicats de visibilité
-    utils.js         → escapeHtml
+    hors-ligne.js    → « Préparer le hors-ligne » : pré-chargement des tuiles
+                       de la zone (voir "Hors-ligne")
+    utils.js         → escapeHtml (sûr en attribut) + urlSure (schémas
+                       autorisés pour les href issus des données)
 sorties/
   2026-10-drome-saou/
     index.html       → page carte de cette sortie
@@ -166,22 +175,49 @@ CRS : **EPSG:4326** obligatoire.
   `-worker`, `.css`) sont **ajoutés au pré-cache** du service worker : ils
   sont donc disponibles hors-ligne dès l'install, sans dépendre du CDN au
   moment de l'usage.
-- **Tuiles / fond de carte** (OpenFreeMap, cross-origin) : **cache d'abord**
-  → les tuiles sont versionnées (immuables, le numéro de modèle est dans
-  l'URL) : une fois affichées, elles sont servies du cache **instantanément
-  et sans bande passante** aux visites suivantes (l'objectif premier du site,
-  contexte réseau faible). Le style du fond seul suit stale-while-revalidate
-  (petit fichier, il porte le modèle du jour). L'offline couvre ce qui a déjà
-  été affiché en ligne.
+- **Tuiles / fond de carte** (OpenFreeMap, cross-origin) : **cache d'abord**,
+  dans un cache **séparé** (`sorties-escalade-tuiles-v1`) — les tuiles sont
+  versionnées (immuables, le numéro de modèle est dans l'URL) : une fois
+  affichées, elles sont servies du cache **instantanément et sans bande
+  passante** aux visites suivantes (l'objectif premier du site). Le style du
+  fond seul suit stale-while-revalidate (petit fichier, il porte le modèle
+  du jour).
+
+### « Préparer le hors-ligne »
+
+Le cache des tuiles ci-dessus est **réactif** : il ne protège que les zones
+déjà affichées. Arriver sur une falaise jamais consultée, sans réseau,
+donnait donc un fond gris. Le bouton **« Préparer le hors-ligne »** (dans la
+légende, voir `assets/js/hors-ligne.js`) inverse la logique : il télécharge à
+l'avance le fond autour de tous les points de la sortie.
+
+- **Disques autour des points, pas le rectangle englobant** : le bbox complet
+  de la sortie Drôme représente ~13 000 tuiles / ~650 Mo. Les falaises sont
+  des points dispersés : un anneau de ±1 tuile autour de chacun, dédupliqué,
+  tombe à **463 tuiles / ~21 Mo** — mesuré, ~9 s en wifi.
+- **z9 à z14 seulement** : la source OpenFreeMap déclare `maxzoom: 14`.
+  Au-delà, aucune tuile n'existe (MapLibre sur-zoome celle de z14) —
+  pré-charger z15/z16 ne téléchargerait que des 404. z9–14 couvre donc
+  **tous** les niveaux de zoom atteignables.
+- Les **glyphes** (plages latines) sont inclus : sans eux, un fond hors-ligne
+  s'afficherait sans aucun nom de lieu.
+- L'URL des tuiles contient l'horodatage du build planète OpenFreeMap
+  (`/planet/20260823_080002_pt/...`). À chaque nouveau build, ce chemin change
+  et **toutes les tuiles en cache deviennent inatteignables d'un coup** : la
+  préparation mémorise ce modèle et signale « à repréparer » si le fond a
+  changé depuis.
 
 Une mise à jour (code ou données : nouveau `data.geojson`, `routes/`) finit
 toujours par arriver toute seule grâce au stale-while-revalidate — au pire
 2 rechargements (le 1er sert encore l'ancien contenu tout en déclenchant le
 rafraîchissement en arrière-plan, le 2e sert la version fraîche). **Bumper
 `CACHE_NAME`** dans `sw.js` reste utile pour forcer un renouvellement
-**immédiat** (ex. correctif urgent), mais n'est plus une obligation pour
-qu'une mise à jour de routine finisse par atteindre les visiteurs déjà
-passés.
+**immédiat** (ex. correctif urgent), et reste **obligatoire quand on ajoute
+un module JS** à la coquille : un nouvel import absent du pré-cache fait
+échouer tout le graphe de modules au premier chargement hors ligne (constaté
+en test). Ce bump n'efface **pas** les tuiles, qui vivent dans leur propre
+cache — un déploiement de routine ne coûte donc jamais la préparation
+hors-ligne de quelqu'un.
 
 > **Dev avec Vite** : le service worker est volontairement désactivé (et
 > désenregistré) quand la page est servie par Vite — son cache-first
