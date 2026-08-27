@@ -239,7 +239,7 @@ export function popupFalaise(p, lat, lon, cle) {
       ? String(p.topo_page).split(';').map(pg => `<span class="topo-page-badge">p. ${escapeHtml(pg.trim())}</span>`).join('')
       : '';
     const identite = p.topoNom ? `<p class="topo-reference">${escapeHtml(p.topoNom)}${parentheses}</p>` : '';
-    const lignePage = badgesPage ? `<p class="topo-page">${badgesPage}</p>` : '';
+    const lignePage = badgesPage ? `<div class="topo-page">${badgesPage}</div>` : '';
     // Le texte du lien dépend du type de source (jamais "Acheter" sur une
     // brochure gratuite, ce serait faux) — voir source.type,
     // escalade/data/raw/NOTICE.md.
@@ -247,9 +247,17 @@ export function popupFalaise(p, lat, lon, cle) {
     if (p.topoType === 'topo payant') libelleLien = 'Acheter ce topo';
     else if (p.topoType === 'brochure_gratuite') libelleLien = 'Télécharger cette brochure';
     const lienAchat = p.topoUrl
-      ? `<p class="topo-achat"><a href="${escapeHtml(p.topoUrl)}" target="_blank" rel="noopener">${libelleLien}</a></p>`
+      ? `<a class="topo-achat" href="${escapeHtml(p.topoUrl)}" target="_blank" rel="noopener">${libelleLien}</a>`
       : '';
-    groupeTopo = `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Topo papier</div>${identite}${lignePage}${lienAchat}</div>`;
+    // Page(s) et lien d'achat sur la MÊME ligne (badges à gauche, lien à
+    // droite, voir .topo-page-ligne) — même motif que .gps-copie (valeur à
+    // gauche, "Copier" à droite) : économise une ligne de hauteur. Repasse
+    // seule sur sa ligne si l'un des deux est absent (topo pas encore
+    // numéroté, ou source sans URL) — pas de wrapper vide dans ce cas.
+    const lignePageEtAchat = (lignePage || lienAchat)
+      ? `<div class="topo-page-ligne">${lignePage}${lienAchat}</div>`
+      : '';
+    groupeTopo = `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Topo papier</div>${identite}${lignePageEtAchat}</div>`;
   }
   const lienOblyk = p.lien_oblyk ? `<a href="${escapeHtml(p.lien_oblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
   const lienC2C = p.lien_camptocamp ? `<a href="${escapeHtml(p.lien_camptocamp)}" target="_blank" rel="noopener">Voir sur C2C</a>` : '';
