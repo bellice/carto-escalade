@@ -290,6 +290,38 @@ describe('Accessibilité et sécurité', () => {
     }
   });
 
+  test('le mouvement réduit est respecté (caméra et transitions)', { timeout: 90000 }, async () => {
+    const contexte = await navigateur.newContext({
+      viewport: { width: 1280, height: 900 },
+      reducedMotion: 'reduce',
+    });
+    const page = await contexte.newPage();
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+
+      const resultat = await page.evaluate(async () => {
+        const { dureeAnimation } = await import('/assets/js/carte-utils.js');
+        const sonde = document.querySelector('#panneau-falaise');
+        return {
+          duree: dureeAnimation(800),
+          transition: getComputedStyle(sonde).transitionDuration,
+        };
+      });
+
+      assert.equal(resultat.duree, 0,
+        'Les vols de caméra doivent être instantanés quand le mouvement réduit est demandé');
+      // Comparaison NUMÉRIQUE : le navigateur peut renvoyer la durée en
+      // notation scientifique ("1e-05s"), qu'un test sur la chaîne raterait.
+      const secondes = Number.parseFloat(resultat.transition);
+      assert.ok(Number.isFinite(secondes) && secondes < 0.05,
+        `Les transitions doivent être neutralisées (obtenu : ${resultat.transition})`);
+    } finally {
+      await contexte.close();
+    }
+  });
+
   test('des données piégées n\'injectent ni attribut ni URL exécutable', { timeout: 90000 }, async () => {
     const { contexte, page } = await nouveauContexte(navigateur, { serviceWorkers: 'block' });
     try {

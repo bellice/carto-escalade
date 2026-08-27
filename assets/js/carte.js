@@ -11,7 +11,7 @@ import {
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
 import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee, afficherDetailVoies, masquerDetailVoies, basculerTriDetailVoies, remplirPlaceholderVoies } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
-import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop } from './carte-utils.js';
+import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop, dureeAnimation } from './carte-utils.js';
 import { monterPreparationHorsLigne } from './hors-ligne.js';
 
 // Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
@@ -727,9 +727,9 @@ export function initCarte(dataUrl) {
       const bounds = new maplibregl.LngLatBounds();
       bounds.extend(pointDe(origine));
       bounds.extend(pointDe(cible));
-      map.fitBounds(bounds, { padding: margeAvantPopup(reserverPanneauDroit), maxZoom: 16, duration: 800 });
+      map.fitBounds(bounds, { padding: margeAvantPopup(reserverPanneauDroit), maxZoom: 16, duration: dureeAnimation(800) });
     } else {
-      map.flyTo({ center: pointDe(cible), zoom: Math.max(map.getZoom(), 15), padding: margeAvantPopup(reserverPanneauDroit), duration: 800 });
+      map.flyTo({ center: pointDe(cible), zoom: Math.max(map.getZoom(), 15), padding: margeAvantPopup(reserverPanneauDroit), duration: dureeAnimation(800) });
     }
 
     if (cible.cat === 'falaise') {
