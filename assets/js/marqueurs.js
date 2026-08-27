@@ -22,9 +22,28 @@ const cacheSitesRoutes = new Map(); // slug-site -> Promise<JSON du site>
 // Un seul fetch par SITE, dédupliqué via un cache de PROMESSES (pas juste de
 // valeurs résolues) : ouvrir 2 falaises du même site coup sur coup, avant que
 // le 1er fetch n'ait répondu, ne déclenche pas 2 requêtes.
+//
+// Le retrait du cache en cas d'ÉCHEC est indispensable : une promesse rejetée
+// laissée en place restait servie à tous les appels suivants, donc un unique
+// raté réseau condamnait les histogrammes de TOUT le site jusqu'au
+// rechargement complet de la page — même une fois le réseau revenu. C'est
+// exactement le scénario d'usage visé (couverture qui va et vient en
+// montagne) : sans ça, "réessayer" ne pouvait pas fonctionner.
+//
+// r.ok : un 404/500 renvoie un corps HTML, que .json() rejetterait avec une
+// erreur de syntaxe peu parlante — on échoue explicitement sur le statut.
 function chargerJsonSite(siteId, urlRoute) {
   if (!cacheSitesRoutes.has(siteId)) {
-    cacheSitesRoutes.set(siteId, fetch(urlRoute(siteId)).then(r => r.json()));
+    const requete = fetch(urlRoute(siteId))
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status} sur ${urlRoute(siteId)}`);
+        return r.json();
+      })
+      .catch((err) => {
+        cacheSitesRoutes.delete(siteId);
+        throw err;
+      });
+    cacheSitesRoutes.set(siteId, requete);
   }
   return cacheSitesRoutes.get(siteId);
 }
@@ -38,6 +57,14 @@ function chargerJsonSite(siteId, urlRoute) {
 // la réutilise telle quelle plutôt que d'en copier une 3e version.
 function chargerDetailVoies(racineEl, urlRoute) {
   const placeholder = racineEl && racineEl.querySelector('[data-route]');
+  remplirPlaceholderVoies(placeholder, urlRoute);
+}
+
+// Même logique, mais à partir du placeholder LUI-MÊME plutôt que d'un
+// ancêtre : le bouton "Réessayer" vit à l'intérieur du placeholder, donc
+// repasser par chargerDetailVoies l'obligerait à remonter au parent pour se
+// retrouver par querySelector — fragile. Les deux entrées partagent ce corps.
+export function remplirPlaceholderVoies(placeholder, urlRoute) {
   if (!placeholder || !urlRoute) return;
   const siteId = placeholder.dataset.route;
   const falaiseId = placeholder.dataset.routeFalaise;
@@ -58,7 +85,20 @@ function chargerDetailVoies(racineEl, urlRoute) {
       rendre(voies);
     })
     .catch(() => {
-      if (placeholder.isConnected) placeholder.remove();
+      // Avant : le placeholder était purement et simplement retiré. Résultat
+      // indistinguable d'une falaise SANS détail de voies — l'utilisateur ne
+      // pouvait pas savoir qu'il manquait une information, ni la redemander.
+      // On affiche l'échec et on propose de réessayer (le clic est traité par
+      // le handler délégué .btn-reessayer-voies de carte.js, qui rappelle
+      // remplirPlaceholderVoies sur ce même placeholder). Le cache de
+      // promesses a été purgé de l'échec (voir chargerJsonSite) : un nouveau
+      // fetch partira réellement.
+      if (!placeholder.isConnected) return;
+      placeholder.innerHTML = `
+        <p class="detail-indisponible">
+          <span>Détail des voies indisponible (hors ligne ?).</span>
+          <button type="button" class="btn-reessayer-voies">Réessayer</button>
+        </p>`;
     });
 }
 
@@ -393,6 +433,7 @@ export function ouvrirPopupFalaise(map, entree, ctx) {
 // panneau reste contextuel : sa largeur se révèle/se referme à la sélection
 // (voir la classe .ouvert, sens CSS width dans style-carte.css).
 let panneauFacade = null; // {estPanneauFalaise:true, remove} — façade compatible avec suivrePopup/popupOuverte (carte.js), qui n'attend qu'un objet avec .remove()
+let declencheurFocus = null; // élément qui a ouvert le panneau : le focus lui revient à la fermeture (voir ouvrirPanneauFalaise/fermerPanneauFalaise)
 
 // Garantit la présence de #panneau-falaise dans le DOM : présent en HTML
 // statique dans chaque sortie, comme SIBLING de #panneau-lateral (pas
@@ -463,6 +504,14 @@ export function ouvrirPanneauFalaise(map, entree, ctx, cameraDejaEncadree = fals
     panneau.classList.add('ouvert');
     panneau.removeAttribute('inert');
     document.body.classList.add('panneau-falaise-ouvert');
+    // Le panneau devient atteignable au clavier (inert retiré), mais le
+    // focus restait sur le marqueur : il fallait tabuler à travers toute la
+    // page pour atteindre une fiche qu'on vient d'ouvrir. On l'y amène, et
+    // on note d'où l'on vient pour l'y ramener à la fermeture (sans quoi le
+    // focus retombe sur <body> et la navigation clavier repart de zéro).
+    declencheurFocus = document.activeElement;
+    const fermer = panneau.querySelector('.panneau-falaise-fermer');
+    if (fermer) fermer.focus();
     if (!cameraDejaEncadree) {
       // Première ouverture ET aucun cadrage déjà en cours (clic direct) :
       // réserve le padding caméra. reinitialiserPadding() d'abord (même
@@ -494,8 +543,20 @@ export function ouvrirPanneauFalaise(map, entree, ctx, cameraDejaEncadree = fals
 export function fermerPanneauFalaise(map, ctx) {
   const panneau = document.getElementById('panneau-falaise');
   if (panneau) {
+    // Rendre le panneau inert AVANT de restituer le focus : sinon le focus
+    // resterait sur un élément d'un conteneur qu'on vient de retirer du
+    // parcours clavier.
+    const focusInterne = panneau.contains(document.activeElement);
     panneau.classList.remove('ouvert');
     panneau.setAttribute('inert', '');
+    // Ramener le focus au marqueur (ou au lien) qui avait ouvert la fiche —
+    // seulement s'il était DANS le panneau : si l'utilisateur avait déjà
+    // déplacé son focus ailleurs entre-temps, le lui reprendre serait
+    // intrusif. isConnected : le déclencheur peut avoir disparu du DOM.
+    if (focusInterne && declencheurFocus && declencheurFocus.isConnected) {
+      declencheurFocus.focus();
+    }
+    declencheurFocus = null;
   }
   document.body.classList.remove('panneau-falaise-ouvert');
   map.stop();

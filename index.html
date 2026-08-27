@@ -4,6 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
+  <!-- Voir la page sortie pour le raisonnement complet. Ici la page est
+       purement statique : la politique peut être encore plus stricte (aucune
+       origine tierce, aucun script inline). -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self';
+    style-src 'self';
+    img-src 'self' data:;
+    connect-src 'self';
+    base-uri 'none';
+    form-action 'none';
+    object-src 'none'
+  " />
   <title>Sorties escalade</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
   <link rel="stylesheet" href="assets/style.css" />
@@ -23,24 +36,8 @@
     </ul>
   </div>
 
-  <script>
-    // Service worker : enregistré SAUF en dev via Vite. Le SW (pré-cache +
-    // cache-first) est incompatible avec Vite, qui transforme les fichiers à
-    // la volée : il servirait des ressources déjà transformées d'une session
-    // précédente (HTML avec html-proxy, modules réécrits) et la page ne se
-    // chargerait plus. Détecté par la présence de /@vite/client (injecté par
-    // Vite dans chaque page) : on désenregistre alors tout SW résiduel. En
-    // production (GitHub Pages) ou sur un serveur statique simple, le SW
-    // s'enregistre normalement.
-    if ('serviceWorker' in navigator) {
-      const estVite = Array.from(document.querySelectorAll('script[src]'))
-        .some((s) => (s.getAttribute('src') || '').includes('/@vite/'));
-      if (estVite) {
-        navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
-      } else {
-        navigator.serviceWorker.register('sw.js');
-      }
-    }
-  </script>
+  <!-- Externalisé (voir demarrer-accueil.js / sw-client.js) : sans script
+       inline, la CSP ci-dessus peut refuser 'unsafe-inline'. -->
+  <script type="module" src="assets/js/demarrer-accueil.js"></script>
 </body>
 </html>
