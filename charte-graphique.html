@@ -180,9 +180,17 @@
 <h3>Échelle</h3>
 <p class="note">
   8 paliers nommés (<code>--fs-2xs</code> à <code>--fs-2xl</code>), chacun avec un rôle
-  propre — remplace un état antérieur à 18 valeurs quasi arbitraires (0.62 à 1.6rem,
-  dont 6 tassées entre 0.70 et 0.78rem à un pixel près les unes des autres, sans
-  justification fonctionnelle). Valeurs lues en direct depuis <code>:root</code>.
+  propre — remplace un état antérieur à 18 valeurs quasi arbitraires, dont 6 tassées
+  à un pixel près les unes des autres sans justification fonctionnelle.
+  Valeurs lues en direct depuis <code>:root</code>.
+</p>
+<p class="note">
+  L'échelle a ensuite été remontée d'environ 12% (corps à 14&nbsp;px) pour l'usage
+  réel : écran à bout de bras, en plein soleil. Les rapports entre paliers sont
+  inchangés — même échelle, décalée. Mesuré avant adoption : la fiche mobile passe
+  de 819 à 820&nbsp;px de contenu, sa hauteur étant dominée par l'histogramme et les
+  espacements, pas par le texte. Les champs de saisie, eux, sont forcés à
+  16&nbsp;px sous 640&nbsp;px : en dessous, iOS zoome la page au focus.
 </p>
 <table class="tailles" id="tailles">
   <thead><tr><th>Token</th><th>Valeur</th><th>Rendu</th><th>Rôle</th></tr></thead>

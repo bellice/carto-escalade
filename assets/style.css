@@ -48,15 +48,27 @@
      --fs-lg   titre de fiche (popup h3)
      --fs-xl   icônes de fermeture (×) — panneau falaise, popup MapLibre,
                champ recherche : les trois unifiées (1.15/1.2/1.3rem avant)
-     --fs-2xl  titre de la page d'accueil */
-  --fs-2xs: 0.62rem;
-  --fs-xs: 0.68rem;
-  --fs-sm: 0.72rem;
-  --fs-base: 0.8rem;
-  --fs-md: 0.9rem;
-  --fs-lg: 1rem;
-  --fs-xl: 1.2rem;
-  --fs-2xl: 1.6rem;
+     --fs-2xl  titre de la page d'accueil
+
+     Échelle remontée d'environ 12% (le corps passant de 12,8 à 14 px) pour
+     l'usage réel : écran à bout de bras, en plein soleil, parfois avec des
+     mains froides. Les rapports entre paliers sont inchangés — c'est la même
+     échelle, décalée, pas une nouvelle hiérarchie.
+     Vérifié avant d'adopter : la fiche mobile passe de 819 à 820 px de
+     contenu, sans débordement. La hauteur est dominée par l'histogramme et
+     les espacements, pas par le texte — la lisibilité gagnée ne coûte donc
+     aucune densité, ce qui est précisément ce qui rendait l'arbitrage
+     évident une fois mesuré plutôt que débattu.
+     Valeurs choisies pour tomber sur des pixels entiers à la racine 16 px
+     (11,2 mis à part) : un rendu plus net qu'avec des fractions. */
+  --fs-2xs: 0.7rem;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-base: 0.875rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.0625rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.625rem;
 
   --radius: 3px;
 
