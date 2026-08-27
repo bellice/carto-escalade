@@ -142,6 +142,69 @@ describe('Filtre par fourchette de cotation', () => {
   });
 });
 
+describe('Légende sur mobile', () => {
+  // Le correctif iOS (champs à 16 px) avait fait gonfler le <select>, qui se
+  // dimensionne sur son option la plus longue : 297 px dans une colonne de
+  // 280, d'où une barre de défilement horizontale sur toute la légende.
+  test('aucun débordement horizontal, mode cotation compris', { timeout: 90000 }, async () => {
+    const contexte = await navigateur.newContext({
+      viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+    });
+    const page = await contexte.newPage();
+    try {
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 30000 });
+      await page.waitForTimeout(2500);
+
+      const deborde = () => page.evaluate(() => {
+        const el = document.querySelector('.legende-contenu');
+        return el.scrollWidth > el.clientWidth;
+      });
+      assert.equal(await deborde(), false, 'Débordement de la légende au chargement');
+
+      await page.selectOption('#mode-figure', 'cotation');
+      await page.waitForTimeout(700);
+      assert.equal(await deborde(), false, 'Débordement une fois la fourchette affichée');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('le bouton ne reste pas surligné après un tap', { timeout: 90000 }, async () => {
+    const contexte = await navigateur.newContext({
+      viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+    });
+    const page = await contexte.newPage();
+    try {
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 30000 });
+      await page.waitForTimeout(2500);
+
+      const fondNormal = await page.evaluate(() =>
+        getComputedStyle(document.querySelector('.legende-toggle')).backgroundColor);
+
+      await (await page.$('.legende-toggle')).tap();
+      await page.waitForTimeout(500);
+
+      const apres = await page.evaluate(() => {
+        const b = document.querySelector('.legende-toggle');
+        return {
+          fond: getComputedStyle(b).backgroundColor,
+          hauteur: Math.round(b.getBoundingClientRect().height),
+          anneau: b.matches(':focus-visible'),
+        };
+      });
+      assert.equal(apres.fond, fondNormal,
+        'Le fond de survol reste collé après un tap — règle :hover non protégée par (hover: hover)');
+      assert.equal(apres.anneau, false,
+        'Pas d\'anneau de focus au tactile (il doit rester réservé au clavier)');
+      assert.ok(apres.hauteur >= 44, `Cible tactile de ${apres.hauteur}px, minimum 44px`);
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
 describe('Fiche falaise', () => {
   test('affiche les métadonnées, l\'histogramme et la référence topo', { timeout: 90000 }, async () => {
     const { contexte, page } = await nouveauContexte(navigateur);

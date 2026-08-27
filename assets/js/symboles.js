@@ -70,7 +70,7 @@ function remplissagePourMode(mode) {
   // Mode fourchette : même vert que l'ancien mode « voies faciles » qu'il
   // remplace — la grandeur reste « des voies à ma portée », seule la borne
   // change (réglable au lieu de figée à 6a+).
-  if (mode === 'cotation') return 'var(--forest)';
+  if (mode === 'cotation') return 'var(--cotation)';
   return 'var(--clay)';
 }
 

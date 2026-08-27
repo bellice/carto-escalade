@@ -22,6 +22,15 @@
      nature) ; sa redondance est textuelle, dans l'aria-label de
      l'histogramme (voir construireHistogramme, popups.js). */
   --couenne: #b8872b;
+  /* Couleur du mode « voies par cotation » sur la carte. Ne PAS réutiliser
+     --forest : mesuré à 1.04:1 face à --gv, autrement dit une luminance
+     identique au brun des grandes voies — changer de mode ne se voyait pas.
+     Ce vert plus clair et plus saturé remonte l'écart à 1.83:1 et ajoute un
+     franc décalage de teinte, tout en restant à 5.26:1 sur --paper (au-delà
+     du seuil de 3:1 exigé pour un élément porteur d'information).
+     Séparé de --forest, qui reste la couleur des liens et doit garder son
+     contraste élevé pour du TEXTE. */
+  --cotation: #38754d;
   /* Texte secondaire (libellés, notes) : seule couleur de texte du site à
      rester en littéral hexadécimal ailleurs plutôt que passer par une
      variable comme --ink/--forest/--clay. Avait une variante --muted-light
