@@ -118,14 +118,15 @@ describe('Filtre par fourchette de cotation', () => {
       await page.selectOption('#cotation-max', { label: '5c' });
       await page.waitForTimeout(600);
 
-      const restreint = await page.evaluate(() => ({
-        falaises: window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length,
-        resume: document.getElementById('cotation-resume').textContent,
-      }));
-      assert.ok(restreint.falaises < complet.falaises,
-        `La fourchette doit masquer des falaises (${restreint.falaises} vs ${complet.falaises})`);
-      assert.match(restreint.resume, /\d+ voies? sur \d+ falaises?/,
-        'Le résumé doit annoncer le volume concerné');
+      const restreint = await page.evaluate(() =>
+        window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length);
+      assert.ok(restreint < complet.falaises,
+        `La fourchette doit masquer des falaises (${restreint} vs ${complet.falaises})`);
+      // Pas de compte affiché : les modes couenne/grande voie masquent eux
+      // aussi sans annoncer de total — n'en afficher un que pour la fourchette
+      // serait incohérent. Voir majFourchette (carte.js).
+      assert.equal(await page.evaluate(() => Boolean(document.getElementById('cotation-resume'))), false,
+        'Le résumé chiffré a été retiré par cohérence entre modes');
 
       // Bornes croisées : on corrige au lieu de refuser.
       await page.selectOption('#cotation-min', { label: '7a' });

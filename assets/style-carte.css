@@ -147,6 +147,13 @@
    seule la sémantique change. */
 .map-header .titre {
   margin: 0;
+  /* Tronque plutôt que de pousser le bouton hors de l'écran : sur un
+     téléphone étroit, c'est le nom de la sortie qui peut céder, pas
+     l'accès à la préparation hors-ligne. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: inherit;
   font-weight: 600;
   color: var(--forest);
@@ -492,33 +499,36 @@
   cursor: pointer;
 }
 
-/* « Préparer le hors-ligne » (voir hors-ligne.js) : dans la légende, sous les
-   autres réglages de carte. Pleine largeur et cible 44 px — c'est l'action
-   qu'on cherche délibérément avant de partir, pas un réglage d'appoint. */
-.preparation {
-  border-top: 1px solid var(--stone-dark);
-  padding-top: 8px;
-  margin-top: 2px;
+/* « Préparer le hors-ligne » (voir hors-ligne.js) — dans l'EN-TÊTE, plus
+   dans la légende : c'est une action de préparation ponctuelle (avant de
+   partir, sur wifi), pas un réglage de carte. Elle y occupait 53 px alors
+   que la légende couvrait déjà 49 % du viewport mobile.
+   Libellé court porté par le bouton lui-même (« Hors-ligne », « 42 % »,
+   « Hors-ligne 27/08 ») : une seconde ligne de statut ne tiendrait pas dans
+   l'en-tête d'un téléphone. L'action complète reste dite par aria-label. */
+#preparation-hors-ligne {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 .btn-preparer {
-  width: 100%;
-  min-height: 44px;
+  padding: 4px 10px;
   border: 1px solid var(--stone-dark);
   border-radius: var(--radius);
   background: var(--paper);
-  color: var(--ink);
+  color: var(--forest);
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
+  white-space: nowrap;
   cursor: pointer;
 }
-
-.preparation-etat:empty { display: none; }
-.preparation-etat {
-  margin: 6px 0 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  color: var(--muted);
+/* Préparation à jour : encre verte pleine, sans icône (règle du site) — le
+   seul signal dont on a besoin est « c'est fait », le détail est dans
+   l'aria-label. */
+.btn-preparer.pret {
+  border-color: var(--cotation);
+  color: var(--cotation);
 }
+
 
 /* Légende / filtres — repliée par défaut (bouton en bas, panneau qui se
    déploie vers le haut au-dessus de lui, position du bouton stable). */
@@ -563,8 +573,10 @@
        contrôle (WCAG 1.4.11) — replié, le bouton flotte sur le fond de carte
        et sa bordure y disparaissait.
      - ombre portée : le détache du fond, quelle qu'en soit la densité. */
-  min-height: 44px;
-  padding: 4px 12px;
+  /* 44px seulement sur pointeur grossier : c'est une contrainte TACTILE
+     (doigt), pas une règle universelle. À la souris le pointeur est précis,
+     et imposer 44px ne fait qu'alourdir un bouton de réglage secondaire. */
+  padding: 3px 10px;
   border: 1px solid var(--muted);
   border-radius: var(--radius);
   background: var(--paper);
@@ -577,6 +589,10 @@
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   flex-shrink: 0;
+}
+@media (pointer: coarse) {
+  .legende-toggle { min-height: 44px; padding: 4px 12px; }
+  .btn-preparer { min-height: 44px; }
 }
 
 .legende-toggle-icone {

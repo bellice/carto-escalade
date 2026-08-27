@@ -1032,12 +1032,12 @@ export function initCarte(dataUrl) {
       // faire qu'une fois data.geojson lu.
       preparerFourchette();
 
-      const contenuLegende = document.getElementById('legende-contenu');
-      if (contenuLegende && !contenuLegende.querySelector('.preparation')) {
+      const hote = document.getElementById('preparation-hors-ligne');
+      if (hote && !hote.querySelector('.btn-preparer')) {
         monterPreparationHorsLigne({
           map,
           points: geojson.features.map(f => f.geometry.coordinates),
-          conteneur: contenuLegende,
+          conteneur: hote,
         });
       }
     })
@@ -1181,7 +1181,6 @@ export function initCarte(dataUrl) {
   // au doigt — cohérent avec le parti « texte plutôt qu'icône » du site.
   const selectCotationMin = document.getElementById('cotation-min');
   const selectCotationMax = document.getElementById('cotation-max');
-  const resumeCotation = document.getElementById('cotation-resume');
 
   // Recalcule nbDansFourchette pour chaque falaise, puis les maxima du mode.
   // Fait ICI, une seule fois par changement de bornes, plutôt qu'à la volée
@@ -1195,15 +1194,12 @@ export function initCarte(dataUrl) {
       if (entree.cat !== 'falaise') return;
       entree.nbDansFourchette = compterDansFourchette(entree.cotations, min, max);
     });
+    // Pas de compte affiché ici : les modes « couennes » et « grandes voies »
+    // masquent eux aussi les falaises à zéro sans jamais annoncer de total.
+    // N'en afficher un que pour la fourchette serait une incohérence née de
+    // la nouveauté de ce mode. Si ce retour chiffré s'avère utile, il devra
+    // être ajouté à TOUS les modes d'un coup.
     Object.assign(maxima, maximaFourchette(entries));
-
-    if (resumeCotation) {
-      const concernees = entries.filter(e => e.cat === 'falaise' && e.nbDansFourchette > 0).length;
-      const voies = entries.reduce((s, e) => s + (e.cat === 'falaise' ? e.nbDansFourchette : 0), 0);
-      resumeCotation.textContent = concernees
-        ? `${voies} voie${voies > 1 ? 's' : ''} sur ${concernees} falaise${concernees > 1 ? 's' : ''}`
-        : 'Aucune voie dans cette fourchette';
-    }
   }
 
   // Peuple les deux listes avec les cotations RÉELLEMENT présentes dans la
