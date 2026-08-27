@@ -30,7 +30,8 @@ sur les jetons réels, échappement HTML et filtrage d'URL, structure des pages
 **`parcours.test.js`** — comportement réel dans Chromium. Démarrage sans
 erreur ni violation CSP, contenu des fiches, bascule des tris du détail des
 voies, résilience réseau (échec, rattrapage, bandeau hors-ligne, rechargement
-hors ligne complet), focus clavier, et injection via des données piégées.
+hors ligne complet), focus clavier, respect de `prefers-reduced-motion`, et
+injection via des données piégées.
 
 ## Contraintes
 

@@ -5,7 +5,7 @@ import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist
 import { cleFalaise, libelleFalaise, secteurDistinct } from './donnees.js';
 import { poserTailleMarqueur } from './symboles.js';
 import { popupFalaise, popupParking, popupGite, construireHistogramme, construireDetailVoies } from './popups.js';
-import { reinitialiserPadding, margeAvantPopup, estPointVisible } from './carte-utils.js';
+import { reinitialiserPadding, margeAvantPopup, estPointVisible, dureeAnimation } from './carte-utils.js';
 
 // Détail des voies (routes/<slug-site>.json, généré par DuckDB, un fichier
 // par SITE — plusieurs falaises/secteurs dedans, indexées par id_falaise)
@@ -521,7 +521,7 @@ export function ouvrirPanneauFalaise(map, entree, ctx, cameraDejaEncadree = fals
       reinitialiserPadding(map);
       const padding = margeAvantPopup(true);
       const visible = estPointVisible(map, entree.lon, entree.lat, map.getPadding());
-      map.easeTo({ padding, ...(visible ? {} : { center: [entree.lon, entree.lat] }), duration: 200 });
+      map.easeTo({ padding, ...(visible ? {} : { center: [entree.lon, entree.lat] }), duration: dureeAnimation(200) });
     }
     // Sinon (cameraDejaEncadree) : allerVers a déjà posé le bon padding et
     // vole déjà vers le bon centre/zoom, rien à faire de plus ici.
@@ -530,7 +530,7 @@ export function ouvrirPanneauFalaise(map, entree, ctx, cameraDejaEncadree = fals
     // collapse/reopen (dejaOuvert), juste un recentrage si la nouvelle
     // falaise tombe sous la colonne — et seulement si l'appelant n'a pas
     // déjà géré la caméra lui-même.
-    map.easeTo({ center: [entree.lon, entree.lat], duration: 200 });
+    map.easeTo({ center: [entree.lon, entree.lat], duration: dureeAnimation(200) });
   }
 
   return panneauFacade;
@@ -567,7 +567,7 @@ export function fermerPanneauFalaise(map, ctx) {
   // le panneau gauche, lui, occupe toujours cet espace à l'écran. Le
   // panneau droit, lui, redevient contextuel : sa réservation (right) est
   // bien relâchée ici, contrairement au panneau gauche.
-  map.easeTo({ padding: margeAvantPopup(), duration: 200 });
+  map.easeTo({ padding: margeAvantPopup(), duration: dureeAnimation(200) });
   const popupActive = ctx.suivrePopup ? ctx.suivrePopup(panneauFacade, false) : null;
   if (!popupActive) ctx.enSurbrillance(null);
   // Contrairement à la fermeture d'une popup mobile (qui NE vide PAS

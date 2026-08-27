@@ -1822,3 +1822,22 @@
     margin-top: 20px;
   }
 }
+
+/* ===== Mouvement réduit =====
+   Pendant CSS de dureeAnimation() (carte-utils.js), qui traite les vols de
+   caméra MapLibre. Ici : les transitions de l'interface (ouverture du panneau
+   falaise, repli de la légende, feuille du bas mobile).
+   On neutralise la DURÉE, pas l'effet : les éléments arrivent au même état
+   final, immédiatement. Mettre `transition: none` produirait le même résultat,
+   mais une durée quasi nulle reste compatible avec les écouteurs
+   `transitionend` s'il en apparaît un jour. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -99,11 +99,17 @@ serveur — hors de portée d'un site statique gratuit.
 ## Répliquer pour une nouvelle sortie
 
 1. Dupliquer `sorties/2026-10-drome-saou/` en `sorties/AAAA-MM-lieu/`.
-2. Depuis le repo de génération (voir plus bas), lancer l'export puis la
-   copie vers ce repo :
-   `uv run scripts/export_geojson.py` puis `uv run scripts/copy_to_site.py --sortie AAAA-MM-lieu`
-   — ça remplace `data.geojson` (version légère, sans le détail des voies)
+2. Depuis le repo de génération (voir plus bas), lancer **une seule commande** :
+   `uv run scripts/tout_regenerer.py --sortie AAAA-MM-lieu`
+   — elle enchaîne base → temps de trajet → export → copie, dans cet ordre.
+   Ça remplace `data.geojson` (version légère, sans le détail des voies)
    ET le dossier `routes/` (détail par site, chargé à la demande).
+
+   > Ne pas lancer les scripts un par un : `build_db.py` **vide** le cache des
+   > temps de trajet (alimenté par l'API IGN, jamais par les CSV). Enchaîner
+   > directement sur l'export produit un site où le curseur « Trajet depuis le
+   > gîte » disparaît sans le moindre message. `tout_regenerer.py` impose
+   > l'ordre et refuse de publier si ce cache est vide.
 3. Ajouter une entrée dans la liste de `index.html` (racine).
 4. `initCarte('data.geojson')` reste inchangé — aucune autre modif de code requise.
 

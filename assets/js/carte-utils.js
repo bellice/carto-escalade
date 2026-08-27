@@ -184,3 +184,16 @@ export function creerControleToutVoir(onClick) {
     },
   };
 }
+
+// Durée d'animation caméra, ramenée à 0 si l'utilisateur a demandé moins de
+// mouvement (prefers-reduced-motion). Les vols de caméra de MapLibre sont
+// exactement le type d'animation visé par ce réglage : déplacement large,
+// rapide et non sollicité, désagréable voire nauséeux pour qui y est
+// sensible. On ne supprime pas le déplacement — la carte doit toujours
+// arriver au bon endroit — on le rend instantané.
+//
+// Évalué à CHAQUE appel plutôt que mémorisé au chargement : le réglage
+// système peut changer en cours de session, et matchMedia est peu coûteux.
+export function dureeAnimation(millisecondes) {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : millisecondes;
+}
