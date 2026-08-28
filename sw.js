@@ -50,6 +50,7 @@ const CACHE_TUILES = 'sorties-escalade-tuiles-v1';
 const PRECACHE = [
   './',
   './index.html',
+  './manifest.webmanifest',
   './assets/style.css',
   './assets/style-carte.css',
   './assets/js/carte.js',

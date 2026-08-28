@@ -150,6 +150,35 @@ function ecrireEtatPreparation(etat) {
   }
 }
 
+// --- Durabilité du stockage ---
+//
+// Télécharger 21 Mo ne sert à rien si le navigateur les jette avant la
+// sortie. Par défaut le stockage d'un site est « best-effort » : évincable
+// dès que la place manque. Et WebKit va plus loin — il supprime le stockage
+// scriptable d'un site après 7 jours sans visite en tant que site principal.
+// C'est exactement le scénario visé ici : on prépare chez soi, on roule, on
+// arrive à la falaise deux semaines plus tard, sans réseau pour rattraper.
+//
+// persist() bascule le site en stockage « persistant », que le navigateur
+// s'engage à ne pas évincer tout seul. On ne le demande PAS au chargement
+// mais au clic sur « Préparer » : les navigateurs accordent la permission
+// sur des heuristiques d'engagement, et une action explicite de
+// l'utilisateur est le meilleur moment pour la réclamer.
+//
+// Renvoie true (accordé), false (refusé) ou null (API absente / erreur) —
+// trois cas distincts, parce qu'on ne dira pas la même chose dans les trois.
+async function assurerPersistance({ demander }) {
+  const s = navigator.storage;
+  if (!s || !s.persisted) return null;
+  try {
+    if (await s.persisted()) return true;
+    if (!demander || !s.persist) return false;
+    return await s.persist();
+  } catch {
+    return null;
+  }
+}
+
 // Monte l'interface (un seul bouton) dans `conteneur`.
 //
 // Un bouton SEUL, dont le libellé porte l'état, plutôt qu'un bouton plus une
@@ -167,6 +196,13 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
 
   const signal = { annule: false, controleur: new AbortController() };
   let enCours = false;
+  // true / false / null (inconnu) — voir assurerPersistance. Tenu à jour ici
+  // plutôt que relu à chaque fois : majLibelle est synchrone et appelé depuis
+  // une demi-douzaine d'endroits.
+  let stockagePersistant = null;
+  // Le fond de carte a été reconstruit depuis la préparation : les tuiles en
+  // cache pointent vers un chemin qui n'est plus servi.
+  let caduque = false;
 
   // Le libellé visible est court par contrainte de place ; la description
   // complète part dans aria-label (lecteurs d'écran) ET title (infobulle au
@@ -200,15 +236,27 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
       bouton.classList.remove('pret');
       return;
     }
+    if (caduque) {
+      poser('Repréparer', 'Le fond de carte a été mis à jour : préparation à refaire');
+      bouton.classList.remove('pret');
+      return;
+    }
     // La date reste dans la description, pas dans le libellé : elle sert à
     // juger si la préparation est encore bonne, or le code répond déjà à
     // cette question tout seul (voir le contrôle de gabarit en bas de
     // fichier, qui bascule sur « Repréparer »). L'afficher en permanence
     // coûterait la largeur du titre pour une information lue une fois.
+    // « Prête » sans réserve serait un demi-mensonge quand le navigateur n'a
+    // pas accordé le stockage persistant : il peut libérer la place à tout
+    // moment. On le dit, avec la parade — rouvrir le site remet à zéro le
+    // compteur d'inactivité de WebKit.
+    const reserve = stockagePersistant === false
+      ? ' Le navigateur peut libérer cet espace : rouvrez le site peu avant de partir.'
+      : '';
     poser('Prête',
       `Carte prête pour le hors-ligne — préparée le `
       + `${new Date(etat.date).toLocaleDateString('fr-FR')} `
-      + `(${etat.nbTuiles} tuiles). Activer pour remettre à jour.`);
+      + `(${etat.nbTuiles} tuiles). Activer pour remettre à jour.${reserve}`);
     bouton.classList.add('pret');
   };
 
@@ -225,6 +273,11 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
     signal.annule = false;
     signal.controleur = new AbortController();
     poser('Annuler', 'Annuler la préparation hors ligne en cours');
+
+    // Avant de télécharger, réclamer le droit de garder. Demandé ici et pas
+    // ailleurs : c'est le seul instant où l'utilisateur vient d'exprimer
+    // explicitement qu'il veut conserver cette carte.
+    stockagePersistant = await assurerPersistance({ demander: true });
 
     try {
       const gabarit = await gabaritTuiles(map);
@@ -261,6 +314,7 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
       });
 
       if (!signal.annule) {
+        caduque = false; // on vient de préparer sur le gabarit courant
         ecrireEtatPreparation({
           date: new Date().toISOString(),
           modele: modeleDeGabarit(gabarit),
@@ -283,6 +337,16 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
   bouton.addEventListener('click', preparer);
   majLibelle();
 
+  // Relire l'état de persistance au retour sur le site. persisted() ne
+  // DEMANDE rien (aucune permission déclenchée) : on peut l'appeler au
+  // montage, contrairement à persist(), réservé au clic. Sans ça, la
+  // description mentirait sur toutes les visites suivantes.
+  assurerPersistance({ demander: false }).then((p) => {
+    if (p === stockagePersistant) return;
+    stockagePersistant = p;
+    if (!enCours) majLibelle();
+  });
+
   // Le fond a-t-il été reconstruit depuis la préparation ? Si oui, les tuiles
   // en cache pointent vers un chemin qui n'est plus servi : la préparation est
   // caduque même si le cache paraît plein. On le signale plutôt que de laisser
@@ -291,9 +355,13 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
   if (etat && etat.modele) {
     gabaritTuiles(map)
       .then((gabarit) => {
+        // Passer par le drapeau + majLibelle plutôt que poser() directement :
+        // deux promesses écrivent sur ce bouton (celle-ci et celle de la
+        // persistance ci-dessus), et rien ne garantit leur ordre. L'état est
+        // porté par une variable, l'affichage recalculé — pas de course.
         if (modeleDeGabarit(gabarit) !== etat.modele && !enCours) {
-          poser('Repréparer', 'Le fond de carte a été mis à jour : préparation à refaire');
-          bouton.classList.remove('pret');
+          caduque = true;
+          majLibelle();
         }
       })
       .catch(() => { /* hors ligne : on garde l'état connu, sans alarmer */ });

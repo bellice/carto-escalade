@@ -446,6 +446,70 @@ describe('Résilience réseau', () => {
       await contexte.close();
     }
   });
+
+  // Télécharger 21 Mo ne sert à rien si le navigateur les évince avant la
+  // sortie (stockage « best-effort » par défaut ; WebKit purge en plus après
+  // 7 jours sans visite). Deux exigences se testent ici :
+  //  - persist() ne doit PAS partir au chargement, sinon on réclame une
+  //    permission avant que l'utilisateur ait exprimé quoi que ce soit ;
+  //  - quand la durabilité n'est pas acquise, « Prête » doit le dire.
+  test('la préparation réclame un stockage durable, et le dit si elle ne l\'obtient pas',
+    { timeout: 120000 }, async () => {
+      for (const durable of [false, true]) {
+        // serviceWorkers bloqués : au rechargement, le SW resservirait
+        // carte.js depuis SON cache, hors de portée de page.route — la carte
+        // ne serait alors jamais exposée aux tests. Le SW n'est pas le sujet
+        // ici (il l'est dans le test précédent).
+        const { contexte, page } = await nouveauContexte(navigateur, { serviceWorkers: 'block' });
+        try {
+          await page.addInitScript((valeur) => {
+            window.__appelsStockage = [];
+            const vrai = navigator.storage;
+            Object.defineProperty(navigator, 'storage', {
+              configurable: true,
+              value: {
+                persisted: async () => { window.__appelsStockage.push('persisted'); return valeur; },
+                persist: async () => { window.__appelsStockage.push('persist'); return valeur; },
+                estimate: () => vrai.estimate(),
+              },
+            });
+          }, durable);
+          await exposerCarte(page);
+          await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+          await attendreCarte(page);
+
+          // Simuler une carte déjà préparée SANS télécharger 21 Mo : il faut
+          // le vrai segment de build, sinon le bouton bascule sur
+          // « Repréparer » et on ne teste pas l'état visé.
+          const modele = await page.evaluate(() => {
+            const url = window.__carteTest.getSource('openmaptiles').tiles[0];
+            const m = /\/planet\/([^/]+)\//.exec(url);
+            return m ? m[1] : url;
+          });
+          await page.evaluate((mod) => localStorage.setItem('preparation-hors-ligne',
+            JSON.stringify({ date: new Date().toISOString(), modele: mod, nbTuiles: 463 })), modele);
+
+          await page.reload({ waitUntil: 'domcontentloaded' });
+          await attendreCarte(page);
+          await page.waitForTimeout(800);
+
+          const vu = await page.evaluate(() => {
+            const b = document.querySelector('.btn-preparer');
+            return { libelle: b.textContent, title: b.title, appels: window.__appelsStockage.slice() };
+          });
+
+          assert.equal(vu.libelle, 'Prête', `Libellé inattendu (durable=${durable})`);
+          assert.ok(vu.appels.includes('persisted'),
+            'persisted() doit être interrogé au montage, sinon la description ment aux visites suivantes');
+          assert.ok(!vu.appels.includes('persist'),
+            'persist() ne doit être demandé qu\'au clic, jamais au chargement');
+          assert.equal(vu.title.includes('peut libérer cet espace'), !durable,
+            `La réserve sur la durabilité doit apparaître si et seulement si elle n'est pas acquise (durable=${durable})`);
+        } finally {
+          await contexte.close();
+        }
+      }
+    });
 });
 
 describe('Accessibilité et sécurité', () => {
