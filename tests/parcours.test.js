@@ -144,30 +144,40 @@ describe('Filtre par fourchette de cotation', () => {
 });
 
 describe('Légende sur mobile', () => {
-  // Le correctif iOS (champs à 16 px) avait fait gonfler le <select>, qui se
-  // dimensionne sur son option la plus longue : 297 px dans une colonne de
-  // 280, d'où une barre de défilement horizontale sur toute la légende.
-  test('aucun débordement horizontal, mode cotation compris', { timeout: 90000 }, async () => {
-    const contexte = await navigateur.newContext({
-      viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
-    });
-    const page = await contexte.newPage();
-    try {
-      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.maplibregl-canvas', { timeout: 30000 });
-      await page.waitForTimeout(2500);
-
-      const deborde = () => page.evaluate(() => {
-        const el = document.querySelector('.legende-contenu');
-        return el.scrollWidth > el.clientWidth;
+  // Deux débordements distincts sont déjà passés par là, d'où les DEUX
+  // largeurs testées :
+  //  - mobile : le correctif iOS (champs à 16 px) avait fait gonfler le
+  //    <select>, qui se dimensionne sur son option la plus longue — 297 px
+  //    dans une colonne de 280 ;
+  //  - bureau : input[type=range] porte un margin:2px de la feuille de style
+  //    du navigateur, que width:100% et box-sizing ne rattrapent pas.
+  test('aucun débordement horizontal, mode cotation compris', { timeout: 120000 }, async () => {
+    for (const vue of [
+      { largeur: 390, hauteur: 844, tactile: true, nom: 'mobile' },
+      { largeur: 1280, hauteur: 900, tactile: false, nom: 'bureau' },
+    ]) {
+      const contexte = await navigateur.newContext({
+        viewport: { width: vue.largeur, height: vue.hauteur },
+        hasTouch: vue.tactile, isMobile: vue.tactile,
       });
-      assert.equal(await deborde(), false, 'Débordement de la légende au chargement');
+      const page = await contexte.newPage();
+      try {
+        await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.maplibregl-canvas', { timeout: 30000 });
+        await page.waitForTimeout(2500);
 
-      await page.selectOption('#mode-figure', 'cotation');
-      await page.waitForTimeout(700);
-      assert.equal(await deborde(), false, 'Débordement une fois la fourchette affichée');
-    } finally {
-      await contexte.close();
+        const deborde = () => page.evaluate(() => {
+          const el = document.querySelector('.legende-contenu');
+          return el.scrollWidth > el.clientWidth;
+        });
+        assert.equal(await deborde(), false, `Débordement de la légende au chargement (${vue.nom})`);
+
+        await page.selectOption('#mode-figure', 'cotation');
+        await page.waitForTimeout(700);
+        assert.equal(await deborde(), false, `Débordement une fois la fourchette affichée (${vue.nom})`);
+      } finally {
+        await contexte.close();
+      }
     }
   });
 

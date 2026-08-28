@@ -263,13 +263,27 @@ describe('Lisibilité : échelle typographique', () => {
   // iOS Safari zoome la page au focus d'un champ dont la police fait moins de
   // 16 px : la carte saute et il faut pincer pour revenir. Défaut objectif,
   // indépendant de l'échelle choisie.
-  test('les champs de saisie font 16 px sur mobile', async () => {
+  // iOS zoome au focus de TOUT contrôle de formulaire sous 16px, <select>
+  // compris — vérifié en documentation après avoir failli les en exclure.
+  // Le zoom ne se défait pas tout seul : l'utilisateur reste coincé zoomé sur
+  // la carte. Le poids visuel du sélecteur se règle par la POLICE (voir
+  // .legende-figure select), pas par la taille.
+  test('les contrôles de formulaire font 16 px sur mobile', async () => {
     const css = await lire('assets/style-carte.css');
-    const bloc = /\.recherche-champ input,[\s\S]*?\{([\s\S]*?)\}/.exec(css);
-    assert.ok(bloc, 'Règle mobile des contrôles de saisie introuvable');
-    assert.match(bloc[1], /font-size:\s*16px/,
-      'Sous 16px, iOS zoome automatiquement au focus — utiliser 16px en dur, ' +
-      'pas un jeton qui pourrait redescendre.');
+    // Ancrer sur la SECTION mobile : `.recherche-champ input` existe aussi en
+    // règle de base (à --fs-base), qu'un motif non ancré attrapait d'abord.
+    const ancre = css.indexOf('Champs de saisie sur mobile');
+    assert.ok(ancre > -1, 'Section « Champs de saisie sur mobile » introuvable');
+    const section = css.slice(ancre);
+
+    for (const selecteur of ['.recherche-champ input', '#mode-figure', '#cotation-min', '#cotation-max']) {
+      const i = section.indexOf(selecteur);
+      assert.ok(i > -1, `${selecteur} absent de la section mobile`);
+      const regle = /\{([\s\S]*?)\}/.exec(section.slice(i));
+      assert.match(regle[1], /font-size:\s*16px/,
+        `${selecteur} : sous 16px, iOS zoome au focus et ne dézoome pas. ` +
+        '16px en dur, pas un jeton qui pourrait redescendre.');
+    }
   });
 });
 

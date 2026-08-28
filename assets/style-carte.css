@@ -766,10 +766,18 @@
   font-size: var(--fs-base);
 }
 .legende-figure select {
-  /* Même typo que les libellés de légende supprimés (mono, petite taille) :
-     le sélecteur est le TITRE des cercles proportionnels, il doit partager
-     la même voix typographique que le reste de la légende. */
-  font-family: var(--font-mono);
+  /* Police du CORPS, pas mono — contrairement aux sélecteurs de cotation
+     juste en dessous. Le site distingue deux voix : mono pour les boutons et
+     les VALEURS techniques (« ≤ 120 min », « 6a+ »), corps pour les libellés
+     et les champs de formulaire (« Falaises », le champ de recherche). Ce
+     sélecteur porte des PHRASES (« Voies par cotation »), pas des codes : la
+     voix mono lui allait mal, et lui coûtait 25 % de largeur en plus à
+     taille égale (169px contre 127px pour « Voies par cotation » à 16px).
+     Sur mobile la taille est forcée à 16px pour le zoom iOS (voir plus bas) :
+     la police était donc le seul levier restant sur le poids visuel.
+     Les sélecteurs de cotation, eux, gardent le mono — ils portent des
+     codes de difficulté, où la chasse fixe aligne les colonnes. */
+  font-family: var(--font-body);
   font-size: var(--fs-sm);
   padding: 4px 6px;
   border: 1px solid var(--stone-dark);
@@ -806,6 +814,11 @@
 }
 .legende-temps input[type="range"] {
   width: 100%;
+  /* La feuille de style du navigateur pose margin:2px sur input[type=range].
+     Avec width:100% ça déborde du conteneur de 2px de chaque côté — assez
+     pour déclencher une barre de défilement horizontale sur toute la
+     légende. box-sizing:border-box ne rattrape pas les marges. */
+  margin: 0;
   accent-color: var(--forest);
 }
 .filtre-temps-valeur {
@@ -1916,7 +1929,9 @@
    Uniquement sous 640 px : sur desktop le problème n'existe pas, et la
    densité de la colonne y est bien réglée. */
 @media (max-width: 640px) {
-  .recherche-champ input,
+  .recherche-champ input {
+    font-size: 16px;
+  }
   #mode-figure,
   #cotation-min,
   #cotation-max {
