@@ -81,6 +81,14 @@
 
   --radius: 3px;
 
+  /* Hauteur de l'en-tête. Était une constante 44px répétée en dur à quatre
+     endroits (#map, les deux panneaux, la hauteur max de la feuille mobile),
+     donc fausse dès que le contenu de l'en-tête changeait : y ajouter un
+     bouton de 44px l'a fait passer à 65px, et la carte s'est retrouvée
+     masquée sur 21px sans que rien ne le signale. Une seule source de
+     vérité, et l'en-tête y est CONTRAINT (height, pas min-height). */
+  --hauteur-entete: 44px;
+
   --largeur-panneau-gauche: 300px; /* bloc compact recherche+légende, desktop */
   --largeur-panneau-droit: 380px;  /* panneau fiche falaise, desktop */
 }

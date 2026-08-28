@@ -128,7 +128,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 14px;
+  height: var(--hauteur-entete);
+  padding: 0 14px;
   background: var(--paper);
   border-bottom: 1px solid var(--stone-dark);
   font-size: var(--fs-md);
@@ -161,7 +162,7 @@
 
 #map {
   position: absolute;
-  top: 44px; bottom: 0; left: 0; right: 0;
+  top: var(--hauteur-entete); bottom: 0; left: 0; right: 0;
 }
 
 /* Panneau gauche (recherche + légende) et panneau droit (fiche falaise) —
@@ -260,7 +261,7 @@
   #panneau-falaise {
     display: block;
     position: absolute;
-    top: 44px; right: 0; bottom: 0;
+    top: var(--hauteur-entete); right: 0; bottom: 0;
     width: 0;
     overflow: hidden;
     z-index: 10;
@@ -592,7 +593,21 @@
 }
 @media (pointer: coarse) {
   .legende-toggle { min-height: 44px; padding: 4px 12px; }
-  .btn-preparer { min-height: 44px; }
+  /* Le bouton de l'en-tête ne peut PAS grandir : l'en-tête a une hauteur
+     fixe (--hauteur-entete) dont dépend le calage de la carte. On étend donc
+     la zone tactile au-delà de la boîte visible, via un pseudo-élément
+     transparent — la cible fait bien 44px au doigt, la mise en page ne bouge
+     pas d'un pixel. */
+  .btn-preparer { position: relative; }
+  .btn-preparer::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
 }
 
 .legende-toggle-icone {
@@ -1722,8 +1737,8 @@
        (← Sorties / nom de la sortie, voir .map-header) visible même en
        plein détail, repère d'orientation constant — 44px = même valeur que
        #map/#panneau-falaise (top:44px), pas une nouvelle constante. */
-    max-height: calc(100vh - 44px);
-    max-height: calc(100dvh - 44px);
+    max-height: calc(100vh - var(--hauteur-entete));
+    max-height: calc(100dvh - var(--hauteur-entete));
   }
   .popup .poignee-fiche {
     display: flex;
