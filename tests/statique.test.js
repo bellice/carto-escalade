@@ -302,6 +302,59 @@ describe('Sécurité : échappement', () => {
   });
 });
 
+// Le manifeste sert un but précis : un site INSTALLÉ échappe à la purge du
+// stockage (7 jours sans visite chez WebKit) et obtient persist() sans
+// discuter chez Chrome. Sans lui, une préparation hors-ligne faite trop tôt
+// peut avoir disparu à l'arrivée à la falaise. D'où ces vérifications : ce
+// n'est pas de la conformité pour la forme.
+describe('Manifeste et installation', () => {
+  const lireManifeste = async () => JSON.parse(await lire('manifest.webmanifest'));
+
+  test('déclare le minimum exigé pour être installable', async () => {
+    const m = await lireManifeste();
+    for (const champ of ['name', 'short_name', 'start_url', 'scope', 'display', 'icons']) {
+      assert.ok(m[champ], `Champ « ${champ} » manquant`);
+    }
+    assert.equal(m.display, 'standalone');
+    const tailles = m.icons.map((i) => i.sizes);
+    assert.ok(tailles.includes('192x192'), 'Chrome exige une icône de 192px au moins');
+    assert.ok(tailles.includes('512x512'), 'Icône 512px attendue (splash / lanceur)');
+    assert.ok(m.icons.some((i) => i.purpose === 'maskable'),
+      'Sans icône maskable, Android rogne l\'icône carrée dans sa forme de lanceur');
+  });
+
+  // Le piège de ce déploiement : le site est servi depuis un SOUS-CHEMIN
+  // (bellice.github.io/carto-escalade/). Une URL commençant par « / » y
+  // pointerait sur la racine du domaine — l'application s'installerait en
+  // ouvrant une 404.
+  test('toutes ses URL sont relatives (site servi depuis un sous-chemin)', async () => {
+    const m = await lireManifeste();
+    const urls = [m.start_url, m.scope, m.id, ...m.icons.map((i) => i.src)].filter(Boolean);
+    for (const url of urls) {
+      assert.ok(!url.startsWith('/') && !/^https?:/.test(url),
+        `« ${url} » doit être relative : le site n'est pas à la racine du domaine`);
+    }
+  });
+
+  test('les fichiers d\'icônes existent vraiment', async () => {
+    const m = await lireManifeste();
+    for (const src of [...m.icons.map((i) => i.src), 'icones/apple-touch-icon.png']) {
+      await assert.doesNotReject(lire(src), `Icône déclarée mais absente : ${src}`);
+    }
+  });
+
+  test('chaque page lie le manifeste par un chemin qui résout', async () => {
+    for (const page of ['index.html', 'sorties/2026-10-drome-saou/index.html']) {
+      const html = await lire(page);
+      const lien = /<link\s+rel="manifest"\s+href="([^"]+)"/.exec(html);
+      assert.ok(lien, `${page} : pas de <link rel="manifest">`);
+      const resolu = join(RACINE, page, '..', lien[1]);
+      await assert.doesNotReject(readFile(resolu, 'utf8'),
+        `${page} : « ${lien[1] }» ne mène à aucun fichier`);
+    }
+  });
+});
+
 describe('Pages HTML', () => {
   const pages = ['index.html', 'sorties/2026-10-drome-saou/index.html'];
 
