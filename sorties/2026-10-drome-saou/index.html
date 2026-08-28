@@ -5,35 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
 
-  <!-- CSP en <meta> : GitHub Pages ne permet pas d'en-têtes HTTP personnalisés.
-       Défense en profondeur — le site injecte du HTML construit à partir des
-       données (innerHTML dans popups.js) ; si une valeur douteuse passait un
-       jour les échappements (voir escapeHtml/urlSure, utils.js), la CSP
-       empêcherait encore l'exécution.
-       - script-src SANS 'unsafe-inline' : possible parce que les scripts
-         inline ont été externalisés (demarrer-sortie.js).
-       - style-src AVEC 'unsafe-inline' : MapLibre pose des styles en ligne
-         sur ses éléments (marqueurs, popups) ; l'interdire casserait la carte.
-         L'injection de style est par ailleurs sans commune mesure avec celle
-         de script.
-       - worker-src DOIT inclure jsdelivr : MapLibre v6 charge son worker de
-         tuiles directement depuis l'URL du CDN (maplibre-gl-worker.mjs), pas
-         depuis un blob — vérifié en test, l'omettre bloque le worker et la
-         carte reste vide sans lever la moindre violation dans la page (une
-         violation survenue dans un worker ne remonte pas au document).
-       - connect-src : data.geojson + routes/*.json (self) et le fond de carte.
-       - frame-ancestors est volontairement absent : cette directive est
-         ignorée en <meta> (elle exige un vrai en-tête HTTP, impossible sur
-         GitHub Pages). L'anti-clickjacking reste donc hors de portée ici. -->
+  <!-- CSP en <meta> : GitHub Pages n'autorise pas d'en-têtes HTTP.
+       PIÈGE : worker-src DOIT inclure jsdelivr — MapLibre v6 charge
+       maplibre-gl-worker.mjs depuis le CDN, et une violation CSP survenue
+       dans un worker ne remonte PAS au document : l'omettre laisse la carte
+       vide sans la moindre erreur en console.
+       style-src garde 'unsafe-inline' (MapLibre pose des styles en ligne sur
+       ses marqueurs) ; script-src peut s'en passer, les scripts inline ayant
+       été externalisés. frame-ancestors est absent volontairement : cette
+       directive est ignorée en <meta>, l'anti-clickjacking reste hors de
+       portée sur GitHub Pages. Rationnel complet : README.md. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' https://cdn.jsdelivr.net;
     style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
     img-src 'self' data: blob: https://tiles.openfreemap.org;
     font-src 'self' data:;
-  <link rel="manifest" href="../../manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="../../icones/apple-touch-icon.png" />
-  <meta name="theme-color" content="#fbfaf6" />
     connect-src 'self' https://tiles.openfreemap.org https://cdn.jsdelivr.net;
     worker-src 'self' blob: https://cdn.jsdelivr.net;
     child-src 'self' blob: https://cdn.jsdelivr.net;
@@ -44,20 +31,17 @@
 
   <title>Sortie escalade - Drôme, forêt de Saoû</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
+  <link rel="manifest" href="../../manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../../icones/apple-touch-icon.png" />
+  <meta name="theme-color" content="#fbfaf6" />
 
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
 
-  <!-- Le graphe d'imports ES (carte.js -> marqueurs.js -> popups.js/symboles.js...)
-       ne se découvre normalement qu'au fil du parsing de chaque module reçu,
-       en 2-3 aller-retours séquentiels avant qu'initCarte() ne puisse
-       tourner (mesuré : peut ajouter plusieurs centaines de ms sur un signal
-       faible, exactement le contexte d'usage visé). Ces indices demandent au
-       navigateur de tout récupérer en parallèle dès le départ. crossorigin
-       requis pour maplibre-gl.mjs (autre origine) — sans lui, le navigateur
-       le télécharge une seconde fois au moment de l'import réel. Les fichiers
-       maplibre sont PRÉ-CACHÉS par le service worker (voir sw.js) : l'offline
-       reste garanti malgré le CDN. -->
+  <!-- Sans ces indices, le graphe d'imports ES ne se découvre qu'au fil du
+       parsing de chaque module, en 2-3 aller-retours séquentiels.
+       crossorigin est requis sur maplibre-gl.mjs (autre origine) : sans lui
+       le navigateur le retélécharge à l'import réel. -->
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs" crossorigin />
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl-shared.mjs" crossorigin />
   <link rel="modulepreload" href="../../assets/js/carte.js" />
@@ -70,15 +54,9 @@
   <link rel="modulepreload" href="../../assets/js/hors-ligne.js" />
   <link rel="modulepreload" href="../../assets/js/utils.js" />
 
-  <!-- data.geojson (falaises + parkings) ne dépend d'aucun des modules
-       ci-dessus : sans cet indice, son fetch() (dans initCarte, carte.js)
-       n'aurait démarré qu'une fois tout le graphe JS résolu ET exécuté —
-       ici il part en parallèle, dès le parsing HTML. crossorigin (même en
-       same-origin) : requis pour que ce préchargement soit réutilisé par le
-       fetch() réel de carte.js plutôt que retéléchargé une 2e fois — fetch()
-       utilise le mode "cors" par défaut, un preload sans crossorigin ne
-       matche pas ce mode et le navigateur traite les deux comme des
-       requêtes différentes. -->
+  <!-- crossorigin même en same-origin : fetch() est en mode "cors" par
+       défaut, et un preload sans crossorigin ne matche pas ce mode — le
+       fichier serait téléchargé deux fois. -->
   <link rel="preload" href="data.geojson" as="fetch" crossorigin />
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css" />
@@ -90,10 +68,6 @@
   <header class="map-header">
     <a href="../../index.html">← Sorties</a>
     <h1 class="titre">Drôme - forêt de Saoû</h1>
-    <!-- Préparation hors-ligne : action de PRÉPARATION ponctuelle (avant de
-         partir, sur wifi), pas un réglage de carte — elle occupait 53px dans
-         la légende, qui couvrait déjà 49% du viewport mobile. Ici elle reste
-         atteignable en permanence sans rien recouvrir. -->
     <div id="preparation-hors-ligne"></div>
   </header>
 
@@ -120,9 +94,8 @@
           <span class="cle"><span class="dot parking"></span> Parkings</span>
           <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
         </div>
-        <!-- Le sélecteur est le TITRE des cercles proportionnels : placé au-dessus
-             de #legende-falaises (les cercles de référence, ou le message
-             "Zoomez pour voir..." quand on est dézoomé). -->
+        <!-- Le sélecteur est le TITRE des cercles proportionnels rendus juste
+             en dessous : sa place au-dessus de #legende-falaises est voulue. -->
         <div class="legende-figure">
           <select id="mode-figure" aria-label="Nombre représenté par la taille des cercles">
             <option value="aucun">Toutes les voies</option>
@@ -131,10 +104,6 @@
             <option value="gv" id="option-gv">Grandes voies</option>
           </select>
         </div>
-        <!-- Fourchette de cotation : visible uniquement en mode "cotation"
-             (même principe que le filtre de trajet ci-dessous, affiché
-             seulement quand la donnée existe). Remplace l'ancienne option
-             "Nombre de voies 5-6a+", qui figeait ces bornes en dur. -->
         <div class="legende-cotation" id="legende-cotation" hidden>
           <div class="legende-cotation-bornes">
             <label for="cotation-min">De</label>
@@ -155,10 +124,9 @@
     </div>
   </div>
 
-  <!-- Panneau droit (fiche falaise) : sibling de #panneau-lateral, PAS
-       imbriqué dedans — il s'ancre à droite de l'écran, indépendant du
-       panneau gauche (recherche/légende), qui reste stable pendant que
-       celui-ci s'ouvre/se ferme. Voir style-carte.css @media min-width:641px. -->
+  <!-- Sibling de #panneau-lateral, PAS imbriqué dedans : il s'ancre à droite,
+       indépendamment du panneau gauche, qui doit rester stable quand celui-ci
+       s'ouvre. Voir style-carte.css @media (min-width: 641px). -->
   <aside id="panneau-falaise" aria-label="Détails de la falaise" inert>
     <div class="panneau-falaise-interieur">
       <button type="button" class="panneau-falaise-fermer" aria-label="Fermer le panneau">×</button>
@@ -166,19 +134,13 @@
     </div>
   </aside>
 
-  <!-- data-donnees : lu par demarrer-sortie.js. Le chemin reste relatif à
+  <!-- data-donnees est lu par demarrer-sortie.js ; le chemin reste relatif à
        CETTE page, chaque sortie ayant son propre data.geojson. -->
   <div id="map" data-donnees="data.geojson"></div>
 
   <div id="etat-chargement" class="etat-chargement">Chargement de la carte…</div>
 
-  <!-- Un script type="module" s'exécute déjà après la fin du parsing HTML
-       (même garantie que "defer"), donc strictement AVANT que DOMContentLoaded
-       ne se déclenche — attendre cet évènement n'apporterait rien, juste un
-       aller-retour de plus dans la boucle d'évènements avant que le fetch de
-       data.geojson (voir initCarte, carte.js) ne parte réellement.
-       Externalisé (plus de code inline) pour que la CSP ci-dessus puisse
-       refuser 'unsafe-inline' sur les scripts. -->
+  <!-- Externalisé pour que la CSP puisse refuser 'unsafe-inline'. -->
   <script type="module" src="../../assets/js/demarrer-sortie.js"></script>
 </body>
 </html>

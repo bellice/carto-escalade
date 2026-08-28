@@ -96,6 +96,33 @@ par les moteurs de recherche. Ça ne rend pas le site privé : l'URL reste acces
 d'accès, il faudrait un repo privé + GitHub Pages payant, ou un mot de passe côté
 serveur — hors de portée d'un site statique gratuit.
 
+### La CSP, et pourquoi elle est en `<meta>`
+
+GitHub Pages n'autorise aucun en-tête HTTP personnalisé : la politique est
+donc déclarée en `<meta http-equiv>` dans chaque page. C'est de la défense en
+profondeur — le site construit du HTML à partir des données (`innerHTML` dans
+`popups.js`) ; si une valeur douteuse franchissait un jour `escapeHtml` /
+`urlSure` (`utils.js`), la CSP empêcherait encore l'exécution.
+
+Directive par directive, ce qui n'est pas évident :
+
+- **`worker-src` DOIT inclure jsdelivr.** MapLibre v6 charge
+  `maplibre-gl-worker.mjs` directement depuis l'URL du CDN, pas depuis un
+  blob. L'omettre laisse la carte **vide et silencieuse** : une violation CSP
+  survenue dans un worker ne remonte pas au document, donc rien n'apparaît en
+  console. Trouvé en bissectant des variantes de CSP ; un test statique le
+  verrouille désormais.
+- **`style-src` garde `'unsafe-inline'`.** MapLibre pose des styles en ligne
+  sur ses marqueurs et ses popups ; l'interdire casse la carte. L'injection de
+  style est par ailleurs sans commune mesure avec celle de script.
+- **`script-src` s'en passe**, parce que les deux anciens scripts inline ont
+  été externalisés (`demarrer-accueil.js`, `demarrer-sortie.js`).
+- **`frame-ancestors` est absent volontairement** : la directive est ignorée
+  en `<meta>` (elle exige un vrai en-tête). L'anti-clickjacking reste donc
+  hors de portée ici.
+- La page d'accueil, purement statique, applique une politique plus stricte
+  encore : aucune origine tierce.
+
 ## Répliquer pour une nouvelle sortie
 
 1. Dupliquer `sorties/2026-10-drome-saou/` en `sorties/AAAA-MM-lieu/`.
@@ -221,9 +248,14 @@ CRS : **EPSG:4326** obligatoire.
 
 Le cache des tuiles ci-dessus est **réactif** : il ne protège que les zones
 déjà affichées. Arriver sur une falaise jamais consultée, sans réseau,
-donnait donc un fond gris. Le bouton **« Préparer le hors-ligne »** (dans la
-légende, voir `assets/js/hors-ligne.js`) inverse la logique : il télécharge à
-l'avance le fond autour de tous les points de la sortie.
+donnait donc un fond gris. Le bouton **« Préparer »** (dans l'en-tête, voir
+`assets/js/hors-ligne.js`) inverse la logique : il télécharge à l'avance le
+fond autour de tous les points de la sortie.
+
+Ses libellés tiennent dans un budget de 107 px mesuré à 390 px de large, et
+aucun état de repos ne dépasse 98 px : `Préparer` (83) → `Prête` (60). L'état
+terminé **rétrécit** le bouton, jamais l'inverse — un libellé qui s'élargit
+coupait le titre de la sortie et déformait le lien de retour.
 
 - **Disques autour des points, pas le rectangle englobant** : le bbox complet
   de la sortie Drôme représente ~13 000 tuiles / ~650 Mo. Les falaises sont
@@ -238,8 +270,35 @@ l'avance le fond autour de tous les points de la sortie.
 - L'URL des tuiles contient l'horodatage du build planète OpenFreeMap
   (`/planet/20260823_080002_pt/...`). À chaque nouveau build, ce chemin change
   et **toutes les tuiles en cache deviennent inatteignables d'un coup** : la
-  préparation mémorise ce modèle et signale « à repréparer » si le fond a
-  changé depuis.
+  préparation mémorise ce modèle et bascule le bouton sur « Repréparer » si le
+  fond a changé depuis.
+
+### Durabilité du stockage, et installation
+
+Télécharger 21 Mo ne sert à rien si le navigateur les jette avant la sortie.
+Par défaut le stockage d'un site est **best-effort** : évinçable dès que la
+place manque. WebKit va plus loin et supprime le stockage scriptable d'un site
+après **7 jours sans visite** en tant que site principal — soit exactement le
+scénario visé (préparer chez soi, arriver à la falaise deux semaines plus
+tard, sans réseau pour rattraper). Deux parades, cumulables :
+
+- **`navigator.storage.persist()`**, réclamé **au clic sur « Préparer »** et
+  jamais au chargement : les navigateurs accordent sur des heuristiques
+  d'engagement, et une action explicite de l'utilisateur est le meilleur
+  moment pour la demander. `persisted()`, qui ne déclenche aucune permission,
+  est relu au montage pour que l'infobulle dise la vérité à chaque visite. Si
+  la durabilité n'est pas acquise, « Prête » l'annonce et donne la parade :
+  rouvrir le site avant de partir remet à zéro le compteur d'inactivité.
+- **Installer le site** (`manifest.webmanifest`) : un site installé échappe à
+  la purge WebKit des 7 jours, et Chrome accorde alors `persist()` sans
+  discuter. C'est la seule parade fiable sur iPhone.
+
+Le manifeste vit à la racine, avec `icones/`. Toutes ses URL sont
+**relatives** (`start_url: "./"`, `scope: "./"`) : le site est servi depuis un
+sous-chemin (`bellice.github.io/carto-escalade/`), un `/` initial pointerait
+sur la racine du domaine. Les icônes sont les seuls bitmaps du site et ne sont
+jamais sur le chemin de rendu — le navigateur ne les récupère qu'à
+l'installation. Régénérables : `node outils/generer-icones.js`.
 
 Une mise à jour (code ou données : nouveau `data.geojson`, `routes/`) finit
 toujours par arriver toute seule grâce au stale-while-revalidate — au pire
