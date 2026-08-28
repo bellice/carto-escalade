@@ -135,7 +135,15 @@
   font-size: var(--fs-md);
 }
 
+/* flex-shrink: 0 — sans lui, flex rétrécit TOUS les enfants souples quand
+   l'en-tête est à l'étroit, y compris ce lien : mesuré à 62px au lieu de 74,
+   donc sous la largeur de son propre texte, qui repassait alors sur deux
+   lignes (32px de haut dans un en-tête de 44px) — la flèche « se décalait ».
+   Le titre, lui, a min-width:0 + ellipse : c'est LUI qui doit céder, et lui
+   seul. Un élément de navigation ne se déforme pas. */
 .map-header a {
+  flex-shrink: 0;
+  white-space: nowrap;
   text-decoration: none;
   font-family: var(--font-mono);
   font-size: var(--fs-base);
@@ -504,9 +512,12 @@
    dans la légende : c'est une action de préparation ponctuelle (avant de
    partir, sur wifi), pas un réglage de carte. Elle y occupait 53 px alors
    que la légende couvrait déjà 49 % du viewport mobile.
-   Libellé court porté par le bouton lui-même (« Hors-ligne », « 42 % »,
-   « Hors-ligne 27/08 ») : une seconde ligne de statut ne tiendrait pas dans
-   l'en-tête d'un téléphone. L'action complète reste dite par aria-label. */
+   Libellé court porté par le bouton lui-même (« Préparer », « 42 % »,
+   « Prête ») : une seconde ligne de statut ne tiendrait pas dans l'en-tête
+   d'un téléphone. L'action complète reste dite par aria-label + title.
+   Le jeu de libellés est calé sur un budget de 107 px mesuré à 390 px de
+   large, et conçu pour ne jamais s'élargir en cours d'usage — voir le
+   commentaire de `poser` dans hors-ligne.js. */
 #preparation-hors-ligne {
   margin-left: auto;
   flex-shrink: 0;
