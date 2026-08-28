@@ -206,6 +206,76 @@ describe('Légende sur mobile', () => {
   });
 });
 
+describe('En-tête sur mobile', () => {
+  // Régression réelle : une fois la carte préparée, le bouton passait de
+  // « Hors-ligne » (98px) à « Hors-ligne 28/08 » (144px). Le lien de retour
+  // n'avait pas flex-shrink:0 — flex le rétrécissait à 62px, sous la largeur
+  // de son propre texte, qui repassait sur DEUX lignes. D'où la flèche qui
+  // « se décalait » et le titre coupé.
+  // On teste l'invariant plutôt que l'état : quel que soit le libellé porté
+  // par le bouton, la navigation ne doit pas bouger. C'est aussi vrai pour
+  // les libellés d'erreur, qu'on ne peut pas déclencher facilement.
+  test('aucun libellé du bouton ne déforme la navigation', { timeout: 90000 }, async () => {
+    const contexte = await navigateur.newContext({
+      viewport: { width: 360, height: 780 }, hasTouch: true, isMobile: true,
+    });
+    const page = await contexte.newPage();
+    try {
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 30000 });
+      await page.waitForTimeout(2500);
+
+      const depart = await page.evaluate(() => {
+        const b = document.querySelector('.btn-preparer');
+        return { libelle: b.textContent, aria: b.getAttribute('aria-label'), title: b.title };
+      });
+      // Un substantif seul (« Hors-ligne ») se lit comme un STATUT dans un
+      // en-tête ; le libellé au repos doit nommer l'action.
+      assert.equal(depart.libelle, 'Préparer',
+        'Le libellé au repos doit être un verbe d\'action');
+      assert.ok(depart.aria && depart.aria.length > depart.libelle.length,
+        'aria-label doit porter l\'action complète');
+      assert.equal(depart.title, depart.aria,
+        'title et aria-label ne doivent pas diverger');
+
+      const mesurer = (libelle) => page.evaluate((txt) => {
+        const btn = document.querySelector('.btn-preparer');
+        if (txt !== null) btn.textContent = txt;
+        const lien = document.querySelector('.map-header a').getBoundingClientRect();
+        return {
+          lienLargeur: Math.round(lien.width),
+          lienHauteur: Math.round(lien.height),
+          entete: Math.round(document.querySelector('.map-header').getBoundingClientRect().height),
+          bouton: Math.round(btn.getBoundingClientRect().width),
+          deborde: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        };
+      }, libelle);
+
+      const reference = await mesurer(null);
+
+      for (const libelle of ['Préparer', 'Prête', 'Repréparer', 'Annuler', '100 %', 'Espace plein', 'Échec']) {
+        const m = await mesurer(libelle);
+        assert.equal(m.lienLargeur, reference.lienLargeur,
+          `« ${libelle} » rétrécit le lien de retour (${m.lienLargeur}px au lieu de ${reference.lienLargeur})`);
+        assert.ok(m.lienHauteur < 24,
+          `« ${libelle} » fait passer le lien de retour sur deux lignes (${m.lienHauteur}px)`);
+        assert.equal(m.entete, reference.entete,
+          `« ${libelle} » change la hauteur de l'en-tête (${m.entete}px)`);
+        assert.equal(m.deborde, false, `« ${libelle} » provoque un débordement horizontal`);
+      }
+
+      // Le passage « action faite » doit RÉTRÉCIR le bouton, jamais
+      // l'élargir : c'est ce qui rend le défaut d'origine impossible.
+      const action = (await mesurer('Préparer')).bouton;
+      const faite = (await mesurer('Prête')).bouton;
+      assert.ok(faite <= action,
+        `Le libellé de l'état préparé (${faite}px) doit tenir dans celui de l'action (${action}px)`);
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
 describe('Fiche falaise', () => {
   test('affiche les métadonnées, l\'histogramme et la référence topo', { timeout: 90000 }, async () => {
     const { contexte, page } = await nouveauContexte(navigateur);

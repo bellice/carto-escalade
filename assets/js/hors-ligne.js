@@ -168,24 +168,46 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
   const signal = { annule: false, controleur: new AbortController() };
   let enCours = false;
 
-  // aria-label toujours explicite : le libellé visible est volontairement
-  // court pour tenir dans l'en-tête, mais un lecteur d'écran doit entendre
-  // l'action complète, pas « Hors-ligne ».
+  // Le libellé visible est court par contrainte de place ; la description
+  // complète part dans aria-label (lecteurs d'écran) ET title (infobulle au
+  // pointeur), les deux tenus par la même fonction pour qu'ils ne divergent
+  // jamais.
+  //
+  // Budget mesuré dans l'en-tête à 390px : 107px pour ce bouton (viewport
+  // moins paddings, gaps, lien de retour et titre de la sortie). D'où la
+  // règle qui gouverne tous les libellés ci-dessous : aucun état de REPOS ne
+  // dépasse 98px, et le passage « action faite » RÉTRÉCIT le bouton
+  // (Préparer 83px -> Prête 60px) au lieu de l'élargir. Un libellé qui
+  // grossit couperait le titre de la sortie et déformerait l'en-tête —
+  // c'est exactement ce que faisait « Hors-ligne 28/08 » (144px).
+  // Seuls les deux états d'ERREUR s'autorisent à dépasser : ils sont
+  // transitoires (4s) et doivent attirer l'œil.
+  //
+  // « Préparer » et non « Hors-ligne » : un substantif seul dans un en-tête
+  // se lit comme un STATUT (« le site est hors ligne »), pas comme une
+  // action. L'infinitif lève l'ambiguïté ; l'objet (la carte) est donné par
+  // le contexte et par la description.
   const poser = (texte, description) => {
     bouton.textContent = texte;
     bouton.setAttribute('aria-label', description);
+    bouton.title = description;
   };
 
   const majLibelle = () => {
     const etat = lireEtatPreparation();
     if (!etat) {
-      poser('Hors-ligne', 'Préparer la carte pour une utilisation hors ligne');
+      poser('Préparer', 'Préparer la carte pour une utilisation hors ligne');
       bouton.classList.remove('pret');
       return;
     }
-    const quand = new Date(etat.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-    poser(`Hors-ligne ${quand}`,
-      `Carte préparée pour le hors-ligne le ${new Date(etat.date).toLocaleDateString('fr-FR')} `
+    // La date reste dans la description, pas dans le libellé : elle sert à
+    // juger si la préparation est encore bonne, or le code répond déjà à
+    // cette question tout seul (voir le contrôle de gabarit en bas de
+    // fichier, qui bascule sur « Repréparer »). L'afficher en permanence
+    // coûterait la largeur du titre pour une information lue une fois.
+    poser('Prête',
+      `Carte prête pour le hors-ligne — préparée le `
+      + `${new Date(etat.date).toLocaleDateString('fr-FR')} `
       + `(${etat.nbTuiles} tuiles). Activer pour remettre à jour.`);
     bouton.classList.add('pret');
   };
@@ -222,7 +244,7 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
         const { quota = 0, usage = 0 } = await navigator.storage.estimate();
         const besoin = urls.length * 45 * 1024; // ~45 Ko/tuile, mesuré sur la zone
         if (quota && quota - usage < besoin) {
-          poser('Espace insuffisant', 'Espace de stockage insuffisant pour préparer la zone');
+          poser('Espace plein', 'Espace de stockage insuffisant pour préparer la zone');
           enCours = false;
           setTimeout(majLibelle, 4000);
           return;
@@ -270,7 +292,7 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
     gabaritTuiles(map)
       .then((gabarit) => {
         if (modeleDeGabarit(gabarit) !== etat.modele && !enCours) {
-          poser('À repréparer', 'Le fond de carte a été mis à jour : préparation à refaire');
+          poser('Repréparer', 'Le fond de carte a été mis à jour : préparation à refaire');
           bouton.classList.remove('pret');
         }
       })
