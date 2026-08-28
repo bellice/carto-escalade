@@ -228,14 +228,36 @@ describe('Lisibilité : échelle typographique', () => {
   // le test vérifie donc la cible LÀ OÙ elle s'applique, pas partout.
   test('la cible tactile de 44 px est garantie sur pointeur grossier', async () => {
     const css = await lire('assets/style-carte.css');
-    const bloc = /@media \(pointer: coarse\)\s*\{([\s\S]*?)\n\}/.exec(css);
-    assert.ok(bloc, 'Bloc @media (pointer: coarse) introuvable');
-    for (const selecteur of ['.legende-toggle', '.btn-preparer']) {
-      const regle = new RegExp(`\\${selecteur}[^{]*\\{[^}]*min-height:\\s*44px`).exec(bloc[1]);
-      assert.ok(regle,
-        `${selecteur} n'a pas de cible tactile de 44px sous (pointer: coarse). ` +
-        'Le bouton de légende est le seul moyen de rouvrir la légende repliée.');
-    }
+    // Découpage par indexOf plutôt que par expression régulière : le bloc
+    // s'étend sur plusieurs règles, et une regex multiligne ici demandait
+    // des échappements que la moindre réécriture du fichier casse.
+    const debut = css.indexOf('@media (pointer: coarse)');
+    assert.ok(debut > 0, 'Bloc @media (pointer: coarse) introuvable');
+    const bloc = css.slice(debut, css.indexOf('\n}', debut));
+
+    // La légende peut grandir librement : min-height suffit.
+    assert.match(bloc, /\.legende-toggle\s*\{[^}]*min-height:\s*44px/,
+      'Le bouton de légende est le seul moyen de rouvrir la légende repliée.');
+
+    // Le bouton d'en-tête, lui, ne PEUT pas grandir : l'en-tête a une hauteur
+    // fixe dont dépend le calage de la carte (l'avoir fait grossir avait
+    // masqué 21px de carte). Sa cible passe donc par un pseudo-élément qui
+    // déborde de la boîte visible sans toucher à la mise en page.
+    assert.match(bloc, /\.btn-preparer::after\s*\{[^}]*height:\s*44px/,
+      "La cible du bouton d'en-tête doit être étendue par ::after, pas par min-height.");
+  });
+
+  // Le calage de la carte dépend de la hauteur de l'en-tête. Tant qu'elle
+  // était écrite en dur à quatre endroits, tout changement de contenu de
+  // l'en-tête la rendait fausse en silence.
+  test("la hauteur d'en-tête est un jeton, pas une constante répétée", async () => {
+    const carte = await lire('assets/style-carte.css');
+    const base = await lire('assets/style.css');
+    assert.match(base, /--hauteur-entete:\s*\d+px/, 'Jeton --hauteur-entete absent');
+    assert.match(carte, /\.map-header\s*\{[^}]*height:\s*var\(--hauteur-entete\)/,
+      "L'en-tête doit être CONTRAINT à ce jeton (height), sinon son contenu peut le faire grandir.");
+    const enDur = [...carte.matchAll(/^\s*(top|max-height):[^;]*44px/gm)].map(m => m[0].trim());
+    assert.deepEqual(enDur, [], 'Calage encore écrit en dur : utiliser var(--hauteur-entete).');
   });
 
   // iOS Safari zoome la page au focus d'un champ dont la police fait moins de
