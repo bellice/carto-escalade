@@ -28,6 +28,15 @@ const ZOOM_MAX = 14;   // = maxzoom de la source ; au-delà MapLibre sur-zoome
 const MARGE_TUILES = 1; // anneau autour de chaque point (1 => carré 3x3)
 const PARALLELE = 6;    // requêtes simultanées : assez pour saturer une ligne, assez peu pour ne pas se faire limiter
 const CLE_STOCKAGE = 'preparation-hors-ligne';
+// Part minimale de tuiles réellement obtenues en dessous de laquelle on refuse
+// d'appeler ça une préparation. Le module tolère volontairement le partiel
+// (voir telechargerLot : sur un réseau instable, mieux vaut 95 % de la zone
+// que rien) — mais sans plancher, un lot ENTIÈREMENT en échec était enregistré
+// comme une réussite : hors ligne, un clic écrivait « prête, 463 tuiles » en
+// une seconde alors que 465 fichiers sur 469 avaient échoué. Une confiance
+// fausse est pire que pas de fonctionnalité du tout : elle ne se découvre
+// qu'au pied de la falaise, sans réseau pour rattraper.
+const SEUIL_REUSSITE = 0.5;
 
 // --- Conversions géographiques (schéma XYZ standard) ---
 function tuileDe(lon, lat, z) {
@@ -112,9 +121,15 @@ function urlsGlyphes(map) {
 // pas lues : le seul but est que le service worker les intercepte et les
 // range dans son cache (voir sw.js, CACHE_TUILES). Un échec isolé n'arrête
 // pas le lot — sur un réseau instable, mieux vaut 95 % de la zone que rien.
+//
+// Renvoie l'ENSEMBLE des URL en échec, pas seulement leur nombre : l'appelant
+// doit pouvoir distinguer une tuile manquante d'un glyphe manquant, les deux
+// catégories étant mêlées dans le même lot alors que l'état enregistré, lui,
+// compte des tuiles. Sans cette distinction on ne peut pas dire honnêtement
+// ce qui a été obtenu.
 async function telechargerLot(urls, { onProgres, signal }) {
   let faits = 0;
-  let echecs = 0;
+  const echoues = new Set();
   const file = urls.slice();
   const ouvrier = async () => {
     while (file.length) {
@@ -122,16 +137,16 @@ async function telechargerLot(urls, { onProgres, signal }) {
       const url = file.pop();
       try {
         const r = await fetch(url, { signal: signal.controleur.signal });
-        if (!r.ok) echecs++;
+        if (!r.ok) echoues.add(url);
       } catch {
-        echecs++;
+        echoues.add(url);
       }
       faits++;
-      onProgres(faits, echecs);
+      onProgres(faits, echoues.size);
     }
   };
   await Promise.all(Array.from({ length: Math.min(PARALLELE, urls.length) }, ouvrier));
-  return { faits, echecs };
+  return { faits, echoues };
 }
 
 export function lireEtatPreparation() {
@@ -223,21 +238,35 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
   // se lit comme un STATUT (« le site est hors ligne »), pas comme une
   // action. L'infinitif lève l'ambiguïté ; l'objet (la carte) est donné par
   // le contexte et par la description.
+  // La disponibilité se recalcule ICI, à chaque changement de libellé, plutôt
+  // que dans un chemin séparé qu'on oublierait de rappeler : hors ligne,
+  // préparer est impossible — chaque tuile échouerait — donc le bouton se
+  // désactive au lieu d'accepter un clic sans effet possible.
+  // EXCEPTION : pendant une préparation en cours, ce même bouton sert à
+  // ANNULER. Le désactiver parce que le réseau vient de tomber piégerait
+  // l'utilisateur dans un téléchargement qu'il ne pourrait plus interrompre.
   const poser = (texte, description) => {
+    bouton.disabled = !navigator.onLine && !enCours;
     bouton.textContent = texte;
     bouton.setAttribute('aria-label', description);
     bouton.title = description;
   };
 
+  // Ajoutée aux seuls états de REPOS : un message d'erreur qui dit déjà
+  // « impossible sans réseau » n'a pas besoin qu'on le lui répète.
+  const noteReseau = () => (navigator.onLine
+    ? ''
+    : ' Indisponible tant que le réseau manque.');
+
   const majLibelle = () => {
     const etat = lireEtatPreparation();
     if (!etat) {
-      poser('Préparer', 'Préparer la carte pour une utilisation hors ligne');
+      poser('Préparer', 'Préparer la carte pour une utilisation hors ligne.' + noteReseau());
       bouton.classList.remove('pret');
       return;
     }
     if (caduque) {
-      poser('Repréparer', 'Le fond de carte a été mis à jour : préparation à refaire');
+      poser('Repréparer', 'Le fond de carte a été mis à jour : préparation à refaire.' + noteReseau());
       bouton.classList.remove('pret');
       return;
     }
@@ -253,10 +282,18 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
     const reserve = stockagePersistant === false
       ? ' Le navigateur peut libérer cet espace : rouvrez le site peu avant de partir.'
       : '';
+    // Une préparation partielle est légitime (voir SEUIL_REUSSITE) mais ne
+    // doit pas se faire passer pour complète : le compte réel est dit.
+    // nbTuilesVisees peut manquer sur un état écrit par une version
+    // antérieure — dans ce cas on ne prétend rien.
+    const partielle = etat.nbTuilesVisees && etat.nbTuiles < etat.nbTuilesVisees
+      ? ` Préparation partielle : ${etat.nbTuiles} tuiles sur ${etat.nbTuilesVisees}.`
+      : '';
     poser('Prête',
       `Carte prête pour le hors-ligne — préparée le `
       + `${new Date(etat.date).toLocaleDateString('fr-FR')} `
-      + `(${etat.nbTuiles} tuiles). Activer pour remettre à jour.${reserve}`);
+      + `(${etat.nbTuiles} tuiles). Activer pour remettre à jour.${partielle}${reserve}`
+      + noteReseau());
     bouton.classList.add('pret');
   };
 
@@ -282,13 +319,13 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
     try {
       const gabarit = await gabaritTuiles(map);
       const tuiles = tuilesPourPoints(points);
-      const urls = [
-        ...urlsGlyphes(map),
-        ...Array.from(tuiles, (t) => {
-          const [z, x, y] = t.split('/');
-          return gabarit.replace('{z}', z).replace('{x}', x).replace('{y}', y);
-        }),
-      ];
+      // Les tuiles restent isolées des glyphes : c'est sur elles seules que se
+      // juge la réussite, et c'est leur compte qui est enregistré.
+      const urlsTuiles = Array.from(tuiles, (t) => {
+        const [z, x, y] = t.split('/');
+        return gabarit.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+      });
+      const urls = [...urlsGlyphes(map), ...urlsTuiles];
 
       // Prévenir AVANT de lancer si l'espace disponible est manifestement
       // insuffisant : mieux vaut le dire que remplir le quota et voir le
@@ -297,15 +334,17 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
         const { quota = 0, usage = 0 } = await navigator.storage.estimate();
         const besoin = urls.length * 45 * 1024; // ~45 Ko/tuile, mesuré sur la zone
         if (quota && quota - usage < besoin) {
-          poser('Espace plein', 'Espace de stockage insuffisant pour préparer la zone');
+          // enCours remis à false AVANT poser : c'est lui qui décide si le
+          // bouton doit être désactivé (voir poser).
           enCours = false;
+          poser('Espace plein', 'Espace de stockage insuffisant pour préparer la zone');
           setTimeout(majLibelle, 4000);
           return;
         }
       }
 
       const total = urls.length;
-      const { faits, echecs } = await telechargerLot(urls, {
+      const { echoues } = await telechargerLot(urls, {
         signal,
         onProgres: (n) => {
           const pct = Math.round((100 * n) / total);
@@ -314,19 +353,36 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
       });
 
       if (!signal.annule) {
+        const visees = urlsTuiles.length;
+        const obtenues = urlsTuiles.filter((u) => !echoues.has(u)).length;
+
+        // Trop peu de tuiles pour que la zone soit lisible sur le terrain :
+        // on n'écrit RIEN. Un état correct plus ancien survit donc à une
+        // tentative ratée, au lieu d'être écrasé par une fausse réussite.
+        if (visees && obtenues / visees < SEUIL_REUSSITE) {
+          enCours = false;
+          poser('Échec', navigator.onLine
+            ? `Préparation incomplète : ${obtenues} tuiles sur ${visees}. Réseau instable — réessayer sur une meilleure connexion.`
+            : 'Impossible de préparer sans réseau : aucune tuile n\'a pu être téléchargée.');
+          setTimeout(majLibelle, 5000);
+          return;
+        }
+
         caduque = false; // on vient de préparer sur le gabarit courant
         ecrireEtatPreparation({
           date: new Date().toISOString(),
           modele: modeleDeGabarit(gabarit),
-          nbTuiles: tuiles.size,
+          nbTuiles: obtenues,  // ce qui est VRAIMENT en cache, pas ce qui était visé
+          nbTuilesVisees: visees,
         });
-        if (echecs) console.warn(`Préparation hors ligne : ${echecs} tuile(s) manquante(s) sur ${total}`);
+        if (obtenues < visees) {
+          console.warn(`Préparation hors ligne : ${visees - obtenues} tuile(s) manquante(s) sur ${visees}`);
+        }
       }
-      void faits;
     } catch (err) {
       console.error('Préparation hors-ligne', err);
-      poser('Échec', 'La préparation hors ligne a échoué (réseau ?)');
       enCours = false;
+      poser('Échec', 'La préparation hors ligne a échoué (réseau ?)');
       setTimeout(majLibelle, 4000);
       return;
     }
@@ -335,6 +391,11 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
   }
 
   bouton.addEventListener('click', preparer);
+  // Le passage en ligne / hors ligne ne change pas l'ÉTAT de la préparation,
+  // mais change ce qu'on peut en faire : majLibelle repasse par poser, qui
+  // recalcule la disponibilité du bouton.
+  window.addEventListener('online', majLibelle);
+  window.addEventListener('offline', majLibelle);
   majLibelle();
 
   // Relire l'état de persistance au retour sur le site. persisted() ne

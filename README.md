@@ -273,6 +273,38 @@ coupait le titre de la sortie et déformait le lien de retour.
   préparation mémorise ce modèle et bascule le bouton sur « Repréparer » si le
   fond a changé depuis.
 
+**Ce qui est enregistré, et à quelle condition.** `nbTuiles` est le nombre de
+tuiles **réellement obtenues**, pas le nombre visé : c'est la seule valeur sur
+laquelle on puisse fonder une promesse. En dessous de `SEUIL_REUSSITE` (50 %),
+rien n'est écrit du tout — le bouton affiche « Échec » en nommant la cause, et
+un état correct plus ancien survit à la tentative ratée.
+
+Ce plancher répare un défaut franc : le lot était auparavant enregistré comme
+une réussite quel que soit le résultat. Hors ligne, un clic écrivait
+« prête, 463 tuiles » en **une seconde** alors que 465 fichiers sur 469 avaient
+échoué — seul un `console.warn` en gardait trace. Une confiance fausse est pire
+que pas de fonctionnalité : elle ne se découvre qu'au pied de la falaise, sans
+réseau pour rattraper. Le partiel reste toléré au-dessus du seuil (mieux vaut
+95 % de la zone que rien), mais il est alors **dit** dans la description du
+bouton.
+
+Le bouton se **désactive hors ligne**, la raison étant portée par
+`title`/`aria-label` — sauf pendant une préparation en cours, où il sert à
+annuler et doit rester actionnable. Désactiver ne suffit pourtant pas : le
+réseau peut tomber *pendant* le téléchargement, cas le plus réaliste sur la
+route. C'est le plancher ci-dessus qui est le vrai garde-fou.
+
+**L'indicateur hors-ligne** (`.bandeau-hors-ligne`) est une puce **permanente**
+posée sur la carte, en haut à gauche. Permanente parce qu'être hors ligne est
+un *état* et non un évènement : un message qui s'efface laisserait sans réponse
+celui qui regarde l'écran cinq minutes plus tard. Sur la carte plutôt qu'en bas
+parce que **recouvrir le canevas est gratuit — rien d'actionnable n'y est
+caché — tandis que recouvrir de l'interface coûte** : ancrée en bas, la barre
+masquait entièrement l'attribution OpenStreetMap (obligation de crédit),
+mangeait 7 px de la légende dépliée et 27 px de la fiche mobile. Elle ne
+réserve aucune place ; sur desktop elle revient dans le flux du panneau, dont
+la hauteur varie au repli.
+
 ### Durabilité du stockage, et installation
 
 Télécharger 21 Mo ne sert à rien si le navigateur les jette avant la sortie.
