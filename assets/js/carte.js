@@ -1071,7 +1071,12 @@ export function initCarte(dataUrl) {
   bandeauReseau.setAttribute('role', 'status');
   bandeauReseau.textContent = 'Hors ligne — données en cache';
   bandeauReseau.hidden = navigator.onLine;
-  document.body.appendChild(bandeauReseau);
+  // Dans le panneau latéral et non dans <body> : sur desktop il s'y place en
+  // flux sous la légende, dont la hauteur varie au repli — un ancrage en
+  // pixels serait faux la moitié du temps. Sur mobile le panneau n'a aucune
+  // règle (voir style-carte.css) : l'élément s'y positionne contre le
+  // viewport, exactement comme .recherche et .legende le font déjà.
+  (document.getElementById('panneau-lateral') || document.body).appendChild(bandeauReseau);
   const majReseau = () => {
     bandeauReseau.hidden = navigator.onLine;
     // Le réseau revient : on retente automatiquement ce qui avait échoué au

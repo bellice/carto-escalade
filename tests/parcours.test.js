@@ -426,6 +426,121 @@ describe('Résilience réseau', () => {
     }
   });
 
+  // L'indicateur était une barre pleine largeur ancrée en bas, en z-index 30 :
+  // il masquait ENTIÈREMENT l'attribution OpenStreetMap (obligation de
+  // crédit), mangeait 7px de la légende dépliée et 27px de la fiche mobile.
+  // La règle qui en sort : recouvrir le canevas de carte est gratuit,
+  // recouvrir de l'interface ne l'est pas.
+  test('l\'indicateur hors-ligne ne recouvre aucun élément d\'interface',
+    { timeout: 150000 }, async () => {
+      const chevauche = (a, b) => Boolean(a && b)
+        && !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+
+      for (const vue of [
+        { largeur: 390, hauteur: 844, tactile: true, nom: 'mobile' },
+        { largeur: 1280, hauteur: 900, tactile: false, nom: 'bureau' },
+      ]) {
+        const { contexte, page } = await nouveauContexte(navigateur, {
+          viewport: { width: vue.largeur, height: vue.hauteur },
+        });
+        try {
+          await exposerCarte(page);
+          await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+          await attendreCarte(page);
+          await contexte.setOffline(true);
+          await page.waitForTimeout(600);
+
+          const releve = () => page.evaluate(() => {
+            const g = (s) => {
+              const e = document.querySelector(s);
+              if (!e || e.hidden || getComputedStyle(e).display === 'none') return null;
+              const b = e.getBoundingClientRect();
+              return b.width && b.height
+                ? { left: b.left, right: b.right, top: b.top, bottom: b.bottom } : null;
+            };
+            return {
+              puce: g('.bandeau-hors-ligne'),
+              attribution: g('.maplibregl-ctrl-bottom-right'),
+              legende: g('.legende'),
+              fiche: g('.maplibregl-popup'),
+              recherche: g('.recherche'),
+              zoom: g('.maplibregl-ctrl-top-right'),
+            };
+          });
+
+          const controler = async (etat) => {
+            const r = await releve();
+            assert.ok(r.puce, `${vue.nom} / ${etat} : l'indicateur doit être visible hors ligne`);
+            assert.ok(r.attribution,
+              `${vue.nom} / ${etat} : l'attribution OpenStreetMap doit rester visible`);
+            for (const cible of ['attribution', 'legende', 'fiche', 'recherche', 'zoom']) {
+              assert.equal(chevauche(r.puce, r[cible]), false,
+                `${vue.nom} / ${etat} : l'indicateur recouvre ${cible}`);
+            }
+          };
+
+          await controler('au repos');
+          // Légende dépliée puis fiche ouverte : les deux états qui remplissent
+          // le bas de l'écran, donc ceux où l'ancien bandeau gênait.
+          await ouvrirFalaise(page, REPERES.lesRoches);
+          await controler('fiche ouverte');
+        } finally {
+          await contexte.close();
+        }
+      }
+    });
+
+  // Le pire défaut trouvé sur cette fonctionnalité : hors ligne, un clic sur
+  // « Préparer » enregistrait « prête, 463 tuiles » en UNE seconde alors que
+  // 465 fichiers sur 469 avaient échoué. Une confiance fausse ne se découvre
+  // qu'au pied de la falaise, sans réseau pour rattraper.
+  test('hors ligne, préparer est refusé et n\'enregistre aucune fausse réussite',
+    { timeout: 120000 }, async () => {
+      const { contexte, page } = await nouveauContexte(navigateur);
+      try {
+        await exposerCarte(page);
+        await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+        await page.evaluate(() => localStorage.removeItem('preparation-hors-ligne'));
+
+        await contexte.setOffline(true);
+        await page.waitForTimeout(600);
+
+        const bouton = () => page.evaluate(() => {
+          const b = document.querySelector('.btn-preparer');
+          return { libelle: b.textContent, desactive: b.disabled, title: b.title };
+        });
+        const avant = await bouton();
+        assert.equal(avant.desactive, true,
+          'Hors ligne, préparer ne peut rien produire : le bouton doit être désactivé');
+        assert.match(avant.title, /réseau/i, 'La raison doit être dite, pas seulement le grisé');
+
+        // Clic forcé : désactiver ne suffit pas, le réseau peut aussi tomber
+        // PENDANT une préparation. C'est le garde-fou sur le résultat qui doit
+        // tenir, seul.
+        await page.evaluate(() => {
+          const b = document.querySelector('.btn-preparer');
+          b.disabled = false;
+          b.click();
+        });
+        await page.waitForFunction(
+          () => !/%|Annuler/.test(document.querySelector('.btn-preparer').textContent),
+          { timeout: 60000 }
+        );
+
+        const apres = await bouton();
+        assert.equal(apres.libelle, 'Échec',
+          'Un lot entièrement en échec ne doit jamais s\'afficher comme une réussite');
+        assert.equal(
+          await page.evaluate(() => localStorage.getItem('preparation-hors-ligne')), null,
+          'Aucun état ne doit être écrit : un état correct antérieur doit survivre'
+        );
+        assert.match(apres.title, /sans réseau/i, 'La cause doit être nommée');
+      } finally {
+        await contexte.close();
+      }
+    });
+
   // Régression réelle : un module ajouté sans être pré-caché faisait échouer
   // l'import et donc TOUTE la carte, au premier chargement hors ligne.
   test('la page se recharge entièrement hors ligne', { timeout: 120000 }, async () => {

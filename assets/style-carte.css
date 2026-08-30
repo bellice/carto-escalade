@@ -232,6 +232,19 @@
   }
   #panneau-lateral > .recherche { border-bottom: 1px solid var(--stone-dark); }
 
+  /* Sur desktop l'indicateur hors-ligne revient dans le flux, en dernière
+     ligne du panneau : la légende se replie et se déplie, donc sa hauteur
+     varie — l'ancrage en pixels de la règle mobile serait faux la moitié du
+     temps. Coins droits, le panneau ayant lui-même overflow:auto qui découpe
+     aux siens. */
+  #panneau-lateral > .bandeau-hors-ligne {
+    position: static;
+    border-radius: 0;
+    padding: 6px 16px;
+    text-align: center;
+    white-space: normal;
+  }
+
   /* Sur desktop, .legende-contenu vit DANS la carte #panneau-lateral
      (bordure + fond + ombre sur tout le panneau) : son propre cadre
      (bordure/fond/padding) serait une "boîte dans la boîte" redondante. On
@@ -466,21 +479,34 @@
   cursor: pointer;
 }
 
-/* Bandeau hors-ligne : en bas, discret, non bloquant — il informe, il
-   n'interrompt pas (le site reste pleinement utilisable en cache). role=status
-   (et non alert) : annoncé sans voler le focus. */
+/* Indicateur hors-ligne — non bloquant : il informe, il n'interrompt pas (le
+   site reste pleinement utilisable en cache). role=status et non alert :
+   annoncé sans voler le focus.
+
+   PERSISTANT et TEXTUEL, par principe : être hors ligne est un ÉTAT durable,
+   pas un évènement. Un message qui s'efface au bout de quelques secondes
+   laisserait sans réponse celui qui regarde l'écran cinq minutes plus tard
+   (visibilité de l'état du système) ; une simple marque colorée échouerait à
+   WCAG 1.4.1.
+
+   PUCE POSÉE SUR LA CARTE, et non plus barre pleine largeur ancrée en bas :
+   recouvrir le canevas est gratuit — rien d'actionnable n'y est caché —
+   tandis que recouvrir de l'interface coûte. En bas, mesuré à 390x844, il
+   masquait ENTIÈREMENT l'attribution OpenStreetMap (y 800-844, obligation de
+   crédit), mangeait 7px de la légende dépliée et 27px de la fiche mobile.
+   Ici il ne réserve aucune place : la carte ne perd pas un pixel. */
 .bandeau-hors-ligne {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  top: 101px; /* sous .recherche : top 54 + ~39 de hauteur + 8 d'air */
+  left: 12px;
   z-index: 30;
-  padding: 6px 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius);
   background: var(--clay-dark);
   color: white;
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  text-align: center;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
 }
 .bandeau-hors-ligne[hidden] { display: none; }
 
@@ -539,6 +565,16 @@
 .btn-preparer.pret {
   border-color: var(--cotation);
   color: var(--cotation);
+}
+/* Hors ligne, préparer ne peut rien produire : chaque tuile échouerait. Le
+   bouton se désactive (voir poser, hors-ligne.js) plutôt que d'accepter un
+   clic sans effet — la raison est dite dans title/aria-label, l'état grisé
+   seul ne l'expliquerait pas. --muted plutôt qu'une opacité : 6,19:1 sur
+   --paper, donc lisible, là où opacity:0.5 aurait dilué aussi la bordure. */
+.btn-preparer:disabled {
+  border-color: var(--stone-dark);
+  color: var(--muted);
+  cursor: not-allowed;
 }
 
 
@@ -1974,6 +2010,7 @@
   .btn-reessayer:hover { background: var(--stone); }
   .btn-reessayer-voies:hover { background: var(--stone); }
   .btn-preparer:hover { background: var(--stone); }
+  .btn-preparer:disabled:hover { background: var(--paper); }
   .legende-toggle:hover { background: var(--stone-dark); }
   .btn-voir-detail-voies:hover { background: var(--stone); }
   .btn-retour-fiche:hover { background: var(--stone); }
