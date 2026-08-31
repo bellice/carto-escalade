@@ -33,6 +33,7 @@ const PRECACHE = [
   './assets/style.css',
   './assets/style-carte.css',
   './assets/js/carte.js',
+  './assets/js/actions-fiche.js',
   './assets/js/carte-utils.js',
   './assets/js/demarrer-accueil.js',
   './assets/js/demarrer-sortie.js',
