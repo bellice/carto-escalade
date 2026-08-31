@@ -11,10 +11,11 @@ import {
   cotationVersValeur, approximerCotation,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
-import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, synchroniserPoignee, afficherDetailVoies, masquerDetailVoies, basculerTriDetailVoies, remplirPlaceholderVoies } from './marqueurs.js';
+import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, masquerDetailVoies } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
 import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop, dureeAnimation } from './carte-utils.js';
 import { monterPreparationHorsLigne } from './hors-ligne.js';
+import { cablerActionsFiche } from './actions-fiche.js';
 
 // Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
 // point uniforme (voir appliquerSimplificationZoom dans initCarte) — à
@@ -315,121 +316,16 @@ export function initCarte(dataUrl) {
   });
 
   // Actions du contenu de popup (poignée, copier, lien vers un secteur) :
-  // UN SEUL écouteur délégué, posé une fois ici, qui retrouve sa cible via
-  // closest() à chaque clic — plutôt que ré-attacher des écouteurs sur des
-  // nœuds DOM précis à chaque ouverture (ancien attachPopupActions). Robuste
-  // à toute réécriture ultérieure du contenu par MapLibre, quelle qu'en soit
-  // la cause exacte (bug observé : la poignée ne répondait plus après avoir
-  // déplacé la carte).
-  document.addEventListener('click', (e) => {
-    const poignee = e.target.closest('.poignee-fiche');
-    if (poignee) {
-      const contenu = poignee.closest('.maplibregl-popup-content');
-      if (!contenu) return;
-      ficheReduite = contenu.classList.toggle('fiche-reduite');
-      synchroniserPoignee(poignee, ficheReduite);
-      return;
-    }
-
-    // "Voir le détail des voies" / "Retour" : swap de contenu dans le même
-    // .popup (mobile ou panneau desktop), voir afficherDetailVoies/
-    // masquerDetailVoies (marqueurs.js) pour la mécanique DOM complète.
-    const btnDetail = e.target.closest('.btn-voir-detail-voies');
-    if (btnDetail) {
-      const popupEl = btnDetail.closest('.popup');
-      const placeholder = btnDetail.closest('.voies-histo-placeholder');
-      if (popupEl && placeholder) {
-        afficherDetailVoies(popupEl, placeholder.dataset.routeFalaise);
-      }
-      return;
-    }
-    const btnRetour = e.target.closest('.btn-retour-fiche');
-    if (btnRetour) {
-      const popupEl = btnRetour.closest('.popup');
-      // ficheReduite (variable de module, plus haut) : restaure l'état
-      // replié/déplié tel qu'il était AVANT l'ouverture du détail (jamais
-      // modifié par afficherDetailVoies, voir marqueurs.js).
-      if (popupEl) masquerDetailVoies(popupEl, ficheReduite);
-      return;
-    }
-    // Bascule Cotation/Position (voir popups.js, construireDetailVoies) :
-    // même chemin data-route-falaise que "Voir le détail des voies"
-    // ci-dessus, le bouton de tri vit dans le même .voies-histo-placeholder.
-    // "Réessayer" après un échec de chargement du détail des voies (voir
-    // marqueurs.js) : on repart du placeholder lui-même, qui porte encore ses
-    // data-route/data-route-falaise.
-    const btnReessayer = e.target.closest('.btn-reessayer-voies');
-    if (btnReessayer) {
-      const placeholder = btnReessayer.closest('.voies-histo-placeholder');
-      if (placeholder) remplirPlaceholderVoies(placeholder, (id) => baseRoutes + id + '.json');
-      return;
-    }
-
-    const btnTri = e.target.closest('.btn-tri-voies');
-    if (btnTri) {
-      const popupEl = btnTri.closest('.popup');
-      const placeholder = btnTri.closest('.voies-histo-placeholder');
-      if (popupEl && placeholder) {
-        basculerTriDetailVoies(popupEl, placeholder.dataset.routeFalaise, btnTri.dataset.tri);
-      }
-      return;
-    }
-
-    const gpsBtn = e.target.closest('.gps-copie');
-    if (gpsBtn) {
-      // Bascule le mot d'action, jamais la valeur : la laisser affichée
-      // pendant la confirmation permet de relire ce qu'on vient de copier.
-      const action = gpsBtn.querySelector('.gps-action');
-      const coords = `${Number(gpsBtn.dataset.lat).toFixed(5)}, ${Number(gpsBtn.dataset.lon).toFixed(5)}`;
-      navigator.clipboard.writeText(coords).then(() => {
-        if (action) action.textContent = 'Copié !';
-        gpsBtn.classList.add('copied');
-        setTimeout(() => {
-          if (action) action.textContent = 'Copier';
-          gpsBtn.classList.remove('copied');
-        }, 1500);
-      });
-      return;
-    }
-
-    // Partager cette falaise (voir popups.js, popupFalaise) : construit le
-    // même lien profond que lit le handler ?falaise= plus haut (initCarte) —
-    // navigator.share() sur les navigateurs qui le supportent (feuille de
-    // partage native, mobile surtout), repli presse-papiers sinon, même
-    // mécanique de confirmation que .gps-copie ci-dessus (texte du bouton
-    // lui-même, pas de mot-action séparé à gérer ici).
-    const btnPartager = e.target.closest('.btn-partager');
-    if (btnPartager) {
-      const url = `${location.origin}${location.pathname}?falaise=${encodeURIComponent(btnPartager.dataset.cle)}`;
-      if (navigator.share) {
-        navigator.share({ title: btnPartager.dataset.nom, url }).catch(() => {});
-      } else {
-        const texteOriginal = btnPartager.textContent;
-        navigator.clipboard.writeText(url).then(() => {
-          btnPartager.textContent = 'Lien copié !';
-          setTimeout(() => { btnPartager.textContent = texteOriginal; }, 1500);
-        });
-      }
-      return;
-    }
-
-    // Les lignes .parking-ligne (fiche falaise) empruntent le même chemin que
-    // les .lien-secteur : navigation + garde du panneau ouvert sur desktop.
-    const lienSecteur = e.target.closest('.lien-secteur, .parking-ligne');
-    if (lienSecteur) {
-      const popupEl = lienSecteur.closest('.popup');
-      const origineCle = popupEl ? popupEl.dataset.cle : undefined;
-      // Même garde que ouvrirFalaise : sur desktop, si c'est le panneau droit
-      // (fiche falaise) qui est ouvert, on le LAISSE en place — les panneaux
-      // gauche et droit sont indépendants, garder la card ouverte conserve le
-      // contexte pendant qu'on affiche le parking associé (lien "Voir sur la
-      // carte"). Sinon (popup parking/gîte flottante, ou mobile) comportement
-      // inchangé : une seule fiche à la fois.
-      if (popupOuverte && !(estDesktop() && popupOuverte.estPanneauFalaise)) {
-        popupOuverte.remove();
-      }
-      allerVers(lienSecteur.dataset.nom, origineCle);
-    }
+  // Actions du contenu des fiches (poignée, détail des voies, tri, GPS,
+  // partage, navigation) : voir actions-fiche.js. Extrait d'ici parce que ce
+  // répartiteur de 120 lignes ne touchait que trois variables de cette
+  // closure — d'où les quatre rappels ci-dessous, et rien de plus.
+  cablerActionsFiche({
+    urlRoute: (id) => baseRoutes + id + '.json',
+    lireFicheReduite: () => ficheReduite,
+    ecrireFicheReduite: (v) => { ficheReduite = v; },
+    popupCourante: () => popupOuverte,
+    allerVers,
   });
 
   // Simplifie TOUS les marqueurs en petit point uniforme sous
