@@ -139,10 +139,16 @@ a:visited { color: var(--forest); }
   border-bottom: 1px solid var(--stone-dark);
 }
 
+/* Le lieu sur sa ligne, l'évènement en dessous — et non côte à côte : un nom
+   de territoire (« Vallée de la Drôme et Diois ») et une date en toutes
+   lettres ne tiennent pas ensemble sur 390px, les deux passaient sur deux
+   lignes entremêlées. La colonne dit aussi la bonne hiérarchie : le lieu est
+   permanent, la sortie n'est qu'un évènement qui s'y rattache. */
 .sortie-list a {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   padding: 16px 4px;
   text-decoration: none;
   color: var(--ink);
@@ -151,8 +157,16 @@ a:visited { color: var(--forest); }
 .sortie-list a:hover { color: var(--clay); }
 
 .sortie-list .nom { font-weight: 600; }
+.sortie-list .chiffres,
 .sortie-list .date {
   font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.note-preparer {
+  margin: 28px 0 0;
+  max-width: 34em;
   font-size: var(--fs-base);
   color: var(--muted);
 }
