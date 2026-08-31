@@ -75,7 +75,12 @@
   <div id="panneau-lateral" role="region" aria-label="Recherche et légende de la carte">
     <div class="recherche">
       <div class="recherche-champ">
-        <input type="search" list="falaises-liste" placeholder="Chercher une falaise…" aria-label="Rechercher une falaise" />
+        <!-- Le champ cherche dans le site, le nom de falaise, le secteur et
+             les noms de parking : « Chercher une falaise » en cachait les
+             trois quarts. Placeholder court par contrainte de largeur (161px
+             utiles) ; l'aria-label, lui, est complet — il n'a pas cette
+             contrainte. -->
+        <input type="search" list="falaises-liste" placeholder="Site, falaise, secteur…" aria-label="Rechercher un site, une falaise, un secteur ou un parking" />
         <button type="button" class="btn-effacer" aria-label="Effacer la recherche" hidden>×</button>
       </div>
       <datalist id="falaises-liste"></datalist>

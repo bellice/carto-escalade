@@ -147,7 +147,12 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     return {
       cat, cle, nom: p.nom, secteur: secteurDistinct(p), lon, lat,
       parkingAssocie, p,
-      recherche: libelleFalaise(p).toLowerCase(),
+      // Le SITE est inclus en plus de « nom · secteur » : sans lui, taper
+      // « Saoû » ne renvoyait rien alors que 40 des 111 secteurs en dépendent
+      // — c'est pourtant le nom que tout le monde emploie. Idem « Crest »,
+      // dont la falaise s'appelle « Les Roches ». Le site n'est pas affiché
+      // dans le libellé, il sert uniquement à la correspondance.
+      recherche: `${libelleFalaise(p)} ${p.site || ''}`.toLowerCase(),
       nbVoies: p.nb_voie_total ?? 0,
       nbFaciles: p.nb_faciles ?? 0,
       // {cotation: nombre} : permet le filtre par fourchette sans télécharger
