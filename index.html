@@ -17,7 +17,7 @@
     form-action 'none';
     object-src 'none'
   " />
-  <title>Sorties escalade</title>
+  <title>Tokelau</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icones/apple-touch-icon.png" />
@@ -26,17 +26,37 @@
 </head>
 <body>
   <div class="home">
-    <h1>Sorties escalade</h1>
-    <p class="tagline">falaises · parkings · approches</p>
+    <h1>Tokelau</h1>
+    <!-- « hors réseau » en 4e valeur : les trois premiers mots décrivent le
+         contenu de la carte, celui-là dit ce qui distingue ce site d'Oblyk ou
+         theCrag — le seul terrain où il peut gagner. -->
+    <p class="tagline">falaises · parkings · approches · hors&nbsp;réseau</p>
 
     <ul class="sortie-list">
       <li>
-        <a href="drome-saou/">
-          <span class="nom">Drôme - forêt de Saoû</span>
-          <span class="date">2026-10</span>
+        <a href="vallee-drome-diois/">
+          <span class="nom">Vallée de la Drôme et Diois</span>
+          <!-- SECTEURS et non falaises : un enregistrement = un couple
+               site+secteur, et 37 noms de falaise seulement se partagent les
+               111 (Grand Regardé en compte 6 à lui seul). Un libellé posé sur
+               un marqueur peut rester approximatif, un COMPTE non.
+               Chiffres relevés dans data.geojson, vérifiés par un test
+               statique : sans lui, une régénération ferait mentir cette page
+               en silence. -->
+          <span class="chiffres">21 sites · 111 secteurs · 1 569 voies</span>
+          <span class="date">sortie en octobre 2026</span>
         </a>
       </li>
     </ul>
+
+    <!-- La phrase la plus utile de la page : elle nomme la seule action qui
+         doit avoir lieu AVANT de quitter le wifi. Le bouton correspondant vit
+         dans l'en-tête de la carte, donc invisible d'ici.
+         L'instruction vient EN PREMIER, le clin d'œil ensuite (une prise
+         d'escalade, une prise réseau) : l'inverse ferait passer la blague
+         avant le message, et le message est le seul qui compte ici. -->
+    <p class="note-preparer">Préparez la carte avant de partir : au pied de la
+      voie, la seule prise sera dans le rocher.</p>
   </div>
 
   <!-- Externalisé (voir demarrer-accueil.js / sw-client.js) : sans script

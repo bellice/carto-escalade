@@ -78,7 +78,7 @@ describe('Données exportées', () => {
   // repassait à null partout et le curseur « Trajet depuis le gîte »
   // disparaissait du site — silencieusement.
   test('les parkings ont tous un temps de trajet depuis le gîte', async () => {
-    const geo = JSON.parse(await lire('drome-saou/data.geojson'));
+    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
     const parkings = geo.features.filter((f) => f.properties.categorie === 'parking');
 
     assert.ok(parkings.length > 0, 'Aucun parking dans data.geojson');
@@ -89,7 +89,7 @@ describe('Données exportées', () => {
   });
 
   test('la table des sources porte auteur et année exploitables', async () => {
-    const geo = JSON.parse(await lire('drome-saou/data.geojson'));
+    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
     assert.ok(Array.isArray(geo.sources) && geo.sources.length, 'geojson.sources absent');
 
     for (const s of geo.sources) {
@@ -108,7 +108,7 @@ describe('Données exportées', () => {
   // faudrait télécharger routes/*.json (350 Ko) juste pour savoir quelles
   // falaises afficher.
   test('chaque falaise sportive embarque sa répartition de cotations', async () => {
-    const geo = JSON.parse(await lire('drome-saou/data.geojson'));
+    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
     const sportives = geo.features.filter((f) => (f.properties.nb_voie_sportive || 0) > 0);
 
     assert.ok(sportives.length > 0, 'Aucune falaise sportive dans data.geojson');
@@ -126,14 +126,44 @@ describe('Données exportées', () => {
   });
 
   test('chaque falaise avec des voies pointe vers un fichier routes existant', async () => {
-    const geo = JSON.parse(await lire('drome-saou/data.geojson'));
-    const fichiers = new Set(await readdir(join(RACINE, 'drome-saou/routes')));
+    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
+    const fichiers = new Set(await readdir(join(RACINE, 'vallee-drome-diois/routes')));
 
     for (const f of geo.features) {
       const p = f.properties;
       if (!p.routes) continue;
       assert.ok(fichiers.has(`${p.routes}.json`),
         `${p.nom} référence routes/${p.routes}.json, absent du dépôt`);
+    }
+  });
+
+  // Un marqueur = un couple site+secteur, PAS une falaise : seulement 37 noms
+  // de falaise se partagent les 111 enregistrements (Grand Regardé en compte 6
+  // à lui seul). Un libellé posé sur UN marqueur peut rester approximatif, un
+  // COMPTE non — l'accueil annonçait « 111 falaises » à tort.
+  // Les chiffres restent écrits en dur dans index.html : régénérer les données
+  // ne le toucherait pas, la page mentirait donc sans ce garde-fou.
+  test("les chiffres de l'accueil correspondent aux données", async () => {
+    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
+    const secteurs = geo.features.filter((f) => f.properties.categorie === 'falaise');
+    const sites = new Set(secteurs.map((f) => f.properties.site)).size;
+    const voies = secteurs.reduce((n, f) => n + (f.properties.nb_voie_total || 0), 0);
+
+    const html = await lire('index.html');
+    const ligne = /<span class="chiffres">([^<]+)<\/span>/.exec(html);
+    assert.ok(ligne, "Ligne de chiffres absente de l'accueil");
+
+    // Découpage sur le point médian plutôt qu'une expression régulière : la
+    // ligne en porte déjà un par compteur, et retirer tout ce qui n'est pas un
+    // chiffre rend la lecture insensible à l'espace des milliers (« 1 569 »).
+    const compteur = (libelle) => {
+      const part = ligne[1].split('·').find((x) => x.includes(libelle));
+      return part ? Number(part.replace(/[^0-9]/g, '')) : null;
+    };
+    for (const [libelle, attendu] of [['sites', sites], ['secteurs', secteurs.length], ['voies', voies]]) {
+      assert.equal(compteur(libelle), attendu,
+        `Accueil : « ${ligne[1]} » annonce un nombre de ${libelle} périmé ` +
+        `(${attendu} dans les données). Mettre index.html à jour.`);
     }
   });
 });
@@ -358,7 +388,7 @@ describe('Manifeste et installation', () => {
   });
 
   test('chaque page lie le manifeste par un chemin qui résout', async () => {
-    for (const page of ['index.html', 'drome-saou/index.html']) {
+    for (const page of ['index.html', 'vallee-drome-diois/index.html']) {
       const html = await lire(page);
       const lien = /<link\s+rel="manifest"\s+href="([^"]+)"/.exec(html);
       assert.ok(lien, `${page} : pas de <link rel="manifest">`);
@@ -370,7 +400,7 @@ describe('Manifeste et installation', () => {
 });
 
 describe('Pages HTML', () => {
-  const pages = ['index.html', '404.html', 'drome-saou/index.html'];
+  const pages = ['index.html', '404.html', 'vallee-drome-diois/index.html'];
 
   test('chaque page a exactement un <h1>', async () => {
     for (const page of pages) {
@@ -401,7 +431,7 @@ describe('Pages HTML', () => {
   });
 
   test('la CSP de la page carte autorise le worker MapLibre depuis le CDN', async () => {
-    const html = await lire('drome-saou/index.html');
+    const html = await lire('vallee-drome-diois/index.html');
     // On extrait la valeur de l'attribut content, PAS le HTML brut : le
     // commentaire qui précède la balise mentionne lui aussi « worker-src »,
     // et une recherche naïve tomberait dessus (erreur commise en écrivant ce

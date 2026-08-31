@@ -54,8 +54,8 @@ const PRECACHE = [
   // (leurs URLs dépendent du modèle du jour) : mises en cache au fil des vues.
   'https://tiles.openfreemap.org/styles/positron',
   // Sorties (une entrée par dossier) :
-  './drome-saou/index.html',
-  './drome-saou/data.geojson',
+  './vallee-drome-diois/index.html',
+  './vallee-drome-diois/data.geojson',
 ];
 
 // Sans ce pré-cache, la première ouverture d'une fiche paie une latence

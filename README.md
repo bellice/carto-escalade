@@ -38,7 +38,7 @@ assets/
                        de la zone (voir "Hors-ligne")
     utils.js         → escapeHtml (sûr en attribut) + urlSure (schémas
                        autorisés pour les href issus des données)
-drome-saou/          → un dossier par LIEU, pas par sortie : les falaises
+vallee-drome-diois/          → un dossier par LIEU, pas par sortie : les falaises
                        ne bougent pas, la date et le gîte si
     index.html       → page carte de ce lieu
     data.geojson     → falaises + parkings, version LÉGÈRE (sans le détail des
@@ -140,7 +140,7 @@ Directive par directive, ce qui n'est pas évident :
 
 ## Répliquer pour un nouveau lieu
 
-1. Dupliquer `drome-saou/` en `<lieu>/`.
+1. Dupliquer `vallee-drome-diois/` en `<lieu>/`.
 2. Depuis le repo de génération (voir plus bas), lancer **une seule commande** :
    `uv run scripts/tout_regenerer.py --lieu <lieu>`
    — elle enchaîne base → temps de trajet → export → copie, dans cet ordre.
