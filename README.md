@@ -38,9 +38,9 @@ assets/
                        de la zone (voir "Hors-ligne")
     utils.js         → escapeHtml (sûr en attribut) + urlSure (schémas
                        autorisés pour les href issus des données)
-sorties/
-  2026-10-drome-saou/
-    index.html       → page carte de cette sortie
+drome-saou/          → un dossier par LIEU, pas par sortie : les falaises
+                       ne bougent pas, la date et le gîte si
+    index.html       → page carte de ce lieu
     data.geojson     → falaises + parkings, version LÉGÈRE (sans le détail des
                        voies, compteurs précalculés) — généré depuis une base DuckDB
     routes/          → détail des voies, 1 fichier par SITE (chargé à la
@@ -138,11 +138,11 @@ Directive par directive, ce qui n'est pas évident :
 - La page d'accueil, purement statique, applique une politique plus stricte
   encore : aucune origine tierce.
 
-## Répliquer pour une nouvelle sortie
+## Répliquer pour un nouveau lieu
 
-1. Dupliquer `sorties/2026-10-drome-saou/` en `sorties/AAAA-MM-lieu/`.
+1. Dupliquer `drome-saou/` en `<lieu>/`.
 2. Depuis le repo de génération (voir plus bas), lancer **une seule commande** :
-   `uv run scripts/tout_regenerer.py --sortie AAAA-MM-lieu`
+   `uv run scripts/tout_regenerer.py --lieu <lieu>`
    — elle enchaîne base → temps de trajet → export → copie, dans cet ordre.
    Ça remplace `data.geojson` (version légère, sans le détail des voies)
    ET le dossier `routes/` (détail par site, chargé à la demande).

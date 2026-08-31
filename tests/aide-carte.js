@@ -19,7 +19,7 @@ export const REPERES = {
   chironne: { nom: 'Rocher de Chironne', coord: [5.391514, 44.840549] },
 };
 
-export const CHEMIN_SORTIE = '/sorties/2026-10-drome-saou/index.html';
+export const CHEMIN_SORTIE = '/drome-saou/index.html';
 
 // Rend l'objet Map accessible depuis les tests. On insère l'affectation juste
 // après la construction, dans une copie servie à la volée : le fichier du

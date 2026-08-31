@@ -78,7 +78,7 @@ describe('Données exportées', () => {
   // repassait à null partout et le curseur « Trajet depuis le gîte »
   // disparaissait du site — silencieusement.
   test('les parkings ont tous un temps de trajet depuis le gîte', async () => {
-    const geo = JSON.parse(await lire('sorties/2026-10-drome-saou/data.geojson'));
+    const geo = JSON.parse(await lire('drome-saou/data.geojson'));
     const parkings = geo.features.filter((f) => f.properties.categorie === 'parking');
 
     assert.ok(parkings.length > 0, 'Aucun parking dans data.geojson');
@@ -89,7 +89,7 @@ describe('Données exportées', () => {
   });
 
   test('la table des sources porte auteur et année exploitables', async () => {
-    const geo = JSON.parse(await lire('sorties/2026-10-drome-saou/data.geojson'));
+    const geo = JSON.parse(await lire('drome-saou/data.geojson'));
     assert.ok(Array.isArray(geo.sources) && geo.sources.length, 'geojson.sources absent');
 
     for (const s of geo.sources) {
@@ -108,7 +108,7 @@ describe('Données exportées', () => {
   // faudrait télécharger routes/*.json (350 Ko) juste pour savoir quelles
   // falaises afficher.
   test('chaque falaise sportive embarque sa répartition de cotations', async () => {
-    const geo = JSON.parse(await lire('sorties/2026-10-drome-saou/data.geojson'));
+    const geo = JSON.parse(await lire('drome-saou/data.geojson'));
     const sportives = geo.features.filter((f) => (f.properties.nb_voie_sportive || 0) > 0);
 
     assert.ok(sportives.length > 0, 'Aucune falaise sportive dans data.geojson');
@@ -126,8 +126,8 @@ describe('Données exportées', () => {
   });
 
   test('chaque falaise avec des voies pointe vers un fichier routes existant', async () => {
-    const geo = JSON.parse(await lire('sorties/2026-10-drome-saou/data.geojson'));
-    const fichiers = new Set(await readdir(join(RACINE, 'sorties/2026-10-drome-saou/routes')));
+    const geo = JSON.parse(await lire('drome-saou/data.geojson'));
+    const fichiers = new Set(await readdir(join(RACINE, 'drome-saou/routes')));
 
     for (const f of geo.features) {
       const p = f.properties;
@@ -358,7 +358,7 @@ describe('Manifeste et installation', () => {
   });
 
   test('chaque page lie le manifeste par un chemin qui résout', async () => {
-    for (const page of ['index.html', 'sorties/2026-10-drome-saou/index.html']) {
+    for (const page of ['index.html', 'drome-saou/index.html']) {
       const html = await lire(page);
       const lien = /<link\s+rel="manifest"\s+href="([^"]+)"/.exec(html);
       assert.ok(lien, `${page} : pas de <link rel="manifest">`);
@@ -370,7 +370,7 @@ describe('Manifeste et installation', () => {
 });
 
 describe('Pages HTML', () => {
-  const pages = ['index.html', 'sorties/2026-10-drome-saou/index.html'];
+  const pages = ['index.html', '404.html', 'drome-saou/index.html'];
 
   test('chaque page a exactement un <h1>', async () => {
     for (const page of pages) {
@@ -401,7 +401,7 @@ describe('Pages HTML', () => {
   });
 
   test('la CSP de la page carte autorise le worker MapLibre depuis le CDN', async () => {
-    const html = await lire('sorties/2026-10-drome-saou/index.html');
+    const html = await lire('drome-saou/index.html');
     // On extrait la valeur de l'attribut content, PAS le HTML brut : le
     // commentaire qui précède la balise mentionne lui aussi « worker-src »,
     // et une recherche naïve tomberait dessus (erreur commise en écrivant ce
