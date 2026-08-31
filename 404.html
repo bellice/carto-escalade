@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'none';
+    style-src 'self';
+    img-src 'self' data:;
+    connect-src 'none';
+    base-uri 'none';
+    form-action 'none';
+    object-src 'none'
+  " />
+  <title>Page introuvable - Sorties escalade</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
+  <!-- Chemins ABSOLUS, contrairement au reste du site : GitHub sert cette page
+       pour n'importe quelle URL inexistante, donc à n'importe quelle
+       profondeur. Un chemin relatif chercherait la feuille de style à côté de
+       l'adresse fautive. Possible depuis que le site est à la racine d'un
+       domaine — ça n'aurait pas marché sur github.io/carto-escalade/. -->
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+<body>
+  <div class="home">
+    <h1>Page introuvable</h1>
+    <p class="tagline">cette adresse ne mène à rien</p>
+    <p>Le lien est peut-être incomplet : ils se coupent facilement en passant
+       d'une messagerie à l'autre.</p>
+    <p><a href="/">Revenir aux sorties</a></p>
+  </div>
+</body>
+</html>

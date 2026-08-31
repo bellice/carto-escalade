@@ -31,8 +31,8 @@
 
   <title>Sortie escalade - Drôme, forêt de Saoû</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
-  <link rel="manifest" href="../../manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="../../icones/apple-touch-icon.png" />
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
   <meta name="theme-color" content="#fbfaf6" />
 
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
@@ -44,15 +44,15 @@
        le navigateur le retélécharge à l'import réel. -->
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs" crossorigin />
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl-shared.mjs" crossorigin />
-  <link rel="modulepreload" href="../../assets/js/carte.js" />
-  <link rel="modulepreload" href="../../assets/js/carte-utils.js" />
-  <link rel="modulepreload" href="../../assets/js/marqueurs.js" />
-  <link rel="modulepreload" href="../../assets/js/popups.js" />
-  <link rel="modulepreload" href="../../assets/js/symboles.js" />
-  <link rel="modulepreload" href="../../assets/js/labels.js" />
-  <link rel="modulepreload" href="../../assets/js/donnees.js" />
-  <link rel="modulepreload" href="../../assets/js/hors-ligne.js" />
-  <link rel="modulepreload" href="../../assets/js/utils.js" />
+  <link rel="modulepreload" href="../assets/js/carte.js" />
+  <link rel="modulepreload" href="../assets/js/carte-utils.js" />
+  <link rel="modulepreload" href="../assets/js/marqueurs.js" />
+  <link rel="modulepreload" href="../assets/js/popups.js" />
+  <link rel="modulepreload" href="../assets/js/symboles.js" />
+  <link rel="modulepreload" href="../assets/js/labels.js" />
+  <link rel="modulepreload" href="../assets/js/donnees.js" />
+  <link rel="modulepreload" href="../assets/js/hors-ligne.js" />
+  <link rel="modulepreload" href="../assets/js/utils.js" />
 
   <!-- crossorigin même en same-origin : fetch() est en mode "cors" par
        défaut, et un preload sans crossorigin ne matche pas ce mode — le
@@ -60,13 +60,13 @@
   <link rel="preload" href="data.geojson" as="fetch" crossorigin />
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css" />
-  <link rel="stylesheet" href="../../assets/style.css" />
-  <link rel="stylesheet" href="../../assets/style-carte.css" />
+  <link rel="stylesheet" href="../assets/style.css" />
+  <link rel="stylesheet" href="../assets/style-carte.css" />
 </head>
 <body>
 
   <header class="map-header">
-    <a href="../../index.html">← Sorties</a>
+    <a href="../">← Sorties</a>
     <h1 class="titre">Drôme - forêt de Saoû</h1>
     <div id="preparation-hors-ligne"></div>
   </header>
@@ -141,6 +141,6 @@
   <div id="etat-chargement" class="etat-chargement">Chargement de la carte…</div>
 
   <!-- Externalisé pour que la CSP puisse refuser 'unsafe-inline'. -->
-  <script type="module" src="../../assets/js/demarrer-sortie.js"></script>
+  <script type="module" src="../assets/js/demarrer-sortie.js"></script>
 </body>
 </html>

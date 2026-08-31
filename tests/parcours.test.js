@@ -572,6 +572,38 @@ describe('Résilience réseau', () => {
     }
   });
 
+  // Les liens du site pointent vers des RÉPERTOIRES (/sorties/x/) alors que
+  // PRECACHE contient des fichiers (/sorties/x/index.html) : sans le repli
+  // vers index.html dans le handler de navigation, la clé de cache ne
+  // correspond pas et la page est introuvable hors ligne — alors qu'elle est
+  // bel et bien en cache.
+  test('l\'URL courte d\'une sortie se charge hors ligne', { timeout: 120000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur);
+    const REPERTOIRE_SORTIE = CHEMIN_SORTIE.replace(/index\.html$/, '');
+    try {
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 30000 });
+      await page.evaluate(() => navigator.serviceWorker.ready);
+      await page.waitForTimeout(3000);
+
+      await contexte.setOffline(true);
+      await page.goto(serveur.base + REPERTOIRE_SORTIE, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+
+      assert.equal(
+        await page.evaluate(() => Boolean(document.querySelector('.legende-contenu'))), true,
+        'La page doit se charger depuis le cache même demandée par son URL de répertoire'
+      );
+      assert.equal(
+        await page.evaluate(() => Boolean(document.querySelector('.etat-chargement.erreur'))), false,
+        'Aucune erreur de données attendue : tout vient du pré-cache'
+      );
+    } finally {
+      await contexte.close();
+    }
+  });
+
   // Télécharger 21 Mo ne sert à rien si le navigateur les évince avant la
   // sortie (stockage « best-effort » par défaut ; WebKit purge en plus après
   // 7 jours sans visite). Deux exigences se testent ici :

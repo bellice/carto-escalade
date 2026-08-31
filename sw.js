@@ -54,8 +54,8 @@ const PRECACHE = [
   // (leurs URLs dépendent du modèle du jour) : mises en cache au fil des vues.
   'https://tiles.openfreemap.org/styles/positron',
   // Sorties (une entrée par dossier) :
-  './sorties/2026-10-drome-saou/index.html',
-  './sorties/2026-10-drome-saou/data.geojson',
+  './drome-saou/index.html',
+  './drome-saou/data.geojson',
 ];
 
 // Sans ce pré-cache, la première ouverture d'une fiche paie une latence
@@ -179,11 +179,17 @@ self.addEventListener('fetch', (event) => {
     // HTML en vol (ex. Vite et ses proxies html-proxy — erreur "No matching
     // HTML proxy module") en lui renvoyant un HTML périmé ; en offline, le
     // cache sert le HTML déjà vu.
+    // Le repli tente aussi index.html : les liens du site pointent vers des
+    // RÉPERTOIRES (/sorties/x/) alors que PRECACHE contient des fichiers
+    // (/sorties/x/index.html). Sans cette seconde tentative, la clé de cache
+    // ne correspond pas et la page est introuvable hors ligne — alors qu'elle
+    // est bel et bien en cache. Générique : couvre chaque future sortie.
     if (event.request.mode === 'navigate') {
       event.respondWith(
         fetch(event.request)
           .then((reponse) => mettreEnCache(event.request, reponse).then(() => reponse))
-          .catch(() => caches.match(event.request))
+          .catch(() => caches.match(event.request)
+            .then((r) => r || caches.match(new URL('index.html', event.request.url).href)))
       );
       return;
     }
