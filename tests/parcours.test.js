@@ -86,6 +86,47 @@ describe('Démarrage', () => {
   });
 });
 
+describe('Recherche', () => {
+  // Le champ ne cherchait que dans « nom · secteur » : taper « Saoû » ne
+  // renvoyait RIEN, alors que 40 des 111 secteurs en dépendent et que c'est le
+  // nom que tout le monde emploie. Le site s'appelle Saoû, la falaise porte un
+  // autre nom — le terme le plus évident était le seul introuvable.
+  test('trouve par site, par falaise et par secteur', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      // Vue large : toutes les falaises dans le viewport, sinon le comptage
+      // mesurerait le cadrage plutôt que le filtre.
+      await page.evaluate(() => window.__carteTest.jumpTo({ center: [5.35, 44.70], zoom: 8.5 }));
+      await page.waitForTimeout(1200);
+
+      const compter = async (terme) => {
+        await page.fill('.recherche-champ input', terme);
+        await page.waitForTimeout(700);
+        return page.evaluate(() =>
+          window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length);
+      };
+
+      const total = await compter('');
+      assert.ok(total > 50, `Vue de départ trop restreinte (${total} secteurs)`);
+
+      const parSite = await compter('Saoû');
+      assert.ok(parSite > 1,
+        `« Saoû » ne renvoie que ${parSite} secteur(s) : le SITE n'est pas cherchable — ` +
+        'voir le champ "recherche" construit dans marqueurs.js.');
+      assert.ok(parSite < total, '« Saoû » doit restreindre, pas tout garder');
+
+      assert.ok(await compter('Grand Regardé') > 0, 'Recherche par nom de falaise cassée');
+      assert.ok(await compter('Drayas') > 0, 'Recherche par nom de secteur cassée');
+      assert.equal(await compter('zzzz'), 0, 'Un terme absent ne doit rien renvoyer');
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
 describe('Filtre par fourchette de cotation', () => {
   test('restreint les falaises et suit les bornes choisies', { timeout: 90000 }, async () => {
     const { contexte, page } = await nouveauContexte(navigateur);
