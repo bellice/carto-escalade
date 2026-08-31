@@ -403,6 +403,123 @@ describe('Fiche falaise', () => {
   });
 });
 
+// Deux façons d'atteindre une falaise sans passer par le champ de recherche.
+// Toutes deux sont dans le chemin de démarrage (carte.js, ouvrirLienProfond
+// et ajouterLabelsDeSite) : elles s'exécutent une fois, au chargement, et un
+// échec y est silencieux — la carte s'affiche normalement, simplement pas là
+// où on l'attendait.
+describe('Navigation directe', () => {
+  // Le lien produit par « Partager » est la façon dont un secteur circule
+  // dans le club. L'URL n'est pas fabriquée par le test : on reprend celle
+  // que le bouton construirait vraiment, sinon on ne testerait que sa propre
+  // idée du format.
+  test('un lien partagé rouvre la fiche de la bonne falaise', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur);
+    let lien;
+    let nomAttendu;
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      await ouvrirFalaise(page, REPERES.laTour);
+
+      const partage = await page.evaluate(() => {
+        const btn = document.querySelector('.popup .btn-partager');
+        return btn && {
+          requete: `?falaise=${encodeURIComponent(btn.dataset.cle)}`,
+          nom: document.querySelector('.popup h3')?.textContent,
+        };
+      });
+      assert.ok(partage, 'Pas de bouton « Partager » dans la fiche');
+      lien = CHEMIN_SORTIE + partage.requete;
+      nomAttendu = partage.nom;
+    } finally {
+      await contexte.close();
+    }
+
+    const { contexte: contexte2, page: page2, erreurs } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page2);
+      await page2.goto(serveur.base + lien, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page2);
+      await page2.waitForSelector('.popup h3', { timeout: 15000 });
+
+      const titre = await page2.textContent('.popup h3');
+      assert.equal(titre, nomAttendu, 'Le lien partagé n\'ouvre pas la bonne fiche');
+      assert.deepEqual(erreurs, [], 'Erreurs JavaScript détectées');
+    } finally {
+      await contexte2.close();
+    }
+  });
+
+  // Le nom de site est le seul repère qui cadre sur PLUSIEURS falaises d'un
+  // coup ; rien d'autre dans la suite ne l'active.
+  //
+  // La caméra est délibérément envoyée AILLEURS entre la sélection du libellé
+  // et le clic : sans ce détour, la première version de ce test passait
+  // encore après suppression du fitBounds du gestionnaire — le site restait
+  // dans le cadre de la vue d'ensemble, donc l'assertion ne mesurait rien.
+  // Le clic reste possible hors écran, le marqueur MapLibre restant dans le
+  // DOM quelle que soit la position de la caméra.
+  test('cliquer un nom de site cadre sur toutes ses falaises', { timeout: 90000 }, async () => {
+    const { contexte, page, erreurs } = await nouveauContexte(navigateur);
+
+    // Les falaises d'un site donné sont-elles toutes dans le cadre courant ?
+    const cadreContient = (nomSite) => page.evaluate(async (s) => {
+      const geo = await (await fetch('data.geojson')).json();
+      const bornes = window.__carteTest.getBounds();
+      const points = geo.features
+        .filter((f) => f.properties.categorie === 'falaise' && f.properties.site === s)
+        .map((f) => f.geometry.coordinates);
+      return { nb: points.length, toutes: points.every((c) => bornes.contains(c)), aucune: points.every((c) => !bornes.contains(c)) };
+    }, nomSite);
+
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+
+      // Les noms de site disparaissent au-delà de ZOOM_LABELS_SECTEUR (15) :
+      // c'est la vue d'ensemble qu'il faut pour en trouver un.
+      await page.evaluate(() => window.__carteTest.jumpTo({ zoom: 11 }));
+      await page.waitForTimeout(800);
+
+      const site = await page.evaluate(() => {
+        const el = Array.from(document.querySelectorAll('.label-site'))
+          .find((e) => e.style.visibility !== 'hidden' && e.offsetWidth > 0);
+        return el ? el.textContent : null;
+      });
+      assert.ok(site, 'Aucun nom de site visible en vue d ensemble');
+
+      // Détour : on se pose sur la falaise la plus éloignée du site visé.
+      await page.evaluate(async (s) => {
+        const geo = await (await fetch('data.geojson')).json();
+        const falaises = geo.features.filter((f) => f.properties.categorie === 'falaise');
+        const [lon0, lat0] = falaises.find((f) => f.properties.site === s).geometry.coordinates;
+        const distance = (c) => (c[0] - lon0) ** 2 + (c[1] - lat0) ** 2;
+        const loin = falaises.map((f) => f.geometry.coordinates).sort((a, b) => distance(b) - distance(a))[0];
+        window.__carteTest.jumpTo({ center: loin, zoom: 14 });
+      }, site);
+      await page.waitForTimeout(600);
+
+      const depart = await cadreContient(site);
+      assert.ok(depart.nb > 0, `Site ${site} introuvable dans data.geojson`);
+      assert.equal(depart.aucune, true, `Le détour n a pas sorti ${site} du cadre : le test ne mesurerait rien`);
+
+      await page.evaluate((s) => {
+        Array.from(document.querySelectorAll('.label-site')).find((e) => e.textContent === s).click();
+      }, site);
+      await page.waitForTimeout(1800); // fitBounds animé
+
+      const arrivee = await cadreContient(site);
+      assert.equal(arrivee.toutes, true,
+        `Les ${depart.nb} falaises de ${site} ne sont pas revenues dans le cadre après le clic`);
+      assert.deepEqual(erreurs, [], 'Erreurs JavaScript détectées');
+    } finally {
+      await contexte.close();
+    }
+  });
+});
 describe('Résilience réseau', () => {
   // LE bug de référence : la promesse rejetée restait en cache, donc réessayer
   // échouait même une fois le réseau revenu. Service worker désactivé, sinon
