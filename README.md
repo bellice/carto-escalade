@@ -90,6 +90,21 @@ clavier pour y naviguer.
 2. Paramètres du repo → Pages → Source : branche `main`, dossier `/ (root)`.
 3. Le site est en ligne à `https://<utilisateur>.github.io/<repo>/`.
 
+### Domaine `tokelau.fr`
+
+Hébergement inchangé (GitHub Pages) : le domaine ne fait que pointer vers lui.
+Le fichier `CNAME` à la racine porte le domaine ; GitHub le lit à chaque
+déploiement et redirige l'ancienne adresse `github.io`. « Enforce HTTPS »
+s'active dans les réglages Pages une fois le certificat émis.
+
+Zone DNS chez le registrar, sous-domaine vide (racine) :
+
+| type | valeurs |
+|---|---|
+| `A` | 185.199.108.153, 185.199.109.153, 185.199.110.153, 185.199.111.153 |
+| `AAAA` | 2606:50c0:8000::153, 2606:50c0:8001::153, 2606:50c0:8002::153, 2606:50c0:8003::153 |
+| `CNAME` | `www` → `bellice.github.io.` |
+
 `robots.txt` + balise `<meta name="robots">` sur chaque page empêchent l'indexation
 par les moteurs de recherche. Ça ne rend pas le site privé : l'URL reste accessible
 à quiconque la connaît (repo public → Pages public). Pour une vraie restriction
