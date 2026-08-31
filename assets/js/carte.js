@@ -30,19 +30,10 @@ const ZOOM_SIMPLIFICATION = 13;
 const ZOOM_PARKINGS = 15;
 
 export function initCarte(dataUrl) {
-  // La carte est créée APRÈS le chargement de data.geojson (voir la chaîne
-  // .then plus bas) : on calcule alors les bounds réelles des marqueurs et on
-  // les passe au CONSTRUCTEUR (bounds + fitBoundsOptions) plutôt qu'à un
-  // fitBounds() animé après coup. La carte naît donc directement dans la
-  // bonne vue :
-  //  - aucune animation de zoom au chargement, aucun flash ;
-  //  - aucune tuile téléchargée pour un centre/zoom provisoire en dur (gain
-  //    réseau direct — c'est l'objectif premier ici) ;
-  //  - le centre/zoom en dur [5.03, 44.74] / 12 disparaît.
-  // "map" est déclarée ici (let) car toutes les fonctions plus bas
-  // (appliquerSimplificationZoom, appliquerAntiCollision, allerVers...)
-  // l'utilisent via la closure ; elle est assignée une seule fois dans le
-  // .then, juste avant les contrôles/écouteurs qui en dépendent.
+  // La carte est créée APRÈS le chargement de data.geojson : les bounds
+  // réelles passent au CONSTRUCTEUR plutôt qu'à un fitBounds animé. Elle naît
+  // donc dans la bonne vue, sans animation ni tuiles téléchargées pour un
+  // centre provisoire — c'est l'objectif premier ici.
   let map;
 
   // Détail des voies d'une falaise (routes/<id>.json), à côté du fichier de
@@ -141,16 +132,10 @@ export function initCarte(dataUrl) {
   let borneGlobale = null; // étendue de tous les marqueurs, pour le bouton "Tout voir"
   let maxima = { total: 0, couenne: 0, gv: 0 }; // pour la taille des cercles proportionnels
 
-  // Ne garde en pleine opacité que les marqueurs de "cles" (estompe les
-  // autres) ; cles=null remet tout le monde à l'opacité normale (popup fermée).
-  // IMPORTANT : passe par marker.setOpacity(), pas par
-  // marker.getElement().style.opacity — MapLibre gère lui-même l'opacité de
-  // l'élément (mécanisme prévu pour l'occlusion par le terrain/le globe,
-  // this._updateOpacity côté source) et la réapplique à CHAQUE 'move'/'render'
-  // à partir de sa propre valeur interne (this._opacity, par défaut '1'),
-  // écrasant silencieusement toute écriture directe de style.opacity dès le
-  // pan/zoom suivant. setOpacity() met à jour cette valeur interne, donc ses
-  // propres mises à jour restent cohérentes avec la nôtre.
+  // cles=null remet tout le monde à l'opacité normale.
+  // PIÈGE : passer par marker.setOpacity() et jamais par style.opacity —
+  // MapLibre réapplique sa propre valeur interne à chaque 'move'/'render' et
+  // écraserait silencieusement toute écriture directe dès le pan suivant.
   function enSurbrillance(cles) {
     const actifs = cles ? new Set(cles) : null;
     entries.forEach((e) => {
@@ -235,18 +220,10 @@ export function initCarte(dataUrl) {
     }
   }
 
-  // Décollision au pixel générique, partagée entre libellés de secteur et de
-  // site (même algorithme, seule la source des libellés/du regroupement
-  // change) : pour chaque libellé, dans l'ordre de priorité déjà décidé par
-  // l'appelant (nbVoies décroissant, voir construireGeojsonSecteurs/Sites
-  // dans labels.js), masque-le si plus aucune falaise de son groupe n'a de
-  // figuré ponctuel visible en ce moment (mode "Cercles" vidé, recherche qui
-  // l'exclut...), sinon compare son rectangle à l'écran à ceux déjà retenus
-  // (visibility, pas display : garde le DOM mesurable sans fausser le calcul
-  // suivant) — à conflit, le premier retenu (le plus fourni) gagne.
-  // - labels : [{el, marker, ...}], déjà trié par priorité
-  // - entriesParGroupe : clé de regroupement -> entrees falaise
-  // - cleDe(label) -> clé à chercher dans entriesParGroupe
+  // Décollision au pixel, partagée entre libellés de secteur et de site. Les
+  // labels arrivent déjà triés par priorité ; à conflit, le premier retenu
+  // gagne. visibility et non display : garde le DOM mesurable, sinon le
+  // calcul suivant serait faussé.
   function appliquerAntiCollision(labels, entriesParGroupe, cleDe) {
     const retenus = [];
     labels.forEach((label) => {
@@ -490,23 +467,12 @@ export function initCarte(dataUrl) {
     construireLegendeFalaises(max, median, remplissage, modeSimplifieActuel, maxima.total);
   }
 
-  // Couche native "falaises" (rendu GPU) : un seul canvas au lieu d'un
-  // marqueur DOM par falaise — indispensable pour passer à l'échelle quand le
-  // geojson atteindra des milliers de falaises (peinture GPU, tri des cercles
-  // par taille fait dans la SOURCE via construireSourceFalaises, plus de
-  // réordonnancement DOM). Le rendu est data-driven par expressions de zoom :
-  //  - rayon : petit point uniforme (7px) sous ZOOM_SIMPLIFICATION, rayon
-  //    proportionnel (formule de Flannery, précalculé dans "r") au-delà ;
-  //  - couleur : COULEUR_ELOIGNE sous le seuil, couleur du mode "Cercles"
-  //    courant au-delà (mise à jour via setPaintProperty, voir
-  //    definirModeFigure) ;
-  //  - opacité : estompée par feature-state quand une autre falaise a la
-  //    popup ouverte (voir enSurbrillance).
-  // promoteId: 'cle' -> le feature-state s'indexe sur la clé falaise (stable).
-  // Ordre de lecture : la couche est peinte au-dessus du fond ; les marqueurs
-  // DOM (parkings, gîte, libellés) passent au-dessus d'elle via le conteneur
-  // .maplibregl-marker — les falaises restent donc SOUS les parkings, comme
-  // avant.
+  // Couche native (rendu GPU) plutôt qu'un marqueur DOM par falaise : passe à
+  // l'échelle quand le geojson atteindra des milliers d'entrées, et le tri des
+  // cercles par taille se fait dans la SOURCE, sans réordonnancement DOM.
+  // promoteId: 'cle' — le feature-state s'indexe sur la clé falaise, stable.
+  // Les marqueurs DOM (parkings, gîte, libellés) passent au-dessus de cette
+  // couche : les falaises restent SOUS les parkings.
   function construireCoucheFalaises() {
     map.addSource('falaises', {
       type: 'geojson',
@@ -527,30 +493,16 @@ export function initCarte(dataUrl) {
     });
     map.on('mouseenter', 'falaises', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'falaises', () => { map.getCanvas().style.cursor = ''; });
-    // UN SEUL écouteur de clic générique (pas un map.on('click','falaises',...)
-    // séparé + un map.on('click',...) séparé) : les deux se déclenchent sur le
-    // MÊME clic, et un map.on('click','falaises',...) qui ouvre le panneau
-    // change le padding caméra de façon SYNCHRONE (reinitialiserPadding +
-    // easeTo dans ouvrirPanneauFalaise) avant que le second écouteur n'ait pu
-    // s'exécuter — bug constaté en test réel : queryRenderedFeatures(e.point)
-    // dans le second écouteur renvoyait 0 résultat alors que le clic venait
-    // justement de toucher une falaise l'instant d'avant (même pixel, mais le
-    // rendu avait déjà changé sous ce pixel entre les deux écouteurs), fermant
-    // aussitôt le panneau qu'on venait d'ouvrir — plus aucun clic sur un
-    // cercle n'avait d'effet visible après une 1re fermeture. Une seule
-    // requête, un seul écouteur, plus de risque de désynchronisation.
+    // UN SEUL écouteur, jamais un map.on('click','falaises') séparé : les deux
+    // se déclenchent sur le même clic, et le premier change le padding caméra
+    // de façon SYNCHRONE avant que le second ne s'exécute. Bug constaté :
+    // queryRenderedFeatures renvoyait 0 résultat au même pixel, le rendu ayant
+    // déjà changé dessous — le panneau se refermait aussitôt ouvert.
     map.on('click', (e) => {
-      // Un clic parti d'un marqueur ou d'une popup (éléments DOM de
-      // .maplibregl-canvas-container) REMONTE jusqu'à la carte et déclenche
-      // aussi cet écouteur — c'est d'ailleurs le mécanisme officiel de
-      // MapLibre pour ouvrir la popup d'un marqueur (Marker._onMapClick est
-      // branché sur map 'click', voir src/ui/marker.ts). Notre logique de
-      // fermeture (popup flottante / panneau) ne doit PAS s'appliquer à ces
-      // clics-là : sans ce garde-fou, cliquer sur l'icône P ouvrait la popup
-      // parking via MapLibre puis la refermait aussitôt ici (popupOuverte
-      // venait d'être écrasée par la popup qu'on ouvrait) → « je ne peux
-      // plus cliquer sur le parking » après avoir ouvert une falaise. On
-      // n'agit que sur un clic réel du canvas.
+      // Un clic parti d'un marqueur ou d'une popup REMONTE jusqu'ici — c'est
+      // même le mécanisme par lequel MapLibre ouvre la popup d'un marqueur.
+      // Sans ce garde, cliquer sur le P ouvrait la popup parking puis la
+      // refermait aussitôt : « je ne peux plus cliquer sur le parking ».
       const cible = e.originalEvent && e.originalEvent.target;
       if (cible && typeof cible.closest === 'function' &&
           (cible.closest('.maplibregl-marker') || cible.closest('.maplibregl-popup'))) {
@@ -591,19 +543,11 @@ export function initCarte(dataUrl) {
     });
   }
 
-  // Ouvre la fiche d'une falaise de la couche native, au clic ou via la
-  // navigation — popup flottante sur mobile, panneau latéral dédié sur
-  // desktop (voir estDesktop, carte-utils.js). Ferme d'abord toute fiche déjà
-  // ouverte (falaise OU parking/gîte), SAUF si le panneau desktop est déjà
-  // ouvert : dans ce cas on le laisse en place et ouvrirPanneauFalaise se
-  // contente d'en remplacer le contenu (pas de collapse/reopen de la section
-  // en changeant de falaise pendant qu'elle reste affichée). Sur mobile,
-  // estDesktop() est faux et cette garde se réduit exactement au comportement
-  // d'avant (popupOuverte.remove() inconditionnel).
-  // cameraDejaEncadree (facultatif) : à true quand allerVers a DÉJÀ lancé son
-  // propre fitBounds/flyTo juste avant cet appel — évite que
-  // ouvrirPanneauFalaise ne coupe cette animation avec son propre map.stop()
-  // (voir le commentaire détaillé dans marqueurs.js).
+  // Popup flottante sur mobile, panneau latéral sur desktop. Ferme la fiche
+  // ouverte SAUF si le panneau desktop l'est déjà : on remplace alors son
+  // contenu, sans fermeture/réouverture visible.
+  // cameraDejaEncadree évite que ouvrirPanneauFalaise ne coupe l'animation
+  // d'allerVers avec son map.stop() — voir marqueurs.js.
   function ouvrirFalaise(cle, cameraDejaEncadree = false) {
     const entree = index.get(cle);
     if (!entree) return;
@@ -690,17 +634,10 @@ export function initCarte(dataUrl) {
       : null;
     appliquerFiltresEtSecteurs();
 
-    // Cause réelle (vérifiée dans le code source de MapLibre) du cadrage qui
-    // restait sans effet après une 2e navigation enchaînée (ex. recherche ->
-    // falaise, puis tout de suite falaise -> parking) : le padding d'un
-    // fitBounds/flyTo PERSISTE sur la carte, et le calcul du cadrage SUIVANT
-    // l'ADDITIONNE à son propre padding plutôt que de le remplacer — sur
-    // mobile, où margeAvantPopup() est déjà généreux, la somme dépassait la
-    // hauteur réelle du conteneur et MapLibre abandonnait le cadrage
-    // silencieusement (jamais sur desktop, où même doublé le padding restait
-    // sous la hauteur de fenêtre). reinitialiserPadding() repart d'une base à
-    // zéro à chaque fois ; map.stop() coupe aussi une éventuelle animation
-    // encore en cours, par prudence.
+    // PIÈGE MapLibre : le padding d'un fitBounds/flyTo PERSISTE, et le cadrage
+    // suivant l'ADDITIONNE au sien au lieu de le remplacer. Sur mobile la
+    // somme dépassait la hauteur du conteneur et MapLibre abandonnait le
+    // cadrage en silence — d'où reinitialiserPadding() à chaque fois.
     map.stop();
     reinitialiserPadding(map);
 
@@ -708,29 +645,15 @@ export function initCarte(dataUrl) {
     // coordonnées directes (falaise en couche native — plus de marqueur).
     const pointDe = (e) => (e.marker ? e.marker.getLngLat() : [e.lon, e.lat]);
 
-    // margeAvantPopup(...) : la fiche de la cible s'ouvre juste après ce
-    // cadrage — sur mobile, feuille du bas, il faut lui laisser sa place
-    // quelle que soit la catégorie. Sur desktop, le panneau gauche est déjà
-    // réservé en permanence (margeDesktop()) ; le panneau DROIT, lui, ne
-    // s'ouvre QUE pour une falaise (parking/gîte restent en popup flottante
-    // classique) — sa largeur n'est donc réservée en plus que quand une fiche
-    // falaise sera ouverte au moment du cadrage : soit la cible EST une
-    // falaise, soit le panneau droit est DÉJÀ ouvert (cas du lien parking
-    // depuis une fiche falaise — on garde la card ouverte et on cadre le
-    // parking sans le cacher derrière le panneau). L'état du panneau est lu
-    // dans le DOM (panneauFalaiseOuvert), PAS dans popupOuverte : un 2e clic
-    // sur le lien parking referme la popup parking (popupOuverte.remove())
-    // avant cet appel, popupOuverte n'est alors plus le panneau — sans ce
-    // garde, le 2e cadrage n'aurait plus réservé le panneau droit et perdait
-    // le centrage falaise+parking (bug réel constaté).
-    // duration:800 explicite : sans lui, la durée par défaut de MapLibre se
-    // calcule sur la distance/le delta de zoom (courbe "fly") et peut
-    // dépasser 2s pour un grand saut (ex. recherche depuis une vue éloignée
-    // vers une falaise précise) — mesuré en conditions réelles : la fiche et
-    // sa cotation sont déjà affichées bien avant, mais la caméra continue de
-    // bouger derrière, ce qui donne l'impression d'attendre alors que les
-    // données sont prêtes. 800ms reste un mouvement de caméra lisible sans
-    // sembler figé.
+    // Le panneau DROIT ne s'ouvre que pour une falaise : sa largeur n'est
+    // réservée que si la cible en est une, ou s'il est déjà ouvert (lien
+    // parking depuis une fiche falaise). L'état est lu dans le DOM et non dans
+    // popupOuverte : un 2e clic sur le lien parking ferme la popup avant cet
+    // appel, popupOuverte n'est alors plus le panneau — sans ce garde, le
+    // cadrage perdait le centrage falaise+parking (bug constaté).
+    // duration:800 explicite : la durée par défaut se calcule sur la distance
+    // et dépassait 2 s sur un grand saut, la caméra bougeant encore longtemps
+    // après l'affichage de la fiche.
     const reserverPanneauDroit = cible.cat === 'falaise' || panneauFalaiseOuvert();
     if (origine) {
       const bounds = new maplibregl.LngLatBounds();
@@ -817,15 +740,9 @@ export function initCarte(dataUrl) {
       // possible avec NavigationControl au-dessus, quelle que soit sa hauteur
       // réelle (icônes zoom+boussole, variable selon les options).
       map.addControl(creerControleToutVoir(() => {
-        // Ferme la fiche ouverte (popup mobile ou panneau desktop) AVANT de
-        // recadrer : "Tout voir" remet falaiseSelectionneeCle à null juste
-        // en dessous, la fiche ouverte doit suivre — sinon le panneau
-        // desktop resterait affiché avec un contenu périmé pendant que la
-        // caméra dézoome sur toute la sortie, en contradiction avec la règle
-        // "panneau ouvert <=> une falaise est sélectionnée". Redondant mais
-        // inoffensif avec les lignes qui suivent (popupOuverte.remove() sur
-        // le panneau réapplique déjà falaiseSelectionneeCle=null +
-        // appliquerFiltresEtSecteurs() via onFermeturePanneau, idempotent).
+        // « Tout voir » vide la sélection juste en dessous : la fiche doit
+        // suivre, sinon le panneau resterait affiché avec un contenu périmé,
+        // en contradiction avec « panneau ouvert <=> falaise sélectionnée ».
         if (popupOuverte) popupOuverte.remove();
         reinitialiserPadding(map);
         if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: 15 });
@@ -891,17 +808,10 @@ export function initCarte(dataUrl) {
           }
         }
       });
-      // Couche native "falaises" : construite une fois (source + couche), puis
-      // alimentée par construireSourceFalaises — features triées par valeur
-      // décroissante (ordre de peinture, le plus petit dessus), mode "aucun"
-      // donc nbVoies total au départ. Voir construireCoucheFalaises.
       // MapLibre exige le STYLE chargé avant addSource/addLayer : on attend
-      // 'load' quand il ne l'est pas encore (cas normal, le style met plus de
-      // temps que le fetch du geojson préchargé). La source est ajoutée vide
-      // puis remplie, le FILTRE est re-posé dans la foulée par
-      // appliquerFiltresEtSecteurs() — même tick, aucun flash de points non
-      // filtrés. Cas inverse (style déjà chargé : data.geojson lent), on
-      // construit directement.
+      // 'load' s'il ne l'est pas — cas normal, le style est plus lent que le
+      // geojson préchargé. La source est ajoutée vide puis remplie, le filtre
+      // re-posé dans le même tick : aucun flash de points non filtrés.
       const chargerFalaises = () => {
         construireCoucheFalaises();
         map.getSource('falaises').setData(construireSourceFalaises(entries, 'aucun', maxima));
@@ -1120,14 +1030,9 @@ export function initCarte(dataUrl) {
   function centrerSurRecherche() {
     const q = filtres.recherche;
     if (!q) return;
-    // Sur mobile, le champ de recherche a encore le focus (clavier affiché)
-    // au moment de ce clic : le PROCHAIN tap ailleurs sur l'écran sert
-    // souvent à fermer le clavier plutôt qu'à activer sa cible réelle (bug
-    // constaté précisément dans ce cas : falaise trouvée par recherche, puis
-    // tap sur "voir sur la carte" pour son parking sans effet — le même
-    // enchaînement depuis un clic direct sur la falaise, sans recherche,
-    // fonctionnait). Fermer le clavier ICI, dès qu'on quitte la recherche,
-    // pour que le prochain tap arrive bien sur sa cible.
+    // Le clavier mobile est encore ouvert : le prochain tap servirait à le
+    // fermer plutôt qu'à atteindre sa cible. Bug constaté — après une
+    // recherche, le lien « voir sur la carte » du parking restait sans effet.
     if (recherche) recherche.blur();
     const correspondances = entries.filter((e) => e.cat === 'falaise' && e.recherche.includes(q));
     if (!correspondances.length) return;
@@ -1299,33 +1204,19 @@ export function initCarte(dataUrl) {
   // la couche native elle utilise map et falaisesVisibles via la closure
   // (elle ne peut plus rester au niveau module, comme avant).
   function appliquerFiltres(entries, filtres, mode, falaiseSelectionneeCle) {
-  // Le mode "Cercles" ET le filtre "Depuis le gîte" masquent des falaises
-  // (estFalaiseVideDansMode / seuil de temps) mais n'autorisent PAS à eux
-  // seuls l'affichage de leurs parkings — sinon déplacer le slider ou
-  // changer de thème réafficherait potentiellement des dizaines de parkings
-  // d'un coup (l'un comme l'autre peuvent laisser beaucoup de falaises
-  // visibles à la fois, contrairement à une recherche, quasi toujours
-  // ciblée sur une poignée de résultats). Trois déclencheurs positifs
-  // autorisent des parkings (voir appliquerVisibiliteParkings) :
-  // - une recherche active (choix explicite ET ciblé) -> tous les parkings
-  //   des falaises qui la passent ;
-  // - la falaise sélectionnée (popup ouverte / cible d'une navigation), si
-  //   elle reste effectivement visible sous le mode/la recherche/le temps
-  //   courants ;
-  // - le zoom (>= ZOOM_PARKINGS) : à fort zoom, les parkings des falaises
-  //   visibles s'affichent par défaut — ce cas est traité dans
-  //   appliquerVisibiliteParkings (à fort zoom, les parkings ne passent pas
-  //   par ce set, réservé aux déclencheurs recherche/sélection).
+  // Le mode "Cercles" et le filtre de trajet masquent des falaises mais
+  // n'autorisent PAS leurs parkings : bouger le slider réafficherait des
+  // dizaines de parkings d'un coup. Seuls trois déclencheurs les autorisent
+  // (voir appliquerVisibiliteParkings) : une recherche active, la falaise
+  // sélectionnée si elle reste visible, et le zoom >= ZOOM_PARKINGS — ce
+  // dernier ne passe pas par ce set.
   parkingsAutorises = new Set();
 
-  // Falaises (couche native) : pas de display DOM — on pose le FILTRE de la
-  // couche (rendu GPU, expressions sur les properties de la source) et on
-  // miroite le résultat dans falaisesVisibles pour entreeVisible (anti-
-  // collision des libellés) sans relire le DOM. 'index-of' vaut -1 quand la
-  // recherche est absente, donc >= 0 = présente. tempsGite null -> coalesce
-  // 0 : une falaise sans trajet calculé n'est jamais exclue par le slider.
-  // L'exclusion liée au MODE (estFalaiseVideDansMode) est, elle, faite dans
-  // la SOURCE (construireSourceFalaises) et non ici.
+  // Couche native : on pose le FILTRE de la couche, pas un display DOM, et on
+  // miroite le résultat dans falaisesVisibles pour l'anti-collision.
+  // tempsGite null -> coalesce 0 : une falaise sans trajet calculé n'est
+  // jamais exclue par le slider. L'exclusion par MODE se fait, elle, dans la
+  // SOURCE et non ici.
   const conditions = [];
   if (filtres.recherche) conditions.push(['>=', ['index-of', filtres.recherche, ['get', 'recherche']], 0]);
   if (Number.isFinite(filtres.tempsMaxGite)) conditions.push(['<=', ['coalesce', ['get', 'tempsGite'], 0], filtres.tempsMaxGite]);

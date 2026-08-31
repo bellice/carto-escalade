@@ -95,20 +95,12 @@ function afficherLienMaps() {
   return window.matchMedia('(pointer: coarse)').matches;
 }
 
-// Un seul bouton "Itinéraire", pas deux (l'ancien "Ouvrir dans Maps" séparé
-// prenait une place en plus sur mobile pour un gain qui, une fois le lien
-// geo: corrigé, n'existait plus vraiment). Deux façons d'y arriver selon
-// l'appareil :
-// - mobile (afficherLienMaps) : un lien geo:lat,lon?q=lat,lon(nom) — laisse
-//   le téléphone proposer TOUTES les applis de nav installées (Organic Maps,
-//   Google Maps, Waze...), pas seulement Google Maps. q=lat,lon(nom) est la
-//   convention Android/Google pour poser un repère NOMMÉ dans Google Maps
-//   (sans lui, Google Maps centre la carte SANS repère — rien à quoi
-//   rattacher un itinéraire) ; répéter les coordonnées avant le "?" (plutôt
-//   que le classique geo:0,0?q=...) garde la compatibilité RFC 5870 pour les
-//   applis qui ignorent q= et ne lisent que la position brute.
-// - desktop : geo: n'ouvrant en général rien, on garde le lien direct vers
-//   Google Maps Itinéraire (seul choix qui marche vraiment là).
+// Mobile : un lien geo: laisse le téléphone proposer TOUTES les applis de
+// navigation installées, pas seulement Google Maps. q=lat,lon(nom) pose un
+// repère nommé — sans lui, Google Maps centre la carte sans repère, donc sans
+// rien à quoi rattacher un itinéraire. Répéter les coordonnées avant le « ? »
+// garde la compatibilité RFC 5870 pour les applis qui ignorent q=.
+// Desktop : geo: n'ouvre en général rien, d'où le lien Google Maps direct.
 function lienItineraire(lat, lon, nom) {
   const coords = `${lat},${lon}`;
   if (afficherLienMaps()) {
@@ -349,27 +341,12 @@ function col(label, valeur) {
 
 
 
-// Parking(s) associé(s) à une falaise : le nom réel du parking (souvent une
-// description type "petit parking D136") n'aide pas à décider de cliquer —
-// seul le fait qu'il y en ait un compte. Cas courant (61 falaises/71, un
-// seul parking) : un verbe d'action plutôt qu'un nom — et surtout pas le mot
-// "parking" une 2e fois, déjà dit par le libellé juste à gauche (repéré après
-// coup : "Parking" suivi de "Voir le parking" faisait doublon). Plusieurs
-// parkings (toujours 3 ici dans les données, jamais 2) : impossible de rester
-// générique, il faut bien distinguer les destinations — un simple rang
-// (1/2/3) suffit, dans l'ordre où data.geojson les liste.
-// "min à pied" (pas juste "min") : approche_min est un temps de MARCHE
-// parking->falaise, à ne pas confondre avec trajet_gite_min (popupParking,
-// "en voiture") — les deux se ressemblent d'un coup d'œil ("X min") sans ce
-// qualificatif, alors que ce sont deux temps de nature différente.
-//
-// Cas 1 parking : reste sur une ligne info-ligne classique (label + un seul
-// bouton, ça tient toujours). Cas plusieurs parkings : bascule sur le motif
-// "label seul sur sa ligne + liste en flux" (.liens-detail, même motif que
-// champLiensFalaises) plutôt qu'un texte assemblé avec des "·" (1er jet) —
-// avec le qualificatif "à pied" en plus sur chaque bouton, ces libellés sont
-// devenus trop longs pour rester en ligne : le séparateur pouvait finir seul
-// sur sa propre ligne au retour à la ligne (constaté en réel).
+// Le nom réel du parking (souvent « petit parking D136 ») n'aide pas à
+// décider : seul compte qu'il y en ait un. D'où un verbe d'action, et surtout
+// pas le mot « parking » une 2e fois, déjà porté par le libellé de gauche.
+// « min à pied » et non « min » : approche_min est un temps de MARCHE, à ne
+// pas confondre avec trajet_gite_min, en voiture — les deux se ressemblent
+// d'un coup d'œil sans ce qualificatif.
 function champParkingAssocie(noms, approches) {
   // Chaque parking est une LIGNE cliquable avec son temps d'approche — modèle
   // uniforme entre 1 et N parkings : [P] Parking [n] · X min à pied. La ligne
@@ -448,32 +425,14 @@ function styleGrimpe(p) {
   return 'mixte';
 }
 
-// Histogramme "1 case = 1 voie" par cotation — chargé à la demande (voir
-// marqueurs.js, popup.on('open')) depuis routes/<id>.json : c'est la seule
-// partie du popup qui a besoin de la liste détaillée des voies, donc la
-// seule qui ne vit pas dans le fichier de données principal. Remplace le 1er
-// jet (nuage en miroir sur une échelle 3a→9b fixe et globale) : testé en
-// vrai, une falaise typique ne couvre que 2-3 crans sur les ~39 possibles,
-// donc l'échelle globale compressait ses points dans une toute petite
-// tranche du popup — des cotations voisines finissaient à quelques pixels
-// les unes des autres, illisible (confirmé sur capture d'écran réelle, pas
-// en théorie).
-//
-// Ici, une colonne par cotation RÉELLEMENT présente sur CETTE falaise (pas
-// les ~39 crans possibles) : la largeur du popup reste toujours bien
-// utilisée, quelle que soit l'étendue de la falaise, aucun risque de
-// chevauchement (positions de grille, pas de pixels calculés en continu).
-// Contrepartie assumée : la position d'une colonne n'est plus comparable
-// d'une fiche à l'autre — priorité donnée à la lisibilité individuelle.
-// Best-effort de placement pour 3 formes de cotation non standard mais
-// raisonnablement déductibles — UNIQUEMENT pour positionner une voie sur ce
-// graphique, jamais pour une valeur affichée ailleurs (cotationVersValeur,
-// donnees.js, reste strict — utilisée entre autres pour le mode "Voies
-// faciles" du sélecteur "Cercles", où une estimation n'a pas sa place). Les
-// cases qui en résultent ne sont PAS distinguées visuellement des cotations
-// exactes (essayé, puis retiré : un marquage pour un cas aussi marginal
-// faisait plus de bruit qu'autre chose) — une fois la règle posée, elle
-// s'applique sans réserve affichée.
+// Histogramme « 1 case = 1 voie » : une colonne par cotation RÉELLEMENT
+// présente sur cette falaise, pas sur les ~39 crans possibles — une falaise
+// typique n'en couvre que 2-3, et une échelle globale les compressait dans
+// une tranche illisible. Contrepartie assumée : les colonnes ne sont plus
+// comparables d'une fiche à l'autre.
+// L'approximation de cotation ne sert QU'À positionner une case ici ;
+// cotationVersValeur (donnees.js) reste strict, une estimation n'ayant pas sa
+// place dans un filtre.
 export function construireHistogramme(voiesSportives, aAutresDisciplines) {
   if (!voiesSportives || !voiesSportives.length) return '';
 
@@ -532,29 +491,13 @@ export function construireHistogramme(voiesSportives, aAutresDisciplines) {
     '<span class="histo-cle"><span class="histo-swatch gv"></span>grande voie</span>',
   ];
 
-  // role="img" + un seul aria-label résumé sur l'histogramme entier (pas un
-  // par case) : le détail au clic est fourni par le bouton "Voir le détail
-  // des voies" ci-dessous (voir construireDetailVoies), pas par les cases
-  // elles-mêmes (8-13px, sous la règle des 44px de cible tactile déjà
-  // appliquée ailleurs sur ce site pour les marqueurs — poserTailleMarqueur,
-  // symboles.js) : annoncer individuellement jusqu'à plusieurs dizaines de
-  // cases n'aiderait personne de toute façon.
-  // Titre "Cotation (hors trad et artificielle)" plutôt que "Cotation voies
-  // sportives" UNIQUEMENT quand la falaise a aussi des voies trad/artificielle
-  // (aAutresDisciplines, dérivé de nb_voie_trad/nb_voie_artificielle — voir
-  // l'attribut data-autres-disciplines posé par popupFalaise) : au-delà de
-  // servir de rupture visuelle avant la légende couenne/grande voie (une
-  // classification différente qui s'enchaînerait sinon sans signal), la
-  // formulation par EXCLUSION prévient explicitement toute confusion avec le
-  // total "Voies" plus haut — l'histogramme ne couvre pas les voies
-  // trad/artificielle (non détaillées par voie dans les données, seulement
-  // comptées), contrairement à ce qu'un titre par inclusion ("voies
-  // sportives") laisse deviner seul. "trad"/"artificielle" sont déjà le
-  // vocabulaire affiché ailleurs dans cette même fiche (colonne "Grimpe",
-  // voir styleGrimpe) — pas une terminologie nouvelle. Si la falaise est
-  // 100% sportive, cette précision n'exclut plus rien : la mention
-  // deviendrait du bruit ("hors" de quoi, puisqu'il n'y a que ça ?), simple
-  // "Cotation" suffit.
+  // Un seul aria-label résumé sur l'histogramme entier, pas un par case :
+  // annoncer plusieurs dizaines de cases n'aiderait personne, le détail vient
+  // du bouton ci-dessous.
+  // Titre par EXCLUSION quand la falaise a aussi du trad/artificiel :
+  // l'histogramme ne les couvre pas (comptés mais non détaillés), et un titre
+  // par inclusion laisserait croire l'inverse face au total « Voies » plus
+  // haut. Sur une falaise 100 % sportive la mention n'exclurait plus rien.
   const titre = aAutresDisciplines ? 'Cotation (hors trad et artificielle)' : 'Cotation';
   // Répartition couenne/grande voie ÉNONCÉE DANS L'aria-label : dans le
   // graphique, cette distinction ne repose que sur la couleur des cases
@@ -608,15 +551,9 @@ function valeurCotationPourTri(v) {
   return estimee ? cotationVersValeur(estimee.label) : Infinity;
 }
 
-// Texte de cotation à AFFICHER — même règle d'approximation que ci-dessus et
-// que l'histogramme (colonnesHtml, plus haut dans ce fichier) : une cotation
-// non standard mais déductible ("4-", "5"...) doit s'afficher sous sa forme
-// normalisée ("4a", "5b") ici AUSSI, pas seulement pour le tri/regroupement
-// en interne — sinon la MÊME voie affiche 2 cotations différentes selon
-// qu'on la lit dans l'histogramme (déjà normalisé) ou dans cette liste
-// (texte brut de la donnée), une incohérence repérée en relisant les deux
-// vues côte à côte. Une cotation ni standard ni approximable reste affichée
-// telle quelle : rien de mieux à montrer.
+// Même normalisation qu'à l'histogramme, sinon la MÊME voie afficherait deux
+// cotations différentes selon qu'on la lit dans l'un ou dans cette liste. Une
+// cotation ni standard ni approximable reste affichée telle quelle.
 function libelleCotationAffichee(cotation) {
   if (cotationVersValeur(cotation) != null) return cotation;
   const estimee = approximerCotation(cotation);
@@ -662,17 +599,9 @@ export function construireDetailVoies(voiesSportives, mode = 'cotation') {
   const liste = mode === 'position' ? construireListePosition(voiesSportives) : construireListeCotation(voiesSportives);
   const bascule = (valeur, libelle) =>
     `<button type="button" class="btn-tri-voies${mode === valeur ? ' actif' : ''}" data-tri="${valeur}" aria-pressed="${mode === valeur}">${libelle}</button>`;
-  // "Retour" en bas, PAS en haut à côté du titre (1er jet, abandonné) :
-  // repéré au retour terrain — sur mobile, une fois la fiche quasi plein
-  // écran (voir style-carte.css, .detail-voies-ouvert), un bouton en haut se
-  // retrouve à l'opposé du pouce, inconfortable à atteindre à une main. En
-  // `position: sticky; bottom: 0` (CSS) DANS la liste qui défile : reste
-  // accessible en permanence, quelle que soit la position de scroll dans
-  // une liste de 40+ voies, sans avoir à remonter tout en haut. Redevenu un
-  // vrai bouton à cadre (comme "Voir le détail des voies") plutôt qu'un lien
-  // souligné : plus prononcé, plus facile à repérer d'un coup d'œil comme
-  // action possible — corrige aussi le "pas assez explicite" relevé sur la
-  // version précédente (texte simple à côté du titre, discret).
+  // « Retour » en bas et non près du titre : fiche quasi plein écran sur
+  // mobile, un bouton en haut tombe à l'opposé du pouce. En sticky dans la
+  // liste, il reste atteignable au milieu de 40 voies.
   return `
     <div class="fiche-voies-detail">
       <h4 class="detail-voies-titre">${escapeHtml(titre)}</h4>
@@ -765,13 +694,8 @@ function formatHauteur(hauteurM) {
 }
 
 function ligneDetailVoie(v, index) {
-  // Fond alterné 1 ligne sur 2 (repéré comme utile pour suivre une ligne des
-  // yeux jusqu'à la colonne Hauteur, la plus éloignée du nom) : classe posée
-  // ici plutôt que déduite en CSS par nth-child — chaque voie émet 5
-  // cellules dans une grille aplatie par display:contents (voir CSS), et la
-  // ligne d'en-tête (elle aussi 5 cellules) décale tout calcul nth-child
-  // purement CSS ; un index explicite reste correct quel que soit le nombre
-  // de colonnes ou la présence de l'en-tête.
+  // Classe posée ici et non par nth-child en CSS : display:contents aplatit
+  // chaque voie en 5 cellules et la ligne d'en-tête décale tout calcul CSS.
   const impaire = index % 2 === 1;
   return `
     <li class="detail-voie${impaire ? ' detail-voie-impaire' : ''}">

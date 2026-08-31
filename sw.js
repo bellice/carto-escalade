@@ -1,24 +1,14 @@
-// sw.js — stratégie par type de ressource : coquille offline + faible bande
-// passante (contexte réseau lent en falaise) :
-// - sous-ressources locales (CSS, JS) + data.geojson + routes/<id>.json :
-//   PRÉ-CACHÉES à l'install puis servies en stale-while-revalidate — l'app
-//   démarre sans attendre le réseau (réponse cache immédiate), tout en se
-//   rafraîchissant en arrière-plan à chaque visite (voir repondreEnRevalidant) ;
-// - navigations (pages HTML) : réseau d'abord avec repli cache — indispensable
-//   avec un serveur de dev qui transforme le HTML (Vite et ses html-proxy),
-//   et l'offline sert le HTML déjà vu ;
-// - fond de carte (cross-origin OpenFreeMap) : cache d'abord — les tuiles
-//   sont versionnées (immuables) : une fois vues, plus aucun octet réseau aux
-//   visites suivantes (le principal gain de bande passante du site). Le style
-//   seul suit stale-while-revalidate (voir le fetch handler).
-// Bump CACHE_NAME pour forcer un renouvellement IMMÉDIAT (utile pour un
-// correctif urgent) — plus une obligation à chaque déploiement de routine
-// depuis que toute la coquille locale passe en stale-while-revalidate (voir
-// repondreEnRevalidant plus bas) : un simple cache-first sans revalidation
-// la servait indéfiniment tant que CACHE_NAME ne changeait pas, ce qui a
-// fini par arriver (plusieurs vagues de JS/CSS déployées sans y penser —
-// bug réel constaté : les visiteurs déjà passés ne recevaient plus AUCUNE
-// mise à jour tant qu'ils ne vidaient pas leur cache à la main).
+// sw.js — une stratégie par type de ressource, pour tenir sur réseau lent :
+// - CSS/JS locaux, data.geojson, routes/*.json : pré-cachés à l'install puis
+//   stale-while-revalidate — démarrage sans attendre le réseau, rafraîchi en
+//   arrière-plan ;
+// - navigations HTML : réseau d'abord, repli cache — indispensable avec un
+//   serveur de dev qui transforme le HTML (Vite) ;
+// - fond de carte OpenFreeMap : cache d'abord, les tuiles étant versionnées
+//   donc immuables. C'est le principal gain de bande passante du site.
+// Bumper CACHE_NAME force un renouvellement IMMÉDIAT (correctif urgent), mais
+// n'est plus obligatoire à chaque déploiement depuis le passage en
+// stale-while-revalidate.
 const CACHE_PREFIXE = 'sorties-escalade-v';
 // v7 : ajout des modules hors-ligne.js, sw-client.js et demarrer-*.js à la
 // coquille. Un nouveau module ne peut PAS attendre le rafraîchissement
@@ -27,26 +17,15 @@ const CACHE_PREFIXE = 'sorties-escalade-v';
 // le cas type qui justifie encore un bump.
 const CACHE_NAME = `${CACHE_PREFIXE}7`;
 
-// Cache SÉPARÉ pour le fond de carte (tuiles, glyphes, sprites). Deux
-// raisons de ne pas le mélanger à la coquille :
-// - il n'est PAS versionné par CACHE_NAME : bumper la coquille pour livrer du
-//   code ne doit pas effacer une zone pré-chargée avant une sortie (voir
-//   l'activate plus bas) ;
-// - il grossit sans limite (chaque tuile vue s'y ajoute), alors que la
-//   coquille a une taille fixe et connue — les surveiller ensemble ne
-//   permettait de raisonner ni sur l'une ni sur l'autre.
+// Cache SÉPARÉ du fond de carte, à ne surtout pas fusionner avec la coquille :
+// il n'est pas versionné par CACHE_NAME, sans quoi bumper la coquille pour
+// livrer du code effacerait une zone pré-chargée avant une sortie.
 const CACHE_TUILES = 'sorties-escalade-tuiles-v1';
 
-// Coquille pré-cachée à l'install. Liste manuelle : une entrée par dossier
-// sortie/ (page + data.geojson). maplibre-gl reste servi par le CDN (voir
-// README — le build ESM 6.4.1 ne charge pas ses tuiles en same-origin) mais
-// ses 4 fichiers sont PRÉ-CACHÉS ici : l'offline de la lib est garanti dès
-// l'install, sans dépendre du réseau. Les routes/<id>.json (détail des
-// voies) sont pré-cachées DYNAMIQUEMENT à l'install (voir precacherRoutes) :
-// l'histogramme d'une fiche sort du cache instantanément, sans aller-retour
-// réseau, même à la première ouverture (contexte faible réseau). Elles
-// restent servies en stale-while-revalidate par la suite (mise à jour en
-// arrière-plan).
+// Liste MANUELLE : une entrée par dossier sortie/ (page + data.geojson) — un
+// oubli casse le hors-ligne de cette sortie, en silence. maplibre-gl vient du
+// CDN mais ses 4 fichiers sont pré-cachés ici, sans quoi la lib dépendrait du
+// réseau. Les routes/*.json, elles, sont ajoutées dynamiquement (precacherRoutes).
 const PRECACHE = [
   './',
   './index.html',
@@ -79,17 +58,10 @@ const PRECACHE = [
   './sorties/2026-10-drome-saou/data.geojson',
 ];
 
-// Pré-cache du détail des voies (routes/<slug-site>.json, un fichier par
-// SITE — plusieurs falaises dedans) de chaque sortie, à l'install.
-// L'histogramme d'une fiche est chargé à la demande à l'ouverture de la
-// popup (voir marqueurs.js) : sans ce pré-cache, sa première ouverture
-// déclenche un aller-retour réseau — ~2 Ko en moyenne, mais une LATENCE
-// pleine sur réseau faible (le motif exact du "ça met du temps à afficher la
-// dataviz"). Le total d'une sortie est négligeable (~170 Ko) : on pré-cache
-// donc tout à l'install, et la dataviz sort du cache instantanément (même
-// hors-ligne). Les identifiants sont lus depuis data.geojson (déjà dans
-// PRECACHE) : pas de liste à maintenir — chaque nouveau dossier sortie/ est
-// pris en compte automatiquement.
+// Sans ce pré-cache, la première ouverture d'une fiche paie une latence
+// réseau pleine pour ~2 Ko — très visible sur réseau faible. Le total d'une
+// sortie est négligeable (~170 Ko), autant tout prendre à l'install.
+// Les identifiants viennent de data.geojson : aucune liste à maintenir.
 function precacherRoutes() {
   const sorties = PRECACHE.filter((u) => u.endsWith('/data.geojson'));
   return Promise.allSettled(
@@ -158,15 +130,11 @@ function reponseCachable(response) {
   return response.ok || response.type === 'opaque';
 }
 
-// Renvoie une promesse qui se résout une fois la tentative de mise en cache
-// terminée (jamais rejetée) : le fetch handler s'en sert à la fois pour son
-// event.waitUntil (garder le service worker vivant jusqu'à l'écriture
-// réelle, pas juste jusqu'à l'appel de cache.open) et pour renvoyer la
-// réponse une fois cette écriture lancée.
-// Aiguille chaque ressource vers son cache. Seul le fond de carte PROPREMENT
-// DIT (tuiles, glyphes, sprites) part dans CACHE_TUILES ; le style JSON reste
-// avec la coquille, dont il partage le cycle de vie (il est dans PRECACHE et
-// tient en quelques Ko).
+// Promesse jamais rejetée, résolue après l'écriture RÉELLE : le waitUntil du
+// fetch handler doit garder le worker vivant jusque-là, pas seulement jusqu'à
+// l'appel de cache.open.
+// Seules les tuiles, glyphes et sprites vont dans CACHE_TUILES ; le style JSON
+// reste avec la coquille, dont il partage le cycle de vie.
 function cachePour(request) {
   const url = new URL(request.url);
   const estFondDeCarte = url.hostname === 'tiles.openfreemap.org'
@@ -180,16 +148,10 @@ function mettreEnCache(request, response) {
   return caches.open(cachePour(request)).then((cache) => cache.put(request, copie));
 }
 
-// Sert le cache immédiatement (latence nulle, hors-ligne inclus) tout en
-// rafraîchissant en arrière-plan pour la PROCHAINE visite — même mécanique
-// pour 3 catégories de ressources (coquille locale, données, style du fond
-// de carte, voir le fetch handler plus bas), qui ne diffèrent que par CE QUI
-// déclenche cette stratégie, jamais par son comportement. Factorisé ici
-// plutôt que dupliqué 3 fois : avant, seules data.geojson/routes en
-// bénéficiaient — la coquille locale (JS/CSS) restait en cache-first PUR,
-// sans jamais se rafraîchir tant que CACHE_NAME n'était pas bumpé à la main
-// (oubli constaté en pratique : des visiteurs déjà passés ne recevaient plus
-// aucune mise à jour de code tant qu'ils ne vidaient pas leur cache).
+// Sert le cache immédiatement, rafraîchit en arrière-plan pour la PROCHAINE
+// visite. Couvre coquille locale, données et style du fond : sans ça, un
+// cache-first pur servait le code indéfiniment tant que CACHE_NAME n'était
+// pas bumpé — des visiteurs ne recevaient plus aucune mise à jour.
 function repondreEnRevalidant(event) {
   // cache: 'no-cache' force la revalidation reseau (avec le serveur, pas
   // avec le cache HTTP du navigateur) : sans ça, le HTTP cache du navigateur
@@ -234,13 +196,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Ressources cross-origin (fond de carte OpenFreeMap : tuiles, style,
-  // glyphes, sprites) : cache d'abord — l'objectif est de minimiser la bande
-  // passante (contexte faible réseau), et ces ressources sont versionnées :
-  // les URL de tuiles embarquent le numéro de modèle (immuables), les
-  // glyphes/sprites sont statiques. Une fois en cache, plus aucun octet
-  // réseau pour le fond aux visites suivantes. Repli réseau si pas encore en
-  // cache (1re vue).
+  // Fond de carte : cache d'abord. Les URL de tuiles embarquent le numéro de
+  // build, elles sont donc immuables — une fois vues, plus aucun octet réseau.
   if (!url.pathname.includes('/styles/')) {
     // Tuiles / glyphes / sprites : PURE cache-first — immutables, pas de
     // revalidation en arrière-plan (ça re-téléchargerait tout le fond à
