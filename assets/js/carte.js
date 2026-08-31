@@ -31,10 +31,8 @@ const ZOOM_SIMPLIFICATION = 13;
 const ZOOM_PARKINGS = 15;
 
 export function initCarte(dataUrl) {
-  // La carte est créée APRÈS le chargement de data.geojson : les bounds
-  // réelles passent au CONSTRUCTEUR plutôt qu'à un fitBounds animé. Elle naît
-  // donc dans la bonne vue, sans animation ni tuiles téléchargées pour un
-  // centre provisoire — c'est l'objectif premier ici.
+  // Créée seulement une fois data.geojson chargé, pour pouvoir passer les
+  // bounds réelles au constructeur — voir creerCarte.
   let map;
 
   // Détail des voies d'une falaise (routes/<id>.json), à côté du fichier de
@@ -190,7 +188,7 @@ export function initCarte(dataUrl) {
   // pour rester réactive PENDANT un geste de zoom continu ; le calcul des
   // recouvrements (plus coûteux : projection + mesure DOM de chaque libellé)
   // attend que la caméra se stabilise (moveend/zoomend) — voir le câblage
-  // map.on(...) une fois le geojson chargé.
+  // dans ajouterLabelsDeSecteur.
   function appliquerVisibiliteSecteurs() {
     const visible = map.getZoom() >= ZOOM_LABELS_SECTEUR;
     if (visible === secteursVisibles) return;
@@ -315,7 +313,6 @@ export function initCarte(dataUrl) {
     }
   });
 
-  // Actions du contenu de popup (poignée, copier, lien vers un secteur) :
   // Actions du contenu des fiches (poignée, détail des voies, tri, GPS,
   // partage, navigation) : voir actions-fiche.js. Extrait d'ici parce que ce
   // répartiteur de 120 lignes ne touchait que trois variables de cette
@@ -350,9 +347,8 @@ export function initCarte(dataUrl) {
     });
     rafraichirLegendeFalaises();
   }
-  // map.on('zoom', appliquerSimplificationZoom) est enregistré après la
-  // création de la carte, dans le .then (voir plus bas) — map n'existe pas
-  // encore à ce stade du code.
+  // Son map.on('zoom', ...) est enregistré dans creerCarte : map n'existe
+  // pas encore à ce stade du code.
 
   // Reconstruit la mini-légende falaises selon le mode "Cercles" courant ET
   // l'état de simplification par zoom — sinon la légende continuerait de
@@ -588,281 +584,314 @@ export function initCarte(dataUrl) {
   // ça, un échec au chargement initial était définitif et n'offrait que le
   // rechargement manuel de la page — inconfortable sur un réseau qui va et
   // vient, et perdant si la page elle-même n'est plus servie.
+  //
+  // Le corps est la LISTE DES ÉTAPES ; celles qui n'appartiennent qu'au
+  // chargement sont définies juste en dessous, dans le même ordre. Cet
+  // ordre n'est pas libre : creerCarte passe en premier (tout le
+  // reste écrit dans map), construireEntrees avant tout ce qui lit
+  // entries/index/maxima, et appliquerFiltresEtSecteurs après les deux
+  // familles de libellés, dont elle retraite les collisions.
   function chargerDonnees() {
     if (etatChargement) {
       etatChargement.textContent = 'Chargement de la carte…';
       etatChargement.classList.remove('erreur');
     }
     return fetch(dataUrl)
-    .then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status} sur ${dataUrl}`);
-      return r.json();
-    })
-    .then(geojson => {
-      // Cadrage initial AVANT de créer la carte : les bounds réelles des
-      // marqueurs sont connues ici (data.geojson est préchargé via
-      // <link rel="preload">, l'attente est quasi nulle — le parse de
-      // maplibre-gl.mjs prend plus longtemps que ce fetch). Passées au
-      // constructeur via bounds + fitBoundsOptions (padding/maxZoom inclus,
-      // doc MapLibre v6) : la carte démarre directement dans la bonne vue,
-      // sans fitBounds() animé après coup.
-      borneGlobale = new maplibregl.LngLatBounds();
-      geojson.features.forEach(f => borneGlobale.extend(f.geometry.coordinates));
-      map = new maplibregl.Map({
-        container: 'map',
-        // "positron" (fond neutre, peu de POI/labels) plutôt que "liberty"
-        // (style généraliste chargé) : le fond doit rester discret pour que
-        // les marqueurs falaise/parking/gîte restent la figure dominante
-        // (principe figure-fond) — et un style plus simple charge/peint
-        // aussi plus vite.
-        style: 'https://tiles.openfreemap.org/styles/positron',
-        bounds: borneGlobale,
-        fitBoundsOptions: { padding: margeToutVoir(), maxZoom: 15 },
-        attributionControl: false,
-      });
-      // La vue initiale est déjà la bonne (pas d'animation au chargement) :
-      // on peut poser immédiatement les limites de dérive, sans attendre un
-      // moveend (ex- fitToMarkers).
-      limiterZoneCarte(map);
-      // Câble le bouton fermer (×) du panneau falaise desktop — sans effet
-      // sur mobile, le panneau reste display:none hors media query.
-      cablerFermetureManuellePanneau(map, ctxPanneau);
-
-      map.addControl(new maplibregl.NavigationControl(), 'top-right');
-      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
-      // Contrôle "Tout voir" ajouté via l'API de contrôles MapLibre (pas un
-      // bouton positionné en absolu à la main) : la carte gère elle-même
-      // l'empilement des contrôles partageant un coin, donc pas de collision
-      // possible avec NavigationControl au-dessus, quelle que soit sa hauteur
-      // réelle (icônes zoom+boussole, variable selon les options).
-      map.addControl(creerControleToutVoir(() => {
-        // « Tout voir » vide la sélection juste en dessous : la fiche doit
-        // suivre, sinon le panneau resterait affiché avec un contenu périmé,
-        // en contradiction avec « panneau ouvert <=> falaise sélectionnée ».
-        if (popupOuverte) popupOuverte.remove();
-        reinitialiserPadding(map);
-        if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: 15 });
-        // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
-        // recherche active — sinon la caméra revient mais les marqueurs
-        // restent restreints, contradiction avec "tout voir".
-        falaiseSelectionneeCle = null;
-        reinitialiserRecherche();
-        reinitialiserFiltreTemps();
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status} sur ${dataUrl}`);
+        return r.json();
+      })
+      .then((geojson) => {
+        creerCarte(geojson);
+        const tempsDepuisGite = construireEntrees(geojson);
+        afficherCoucheFalaises();
+        ouvrirLienProfond();
+        ajouterLabelsDeSite(geojson);
+        // Construit AUSSI la légende falaises initiale : à ce premier appel
+        // l'état passe de null à une valeur, donc rafraichirLegendeFalaises
+        // s'exécute. Elle n'est construite explicitement nulle part ailleurs.
+        appliquerSimplificationZoom();
+        ajouterLabelsDeSecteur(geojson);
+        remplirAutocompletion(geojson);
+        ajusterLegendeAuxDonnees(geojson);
+        configurerFiltreTemps(tempsDepuisGite);
         appliquerFiltresEtSecteurs();
-      }), 'top-right');
+        if (etatChargement) etatChargement.remove();
+        preparerFourchette();
+        monterHorsLigne(geojson);
+      })
+      .catch(afficherEchecChargement);
+  }
 
-      // Le contrôle d'attribution démarre parfois "déplié" (classe posée
-      // avant que notre config compact ne s'applique pleinement) — on force
-      // l'état replié une fois la carte chargée, sans empêcher l'utilisateur
-      // de le rouvrir ensuite.
-      map.on('load', () => {
-        const attrib = document.querySelector('.maplibregl-ctrl-attrib');
-        if (attrib) attrib.classList.remove('maplibregl-compact-show');
-      });
-      map.on('zoom', appliquerSimplificationZoom);
-      // L'affichage des parkings dépend aussi du zoom (voir
-      // appliquerVisibiliteParkings) — rafraîchi à chaque zoom, sans repasser
-      // par appliquerFiltres.
-      map.on('zoom', appliquerVisibiliteParkings);
-
-      const parkingInfos = indexerParkingInfos(geojson);
-      maxima = calculerMaxima(geojson);
-      const tempsDepuisGite = calculerTempsDepuisGite(geojson);
-      const sourcesIndex = indexerSources(geojson);
-      geojson.features.forEach(f => {
-        const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, () => ficheReduite, (id) => baseRoutes + id + '.json');
-        entries.push(entree);
-        index.set(entree.cle, entree);
-        if (entree.cat === 'falaise') {
-          entree.tempsGite = tempsDepuisGite.get(entree.cle) ?? null;
-          // Résolu une fois ici (topo_id -> {nom, url}) plutôt que dans
-          // popups.js : ce module ne connaît que p (voir son en-tête, "chaque
-          // fonction ne dépend que de ses paramètres") — pas d'accès à
-          // geojson.sources depuis là-bas.
-          const topo = entree.p.topo_id ? sourcesIndex.get(entree.p.topo_id) : null;
-          // trim() : au moins un nom de source.csv porte un espace de fin
-          // parasite (saisie manuelle) -- corrigé ici plutôt que de compter
-          // sur une donnée toujours propre.
-          entree.p.topoNom = topo ? topo.nom.trim() : null;
-          entree.p.topoUrl = topo ? topo.url : null;
-          entree.p.topoEditeur = topo ? topo.auteur : null;
-          entree.p.topoType = topo ? topo.type : null;
-          // Année déjà résolue côté export (geojson.sources[].annee, voir
-          // export_geojson.py/annee_depuis_millesime) : évite de re-parser un
-          // format de date ici, notamment le format "JJ/MM/AA" qui ne se
-          // laisse pas trivialement découper par simple slice().
-          entree.p.topoAnnee = topo ? topo.annee : null;
-
-          const cleSecteur = entree.secteur || entree.nom;
-          if (!entriesParSecteur.has(cleSecteur)) entriesParSecteur.set(cleSecteur, []);
-          entriesParSecteur.get(cleSecteur).push(entree);
-
-          const site = f.properties.site;
-          if (site) {
-            if (!entriesParSite.has(site)) entriesParSite.set(site, []);
-            entriesParSite.get(site).push(entree);
-          }
-        }
-      });
-      // MapLibre exige le STYLE chargé avant addSource/addLayer : on attend
-      // 'load' s'il ne l'est pas — cas normal, le style est plus lent que le
-      // geojson préchargé. La source est ajoutée vide puis remplie, le filtre
-      // re-posé dans le même tick : aucun flash de points non filtrés.
-      const chargerFalaises = () => {
-        construireCoucheFalaises();
-        map.getSource('falaises').setData(construireSourceFalaises(entries, 'aucun', maxima));
-      };
-      if (map.isStyleLoaded()) {
-        chargerFalaises();
-      } else {
-        map.once('load', () => {
-          chargerFalaises();
-          appliquerFiltresEtSecteurs();
-        });
-      }
-
-      // Lien profond (?falaise=<cle>, voir .btn-partager plus bas) : ouvre
-      // directement la fiche d'une falaise précise au chargement — réutilise
-      // allerVers (même mécanique que "Voir" après une recherche, ligne
-      // ~1008), pas de nouveau code de navigation. cle absente/inconnue :
-      // comportement normal, inchangé.
-      const cleLienProfond = new URLSearchParams(location.search).get('falaise');
-      if (cleLienProfond && index.has(cleLienProfond)) {
-        allerVers(cleLienProfond);
-      }
-
-      // Clic sur un label de site : cadre sur l'étendue de toutes ses
-      // falaises — pas de popup (ce n'est pas une entité unique), juste la
-      // caméra. La recherche se réinitialise (même logique qu'allerVers :
-      // une recherche active pourrait sinon masquer des falaises du site
-      // qu'on vient justement de rejoindre) ; la sélection courante n'a pas
-      // besoin d'être touchée, elle ne cache rien ici.
-      labelsSites = ajouterLabelsSites(map, geojson, (site) => {
-        const falaisesDuSite = geojson.features.filter(f =>
-          f.properties.categorie === 'falaise' && f.properties.site === site
-        );
-        if (!falaisesDuSite.length) return;
-        reinitialiserRecherche();
-        appliquerFiltresEtSecteurs();
-        const bounds = new maplibregl.LngLatBounds();
-        falaisesDuSite.forEach(f => bounds.extend(f.geometry.coordinates));
-        reinitialiserPadding(map);
-        map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
-      });
-      // Règle de hiérarchie des libellés : les noms de site ne s'affichent
-      // que sous le seuil d'apparition des noms de secteur (zoom <
-      // ZOOM_LABELS_SECTEUR), voir appliquerVisibiliteSites. À trancher dès
-      // maintenant (le cadrage initial peut déjà être au seuil) puis à
-      // chaque zoom.
-      map.on('zoom', appliquerVisibiliteSites);
-      appliquerVisibiliteSites();
-      map.on('moveend', appliquerAntiCollisionSites);
-      map.on('zoomend', appliquerAntiCollisionSites);
-      appliquerSimplificationZoom();
-
-      // Noms de secteur : masqués par défaut, affichés seulement à fort zoom
-      // (voir ZOOM_LABELS_SECTEUR) une fois que les cercles proportionnels
-      // sont assez espacés à l'écran pour rester lisibles. appliquerVisibiliteSecteurs/
-      // appliquerAntiCollisionSecteurs (déclarées plus haut, avant le fetch : elles
-      // doivent aussi être appelables depuis definirModeFigure/appliquerFiltresEtSecteurs)
-      // masquent en plus un libellé sans figuré ponctuel visible en dessous, ou en
-      // collision à l'écran avec un autre déjà affiché.
-      labelsSecteurs = ajouterLabelsSecteurs(map, geojson);
-      map.on('zoom', appliquerVisibiliteSecteurs);
-      map.on('moveend', appliquerAntiCollisionSecteurs);
-      map.on('zoomend', appliquerAntiCollisionSecteurs);
-      appliquerVisibiliteSecteurs();
-
-      // borneGlobale a déjà été calculé au début du .then (bounds passées au
-      // constructeur) ; limiterZoneCarte a été posée juste après la création.
-      remplirAutocompletion(geojson);
-      // La légende initiale est déjà construite par appliquerSimplificationZoom()
-      // ci-dessus (state changed depuis null au premier appel).
-
-      // Les modes "Couenne"/"Grande voie" n'ont de sens que si au moins une
-      // falaise a des voies typées couenne/grande voie — sinon ces options
-      // restent masquées. Relit les "entries" déjà construites
-      // (nbGrandeVoie/nbCouenne précalculés à la génération, voir
-      // export_geojson.py) plutôt que de rescanner le geojson brut une 2e fois.
-      const auMoinsUneAvecType = entries.some(e =>
-        e.cat === 'falaise' && (e.nbGrandeVoie > 0 || e.nbCouenne > 0)
-      );
-      if (!auMoinsUneAvecType) {
-        ['option-couenne', 'option-gv'].forEach((id) => {
-          const opt = document.getElementById(id);
-          if (opt) opt.remove();
-        });
-      }
-
-      // La clé "Gîte" de la légende n'a de sens que si la sortie en a un.
-      const aGite = geojson.features.some(f => f.properties.categorie === 'hebergement');
-      if (!aGite) {
-        const legendeGite = document.getElementById('legende-gite');
-        if (legendeGite) legendeGite.remove();
-      }
-
-      // Filtre "Depuis le gîte" : masqué par défaut (voir HTML, attribut
-      // hidden) tant qu'on n'a pas confirmé qu'au moins une falaise a un
-      // temps calculable — un slider sans borne réelle n'aurait rien à
-      // montrer. Bornes arrondies au multiple de 5 le plus proche (ex. 5→120
-      // sur ce jeu de données) pour un pas de slider net plutôt que des
-      // valeurs à la minute près, qui n'apportent rien de plus utile ici.
-      const tempsValeurs = Array.from(tempsDepuisGite.values());
-      if (tempsValeurs.length && filtreTemps && filtreTempsValeur && legendeTemps) {
-        const plancher = Math.floor(Math.min(...tempsValeurs) / 5) * 5;
-        const plafond = Math.ceil(Math.max(...tempsValeurs) / 5) * 5;
-        filtres.tempsGitePlafond = plafond;
-        filtres.tempsMaxGite = plafond;
-        filtreTemps.min = String(plancher);
-        filtreTemps.max = String(plafond);
-        filtreTemps.step = '5';
-        filtreTemps.value = String(plafond);
-        filtreTempsValeur.textContent = `≤ ${plafond} min`;
-        legendeTemps.hidden = false;
-        filtreTemps.addEventListener('input', () => {
-          filtres.tempsMaxGite = Number(filtreTemps.value);
-          filtreTempsValeur.textContent = `≤ ${filtreTemps.value} min`;
-          appliquerFiltresEtSecteurs();
-        });
-      }
-
-      appliquerFiltresEtSecteurs();
-      if (etatChargement) etatChargement.remove();
-
-      // « Préparer le hors-ligne » : monté ici, une fois qu'on connaît les
-      // points réels de la sortie (falaises + parkings + gîte) — ce sont eux
-      // qui déterminent les tuiles à télécharger. Placé dans la légende,
-      // avec le reste des réglages de la carte. Idempotent : ne fait rien si
-      // le bloc existe déjà (rechargement après un "Réessayer").
-      // Les listes de cotations se peuplent depuis les entries : ne peut se
-      // faire qu'une fois data.geojson lu.
-      preparerFourchette();
-
-      const hote = document.getElementById('preparation-hors-ligne');
-      if (hote && !hote.querySelector('.btn-preparer')) {
-        monterPreparationHorsLigne({
-          map,
-          points: geojson.features.map(f => f.geometry.coordinates),
-          conteneur: hote,
-        });
-      }
-    })
-    .catch(err => {
-      console.error('Erreur de chargement des données', err);
-      if (!etatChargement) return;
-      etatChargement.textContent = '';
-      etatChargement.classList.add('erreur');
-      const message = document.createElement('span');
-      message.textContent = navigator.onLine
-        ? 'Impossible de charger les données de la sortie.'
-        : 'Hors ligne, et ces données ne sont pas encore en cache.';
-      const bouton = document.createElement('button');
-      bouton.type = 'button';
-      bouton.className = 'btn-reessayer';
-      bouton.textContent = 'Réessayer';
-      bouton.addEventListener('click', chargerDonnees);
-      etatChargement.append(message, bouton);
+  // La carte est créée AVEC ses bounds réelles (calculées juste avant) plutôt
+  // qu'avec un fitBounds animé après coup : elle naît dans la bonne vue, sans
+  // animation ni tuiles téléchargées pour un centre provisoire. C'est
+  // possible parce que data.geojson est préchargé (<link rel="preload">) et
+  // que son fetch est plus court que le parse de maplibre-gl.mjs.
+  function creerCarte(geojson) {
+    borneGlobale = new maplibregl.LngLatBounds();
+    geojson.features.forEach(f => borneGlobale.extend(f.geometry.coordinates));
+    map = new maplibregl.Map({
+      container: 'map',
+      // "positron" (fond neutre, peu de POI/labels) plutôt que "liberty"
+      // (style généraliste chargé) : le fond doit rester discret pour que
+      // les marqueurs falaise/parking/gîte restent la figure dominante
+      // (principe figure-fond) — et un style plus simple charge/peint
+      // aussi plus vite.
+      style: 'https://tiles.openfreemap.org/styles/positron',
+      bounds: borneGlobale,
+      fitBoundsOptions: { padding: margeToutVoir(), maxZoom: 15 },
+      attributionControl: false,
     });
+    // La vue initiale est déjà la bonne (pas d'animation au chargement) : on
+    // peut poser immédiatement les limites de dérive, sans attendre un
+    // moveend (ex- fitToMarkers).
+    limiterZoneCarte(map);
+    // Câble le bouton fermer (×) du panneau falaise desktop — sans effet
+    // sur mobile, le panneau reste display:none hors media query.
+    cablerFermetureManuellePanneau(map, ctxPanneau);
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+    // Contrôle "Tout voir" ajouté via l'API de contrôles MapLibre (pas un
+    // bouton positionné en absolu à la main) : la carte gère elle-même
+    // l'empilement des contrôles partageant un coin, donc pas de collision
+    // possible avec NavigationControl au-dessus, quelle que soit sa hauteur
+    // réelle (icônes zoom+boussole, variable selon les options).
+    map.addControl(creerControleToutVoir(() => {
+      // « Tout voir » vide la sélection juste en dessous : la fiche doit
+      // suivre, sinon le panneau resterait affiché avec un contenu périmé,
+      // en contradiction avec « panneau ouvert <=> falaise sélectionnée ».
+      if (popupOuverte) popupOuverte.remove();
+      reinitialiserPadding(map);
+      if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: 15 });
+      // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
+      // recherche active — sinon la caméra revient mais les marqueurs
+      // restent restreints, contradiction avec "tout voir".
+      falaiseSelectionneeCle = null;
+      reinitialiserRecherche();
+      reinitialiserFiltreTemps();
+      appliquerFiltresEtSecteurs();
+    }), 'top-right');
+
+    // Le contrôle d'attribution démarre parfois "déplié" (classe posée
+    // avant que notre config compact ne s'applique pleinement) — on force
+    // l'état replié une fois la carte chargée, sans empêcher l'utilisateur
+    // de le rouvrir ensuite.
+    map.on('load', () => {
+      const attrib = document.querySelector('.maplibregl-ctrl-attrib');
+      if (attrib) attrib.classList.remove('maplibregl-compact-show');
+    });
+    map.on('zoom', appliquerSimplificationZoom);
+    // L'affichage des parkings dépend aussi du zoom (voir
+    // appliquerVisibiliteParkings) — rafraîchi à chaque zoom, sans repasser
+    // par appliquerFiltres.
+    map.on('zoom', appliquerVisibiliteParkings);
+  }
+
+  // Peuple entries/index (l'index de travail de toute la page) et les deux
+  // regroupements dont dépend l'anti-collision des libellés. Renvoie les
+  // temps depuis le gîte : c'est la seule sortie de cette étape dont une
+  // autre a besoin ensuite (configurerFiltreTemps).
+  function construireEntrees(geojson) {
+    const parkingInfos = indexerParkingInfos(geojson);
+    maxima = calculerMaxima(geojson);
+    const tempsDepuisGite = calculerTempsDepuisGite(geojson);
+    const sourcesIndex = indexerSources(geojson);
+    geojson.features.forEach(f => {
+      const entree = addMarker(map, f, parkingInfos, maxima, enSurbrillance, definirFalaiseSelectionnee, suivrePopup, () => ficheReduite, (id) => baseRoutes + id + '.json');
+      entries.push(entree);
+      index.set(entree.cle, entree);
+      if (entree.cat !== 'falaise') return;
+
+      entree.tempsGite = tempsDepuisGite.get(entree.cle) ?? null;
+      // Résolu une fois ici (topo_id -> {nom, url}) plutôt que dans
+      // popups.js : ce module ne connaît que p (voir son en-tête, "chaque
+      // fonction ne dépend que de ses paramètres") — pas d'accès à
+      // geojson.sources depuis là-bas.
+      const topo = entree.p.topo_id ? sourcesIndex.get(entree.p.topo_id) : null;
+      // trim() : au moins un nom de source.csv porte un espace de fin
+      // parasite (saisie manuelle) -- corrigé ici plutôt que de compter
+      // sur une donnée toujours propre.
+      entree.p.topoNom = topo ? topo.nom.trim() : null;
+      entree.p.topoUrl = topo ? topo.url : null;
+      entree.p.topoEditeur = topo ? topo.auteur : null;
+      entree.p.topoType = topo ? topo.type : null;
+      // Année déjà résolue côté export (geojson.sources[].annee, voir
+      // export_geojson.py/annee_depuis_millesime) : évite de re-parser un
+      // format de date ici, notamment le format "JJ/MM/AA" qui ne se
+      // laisse pas trivialement découper par simple slice().
+      entree.p.topoAnnee = topo ? topo.annee : null;
+
+      const cleSecteur = entree.secteur || entree.nom;
+      if (!entriesParSecteur.has(cleSecteur)) entriesParSecteur.set(cleSecteur, []);
+      entriesParSecteur.get(cleSecteur).push(entree);
+
+      const site = f.properties.site;
+      if (site) {
+        if (!entriesParSite.has(site)) entriesParSite.set(site, []);
+        entriesParSite.get(site).push(entree);
+      }
+    });
+    return tempsDepuisGite;
+  }
+
+  // MapLibre exige le STYLE chargé avant addSource/addLayer : on attend
+  // 'load' s'il ne l'est pas — cas normal, le style est plus lent que le
+  // geojson préchargé. La source est ajoutée vide puis remplie, le filtre
+  // re-posé dans le même tick : aucun flash de points non filtrés.
+  function afficherCoucheFalaises() {
+    const poser = () => {
+      construireCoucheFalaises();
+      map.getSource('falaises').setData(construireSourceFalaises(entries, 'aucun', maxima));
+    };
+    if (map.isStyleLoaded()) {
+      poser();
+    } else {
+      map.once('load', () => {
+        poser();
+        appliquerFiltresEtSecteurs();
+      });
+    }
+  }
+
+  // Lien profond (?falaise=<cle>, produit par le bouton « Partager » — voir
+  // actions-fiche.js) : ouvre directement la fiche d'une falaise précise au
+  // chargement, en réutilisant allerVers (même mécanique que "Voir" après une
+  // recherche, pas de code de navigation en double). Clé absente ou inconnue :
+  // comportement normal, inchangé.
+  function ouvrirLienProfond() {
+    const cle = new URLSearchParams(location.search).get('falaise');
+    if (cle && index.has(cle)) allerVers(cle);
+  }
+
+  // Clic sur un label de site : cadre sur l'étendue de toutes ses falaises —
+  // pas de popup (ce n'est pas une entité unique), juste la caméra. La
+  // recherche se réinitialise (même logique qu'allerVers : une recherche
+  // active pourrait sinon masquer des falaises du site qu'on vient justement
+  // de rejoindre) ; la sélection courante n'a pas besoin d'être touchée, elle
+  // ne cache rien ici.
+  function ajouterLabelsDeSite(geojson) {
+    labelsSites = ajouterLabelsSites(map, geojson, (site) => {
+      const falaisesDuSite = geojson.features.filter(f =>
+        f.properties.categorie === 'falaise' && f.properties.site === site
+      );
+      if (!falaisesDuSite.length) return;
+      reinitialiserRecherche();
+      appliquerFiltresEtSecteurs();
+      const bounds = new maplibregl.LngLatBounds();
+      falaisesDuSite.forEach(f => bounds.extend(f.geometry.coordinates));
+      reinitialiserPadding(map);
+      map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
+    });
+    // Règle de hiérarchie des libellés : les noms de site ne s'affichent que
+    // sous le seuil d'apparition des noms de secteur (zoom <
+    // ZOOM_LABELS_SECTEUR), voir appliquerVisibiliteSites. À trancher dès
+    // maintenant (le cadrage initial peut déjà être au seuil) puis à chaque
+    // zoom.
+    map.on('zoom', appliquerVisibiliteSites);
+    appliquerVisibiliteSites();
+    map.on('moveend', appliquerAntiCollisionSites);
+    map.on('zoomend', appliquerAntiCollisionSites);
+  }
+
+  // Noms de secteur : masqués par défaut, affichés seulement à fort zoom
+  // (voir ZOOM_LABELS_SECTEUR) une fois que les cercles proportionnels sont
+  // assez espacés à l'écran pour rester lisibles. appliquerVisibiliteSecteurs
+  // et appliquerAntiCollisionSecteurs sont déclarées bien plus haut (elles
+  // doivent aussi être appelables depuis definirModeFigure et
+  // appliquerFiltresEtSecteurs) ; elles masquent en plus un libellé sans
+  // figuré ponctuel visible en dessous, ou en collision à l'écran avec un
+  // autre déjà affiché.
+  function ajouterLabelsDeSecteur(geojson) {
+    labelsSecteurs = ajouterLabelsSecteurs(map, geojson);
+    map.on('zoom', appliquerVisibiliteSecteurs);
+    map.on('moveend', appliquerAntiCollisionSecteurs);
+    map.on('zoomend', appliquerAntiCollisionSecteurs);
+    appliquerVisibiliteSecteurs();
+  }
+
+  // Retire de la légende ce que CETTE sortie ne contient pas : un réglage qui
+  // ne peut rien changer vaut moins que pas de réglage du tout.
+  function ajusterLegendeAuxDonnees(geojson) {
+    // Les modes "Couenne"/"Grande voie" n'ont de sens que si au moins une
+    // falaise a des voies typées. Relit les "entries" déjà construites
+    // (nbGrandeVoie/nbCouenne précalculés à la génération, voir
+    // export_geojson.py) plutôt que de rescanner le geojson brut une 2e fois.
+    const auMoinsUneAvecType = entries.some(e =>
+      e.cat === 'falaise' && (e.nbGrandeVoie > 0 || e.nbCouenne > 0)
+    );
+    if (!auMoinsUneAvecType) {
+      ['option-couenne', 'option-gv'].forEach((id) => {
+        const opt = document.getElementById(id);
+        if (opt) opt.remove();
+      });
+    }
+
+    // La clé "Gîte" de la légende n'a de sens que si la sortie en a un.
+    const aGite = geojson.features.some(f => f.properties.categorie === 'hebergement');
+    if (!aGite) {
+      const legendeGite = document.getElementById('legende-gite');
+      if (legendeGite) legendeGite.remove();
+    }
+  }
+
+  // Filtre "Depuis le gîte" : masqué par défaut (voir HTML, attribut hidden)
+  // tant qu'on n'a pas confirmé qu'au moins une falaise a un temps calculable
+  // — un slider sans borne réelle n'aurait rien à montrer. Bornes arrondies
+  // au multiple de 5 le plus proche (ex. 5→120 sur ce jeu de données) pour un
+  // pas de slider net plutôt que des valeurs à la minute près, qui
+  // n'apportent rien de plus utile ici.
+  function configurerFiltreTemps(tempsDepuisGite) {
+    const tempsValeurs = Array.from(tempsDepuisGite.values());
+    if (!tempsValeurs.length || !filtreTemps || !filtreTempsValeur || !legendeTemps) return;
+
+    const plancher = Math.floor(Math.min(...tempsValeurs) / 5) * 5;
+    const plafond = Math.ceil(Math.max(...tempsValeurs) / 5) * 5;
+    filtres.tempsGitePlafond = plafond;
+    filtres.tempsMaxGite = plafond;
+    filtreTemps.min = String(plancher);
+    filtreTemps.max = String(plafond);
+    filtreTemps.step = '5';
+    filtreTemps.value = String(plafond);
+    filtreTempsValeur.textContent = `≤ ${plafond} min`;
+    legendeTemps.hidden = false;
+    filtreTemps.addEventListener('input', () => {
+      filtres.tempsMaxGite = Number(filtreTemps.value);
+      filtreTempsValeur.textContent = `≤ ${filtreTemps.value} min`;
+      appliquerFiltresEtSecteurs();
+    });
+  }
+
+  // « Préparer » : monté seulement ici, une fois connus les points réels de
+  // la sortie (falaises + parkings + gîte) — ce sont eux qui déterminent les
+  // tuiles à télécharger. Idempotent : ne fait rien si le bloc existe déjà
+  // (rechargement après un "Réessayer").
+  function monterHorsLigne(geojson) {
+    const hote = document.getElementById('preparation-hors-ligne');
+    if (!hote || hote.querySelector('.btn-preparer')) return;
+    monterPreparationHorsLigne({
+      map,
+      points: geojson.features.map(f => f.geometry.coordinates),
+      conteneur: hote,
+    });
+  }
+
+  function afficherEchecChargement(err) {
+    console.error('Erreur de chargement des données', err);
+    if (!etatChargement) return;
+    etatChargement.textContent = '';
+    etatChargement.classList.add('erreur');
+    const message = document.createElement('span');
+    message.textContent = navigator.onLine
+      ? 'Impossible de charger les données de la sortie.'
+      : 'Hors ligne, et ces données ne sont pas encore en cache.';
+    const bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'btn-reessayer';
+    bouton.textContent = 'Réessayer';
+    bouton.addEventListener('click', chargerDonnees);
+    etatChargement.append(message, bouton);
   }
 
   chargerDonnees();
