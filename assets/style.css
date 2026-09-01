@@ -131,6 +131,22 @@ a:visited { color: var(--forest); }
   color: var(--forest);
 }
 
+/* Mono, --muted, poids normal : elle doit se lire comme la traduction du nom,
+   pas comme un second titre — l'accroche juste en dessous tient déjà ce rôle.
+   letter-spacing remis à zéro (le h1 le resserre, une mono ne se resserre
+   pas) et nowrap pour que « toquer là-haut » ne se coupe jamais en deux :
+   mesuré à 272px avec le titre sur les 350 utiles d'un 390px, la ligne tient
+   d'un bloc, et sur plus étroit la glose bascule entière à la ligne. */
+.home h1 .glose {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
 /* text-wrap: balance — sur 390px l'accroche passe sur deux lignes et la
    coupure par défaut laissait un « · » orphelin en fin de première ligne.
    Ignoré par les navigateurs qui ne le connaissent pas : au pire on retrouve
