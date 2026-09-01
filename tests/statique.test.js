@@ -141,30 +141,6 @@ describe('Données exportées', () => {
   // de falaise se partagent les 111 enregistrements (Grand Regardé en compte 6
   // à lui seul). Un libellé posé sur UN marqueur peut rester approximatif, un
   // COMPTE non — l'accueil annonçait « 111 falaises » à tort.
-  // Les chiffres restent écrits en dur dans index.html : régénérer les données
-  // ne le toucherait pas, la page mentirait donc sans ce garde-fou.
-  test("les chiffres de l'accueil correspondent aux données", async () => {
-    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
-    const secteurs = geo.features.filter((f) => f.properties.categorie === 'falaise');
-    const voies = secteurs.reduce((n, f) => n + (f.properties.nb_voie_total || 0), 0);
-
-    const html = await lire('index.html');
-    const ligne = /<span class="chiffres">([^<]+)<\/span>/.exec(html);
-    assert.ok(ligne, "Ligne de chiffres absente de l'accueil");
-
-    // Découpage sur le point médian plutôt qu'une expression régulière : la
-    // ligne en porte déjà un par compteur, et retirer tout ce qui n'est pas un
-    // chiffre rend la lecture insensible à l'espace des milliers (« 1 569 »).
-    const compteur = (libelle) => {
-      const part = ligne[1].split('·').find((x) => x.includes(libelle));
-      return part ? Number(part.replace(/[^0-9]/g, '')) : null;
-    };
-    for (const [libelle, attendu] of [['secteurs', secteurs.length], ['voies', voies]]) {
-      assert.equal(compteur(libelle), attendu,
-        `Accueil : « ${ligne[1]} » annonce un nombre de ${libelle} périmé ` +
-        `(${attendu} dans les données). Mettre index.html à jour.`);
-    }
-  });
 });
 
 describe('Accessibilité : jetons de couleur', () => {

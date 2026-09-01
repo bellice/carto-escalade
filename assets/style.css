@@ -208,12 +208,6 @@ a:visited { color: var(--forest); }
   text-decoration-thickness: 1px;
   text-underline-offset: 4px;
 }
-.sortie-list .chiffres,
-.sortie-list .date {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
 
 .note-preparer {
   margin: 28px 0 0;

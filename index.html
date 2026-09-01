@@ -46,37 +46,35 @@
          isolée ?). La note plus bas garde « réseau » pour dire le pourquoi. -->
     <p class="tagline">falaises · parkings · approches · hors&nbsp;ligne</p>
 
+    <!-- Le lieu seul. Les compteurs (« 111 secteurs · 1 569 voies ») et la
+         date de sortie ont été retirés : avec un seul lieu dans la liste,
+         aucun des deux ne changeait de décision — on cliquait de toute façon.
+         La date rouvrait en plus le modèle par SORTIE qu'on avait abandonné
+         au profit du modèle par LIEU (un lieu est permanent, une sortie est
+         un évènement), et elle serait devenue fausse en novembre sans que
+         rien ne le signale.
+         Les compteurs reviendront s'ils redeviennent utiles, c'est-à-dire le
+         jour où il y aura plusieurs lieux à départager. -->
     <ul class="sortie-list">
       <li>
         <a href="vallee-drome-diois/">
           <span class="nom">Vallée de la Drôme et Diois</span>
-          <!-- SECTEURS et non falaises : un enregistrement = un couple
-               site+secteur, et 37 noms de falaise seulement se partagent les
-               111 (Grand Regardé en compte 6 à lui seul). Un libellé posé sur
-               un marqueur peut rester approximatif, un COMPTE non.
-               Deux compteurs et non trois : « 21 sites » a sauté. Sur la page
-               d'accueil d'un site web, le mot est ambigu ; et trois étages de
-               granularité d'un coup (site/secteur/voie) donnent la taxonomie
-               de la base plutôt qu'une information — c'est cette hiérarchie
-               qui avait déjà produit le « 111 falaises » qu'il a fallu
-               corriger.
-               Chiffres relevés dans data.geojson, vérifiés par un test
-               statique : sans lui, une régénération ferait mentir cette page
-               en silence. -->
-          <span class="chiffres">111 secteurs · 1 569 voies</span>
-          <span class="date">octobre 2026</span>
         </a>
       </li>
     </ul>
 
     <!-- La phrase la plus utile de la page : elle nomme la seule action qui
-         doit avoir lieu AVANT de quitter le wifi. Le bouton correspondant vit
-         dans l'en-tête de la carte, donc invisible d'ici.
-         Deux affirmations sèches, le fait surprenant d'abord : un jeu de mots
-         a sa place sur la 404, moment de friction qu'un clin d'œil adoucit,
-         pas ici où l'on vient pour ouvrir une carte. -->
-    <p class="note-preparer">En falaise, pas de réseau. Préparez votre carte
-      avant de partir.</p>
+         doit avoir lieu AVANT de quitter le wifi, et le bouton correspondant
+         vit dans l'en-tête de la carte, donc invisible d'ici.
+         Elle CITE le libellé exact du bouton et dit où il se trouve : la
+         version précédente (« Préparez votre carte avant de partir »)
+         nommait l'intention sans jamais dire comment l'exécuter. Sa première
+         moitié, « En falaise, pas de réseau », a sauté deux fois coupable :
+         doublon avec « hors ligne » de l'accroche, et surpromesse — beaucoup
+         de falaises ont du réseau, et un lecteur qui a cinq barres à Saoû
+         cesse de croire le reste de la page. -->
+    <p class="note-preparer">Avant de partir, appuyez sur «&nbsp;Préparer&nbsp;»
+      en haut de la carte.</p>
   </div>
 
   <!-- Externalisé (voir demarrer-accueil.js / sw-client.js) : sans script
