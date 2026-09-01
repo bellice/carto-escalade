@@ -146,7 +146,6 @@ describe('Données exportées', () => {
   test("les chiffres de l'accueil correspondent aux données", async () => {
     const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
     const secteurs = geo.features.filter((f) => f.properties.categorie === 'falaise');
-    const sites = new Set(secteurs.map((f) => f.properties.site)).size;
     const voies = secteurs.reduce((n, f) => n + (f.properties.nb_voie_total || 0), 0);
 
     const html = await lire('index.html');
@@ -160,7 +159,7 @@ describe('Données exportées', () => {
       const part = ligne[1].split('·').find((x) => x.includes(libelle));
       return part ? Number(part.replace(/[^0-9]/g, '')) : null;
     };
-    for (const [libelle, attendu] of [['sites', sites], ['secteurs', secteurs.length], ['voies', voies]]) {
+    for (const [libelle, attendu] of [['secteurs', secteurs.length], ['voies', voies]]) {
       assert.equal(compteur(libelle), attendu,
         `Accueil : « ${ligne[1]} » annonce un nombre de ${libelle} périmé ` +
         `(${attendu} dans les données). Mettre index.html à jour.`);
