@@ -131,19 +131,21 @@ a:visited { color: var(--forest); }
   color: var(--forest);
 }
 
-/* Mono, --muted, poids normal : elle doit se lire comme la traduction du nom,
-   pas comme un second titre — l'accroche juste en dessous tient déjà ce rôle.
-   letter-spacing remis à zéro (le h1 le resserre, une mono ne se resserre
-   pas) et nowrap pour que « toquer là-haut » ne se coupe jamais en deux :
-   mesuré à 272px avec le titre sur les 350 utiles d'un 390px, la ligne tient
-   d'un bloc, et sur plus étroit la glose bascule entière à la ligne. */
+/* Italique et NON monospace : la mono est la voix « donnée » du site
+   (légende, libellés de popup, compteurs). « toquer là-haut » est un mot, pas
+   une donnée — et l'italique est la convention typographique d'une glose.
+   La mettre en mono, c'était porter à quatre sur sept le nombre de blocs
+   monospace de la page : au-delà, la fonte ne distingue plus rien.
+   letter-spacing remis à zéro (le h1 le resserre, une glose ne se resserre
+   pas) ; nowrap pour que « toquer là-haut » ne se coupe jamais en deux — sur
+   plus étroit qu'un 320px, elle bascule entière à la ligne. */
 .home h1 .glose {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-style: italic;
+  font-size: var(--fs-md);
   font-weight: 400;
   letter-spacing: 0;
   color: var(--muted);
-  margin-left: 6px;
+  margin-left: 8px;
   white-space: nowrap;
 }
 
@@ -184,13 +186,27 @@ a:visited { color: var(--forest); }
   color: var(--ink);
 }
 
-.sortie-list a:hover { color: var(--clay); }
+.sortie-list a:hover,
+.sortie-list a:hover .nom { color: var(--clay); }
 
-/* Le seul élément actionnable de la page : il porte le même palier qu'un
-   titre de fiche, les deux nommant la chose qu'on est en train de regarder. */
+/* Le seul élément actionnable de la page : même palier qu'un titre de fiche,
+   les deux nommant la chose qu'on regarde.
+   Et il DOIT ressembler à un lien. Il était en --ink sans soulignement, donc
+   indistinguable du texte courant, avec pour seul indice un :hover — qui
+   n'existe pas au doigt : sur téléphone, plus rien du tout. Pendant ce
+   temps « Revenir à l'accueil » sur la 404, le lien le moins utile du site,
+   était vert et souligné. Le vert (--forest, couleur de lien du site) lui est
+   rendu — mais NE PAS RETIRER LE SOULIGNEMENT pour autant : --forest et --ink
+   ne sont qu'à 1.51:1 l'un de l'autre, très loin des 3:1 qu'exige WCAG 1.4.1
+   pour distinguer un lien par la couleur seule. C'est le trait qui porte
+   l'information ; le vert ne fait que suivre la convention du site. */
 .sortie-list .nom {
   font-weight: 600;
   font-size: var(--fs-lg);
+  color: var(--forest);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
 }
 .sortie-list .chiffres,
 .sortie-list .date {
