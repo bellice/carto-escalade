@@ -112,6 +112,16 @@ a:visited { color: var(--forest); }
   max-width: 640px;
   margin: 0 auto;
   padding: 48px 20px;
+  /* L'échelle --fs-* est calibrée pour l'interface carte, dense par
+     nécessité — son arbitrage a été tranché sur la hauteur de la fiche
+     mobile (voir le commentaire de l'échelle dans :root). L'accueil et la
+     404 n'ont aucune densité à gérer : 37% de la hauteur occupée sur un
+     390px. Ils montent donc d'un palier, et posent l'interligne que
+     l'interface laisse à `normal` faute de prose à y afficher.
+     Sans font-size ici, ces pages héritaient du 16px par défaut du
+     navigateur — une taille hors échelle, que personne n'avait choisie. */
+  font-size: var(--fs-md);
+  line-height: 1.5;
 }
 
 .home h1 {
@@ -121,11 +131,15 @@ a:visited { color: var(--forest); }
   color: var(--forest);
 }
 
+/* text-wrap: balance — sur 390px l'accroche passe sur deux lignes et la
+   coupure par défaut laissait un « · » orphelin en fin de première ligne.
+   Ignoré par les navigateurs qui ne le connaissent pas : au pire on retrouve
+   la coupure d'avant. */
 .home .tagline {
   font-family: var(--font-mono);
-  font-size: var(--fs-base);
   color: var(--muted);
   margin: 0 0 32px;
+  text-wrap: balance;
 }
 
 .sortie-list {
@@ -156,7 +170,12 @@ a:visited { color: var(--forest); }
 
 .sortie-list a:hover { color: var(--clay); }
 
-.sortie-list .nom { font-weight: 600; }
+/* Le seul élément actionnable de la page : il porte le même palier qu'un
+   titre de fiche, les deux nommant la chose qu'on est en train de regarder. */
+.sortie-list .nom {
+  font-weight: 600;
+  font-size: var(--fs-lg);
+}
 .sortie-list .chiffres,
 .sortie-list .date {
   font-family: var(--font-mono);
@@ -167,6 +186,6 @@ a:visited { color: var(--forest); }
 .note-preparer {
   margin: 28px 0 0;
   max-width: 34em;
-  font-size: var(--fs-base);
   color: var(--muted);
+  text-wrap: balance;
 }

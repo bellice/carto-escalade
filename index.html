@@ -27,10 +27,15 @@
 <body>
   <div class="home">
     <h1>Tokelau</h1>
-    <!-- « hors réseau » en 4e valeur : les trois premiers mots décrivent le
-         contenu de la carte, celui-là dit ce qui distingue ce site d'Oblyk ou
-         theCrag — le seul terrain où il peut gagner. -->
-    <p class="tagline">falaises · parkings · approches · hors&nbsp;réseau</p>
+    <!-- 4e valeur : les trois premiers mots décrivent le contenu de la carte,
+         celui-là dit ce qui distingue ce site d'Oblyk ou theCrag — le seul
+         terrain où il peut gagner. « hors ligne » et non « hors réseau » :
+         c'est le mot que le reste du site emploie déjà (bandeau, bouton,
+         hors-ligne.js), et il nomme un MODE de la carte quand « hors réseau »
+         nommait une circonstance du terrain — donc une rupture avec les trois
+         noms qui précèdent, et une ambiguïté (site non affilié ? falaise
+         isolée ?). La note plus bas garde « réseau » pour dire le pourquoi. -->
+    <p class="tagline">falaises · parkings · approches · hors&nbsp;ligne</p>
 
     <ul class="sortie-list">
       <li>
@@ -40,10 +45,16 @@
                site+secteur, et 37 noms de falaise seulement se partagent les
                111 (Grand Regardé en compte 6 à lui seul). Un libellé posé sur
                un marqueur peut rester approximatif, un COMPTE non.
+               Deux compteurs et non trois : « 21 sites » a sauté. Sur la page
+               d'accueil d'un site web, le mot est ambigu ; et trois étages de
+               granularité d'un coup (site/secteur/voie) donnent la taxonomie
+               de la base plutôt qu'une information — c'est cette hiérarchie
+               qui avait déjà produit le « 111 falaises » qu'il a fallu
+               corriger.
                Chiffres relevés dans data.geojson, vérifiés par un test
                statique : sans lui, une régénération ferait mentir cette page
                en silence. -->
-          <span class="chiffres">21 sites · 111 secteurs · 1 569 voies</span>
+          <span class="chiffres">111 secteurs · 1 569 voies</span>
           <span class="date">octobre 2026</span>
         </a>
       </li>
