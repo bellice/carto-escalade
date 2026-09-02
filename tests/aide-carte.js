@@ -19,7 +19,29 @@ export const REPERES = {
   chironne: { nom: 'Rocher de Chironne', coord: [5.391514, 44.840549] },
 };
 
+// Le lieu de RÉFÉRENCE des parcours détaillés ci-dessous. Les REPERES sont des
+// falaises drômoises précises, choisies pour ce qu'elles couvrent : ces
+// parcours ne se dupliquent donc pas par lieu. C'est LIEUX (ci-dessous) qui
+// assure qu'un nouveau lieu démarre, sans rejouer 20 fois le même scénario.
 export const CHEMIN_SORTIE = '/vallee-drome-diois/index.html';
+
+// Les lieux publiés, découverts et non énumérés : tout dossier portant un
+// data.geojson. Miroir de trouverLieux() dans statique.test.js.
+export async function trouverLieux() {
+  const { readdir, readFile } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const { join } = await import('node:path');
+  const racine = fileURLToPath(new URL('..', import.meta.url));
+  const lieux = [];
+  for (const e of await readdir(racine, { withFileTypes: true })) {
+    if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules') continue;
+    try {
+      await readFile(join(racine, e.name, 'data.geojson'), 'utf8');
+      lieux.push(e.name);
+    } catch { /* pas un dossier de lieu */ }
+  }
+  return lieux.sort();
+}
 
 // Rend l'objet Map accessible depuis les tests. On insère l'affectation juste
 // après la construction, dans une copie servie à la volée : le fichier du

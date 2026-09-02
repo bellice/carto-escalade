@@ -1,6 +1,6 @@
-# Sorties escalade
+# Tokelau
 
-Site statique minimaliste : une carte par sortie (falaises + parkings), pas de backend.
+Site statique minimaliste : une carte par lieu (falaises + parkings), pas de backend.
 
 Palette, typographie et composants : voir [`charte-graphique.html`](charte-graphique.html)
 (ouvrir directement dans un navigateur — s'appuie sur les vraies feuilles de
@@ -9,7 +9,7 @@ style du site, reste à jour tant que les tokens ne changent pas de nom).
 ## Structure
 
 ```
-index.html          → page d'accueil, liste des sorties
+index.html          → page d'accueil, liste des lieux
 sw.js                → service worker : pré-cache de la coquille + données,
                        stale-while-revalidate pour les deux + cache-first
                        pour les tuiles du fond (voir "Hors-ligne")
@@ -138,22 +138,54 @@ Directive par directive, ce qui n'est pas évident :
 - La page d'accueil, purement statique, applique une politique plus stricte
   encore : aucune origine tierce.
 
-## Répliquer pour un nouveau lieu
+## Ajouter un lieu
 
-1. Dupliquer `vallee-drome-diois/` en `<lieu>/`.
-2. Depuis le repo de génération (voir plus bas), lancer **une seule commande** :
-   `uv run scripts/tout_regenerer.py --lieu <lieu>`
-   — elle enchaîne base → temps de trajet → export → copie, dans cet ordre.
-   Ça remplace `data.geojson` (version légère, sans le détail des voies)
-   ET le dossier `routes/` (détail par site, chargé à la demande).
+**Le lieu est une colonne des données, pas seulement un nom de dossier.** Les
+CSV du repo de génération portent une colonne `lieu` (`falaise.csv`,
+`parking.csv`, `hebergement.csv`, `voie.csv`) dont la valeur est **exactement
+le nom du dossier ici** : c'est la charnière entre la donnée et l'URL publiée.
+Avant elle, toutes les requêtes de l'export étaient sans portée — saisir une
+seconde région dans les mêmes CSV l'aurait fait apparaître sur **toutes** les
+cartes, et `--lieu` ne nommait que le dossier de destination.
 
-   > Ne pas lancer les scripts un par un : `build_db.py` **vide** le cache des
-   > temps de trajet (alimenté par l'API IGN, jamais par les CSV). Enchaîner
+1. Saisir les falaises/parkings/voies dans les CSV habituels, avec la nouvelle
+   valeur de `lieu` (ex. `presquile-crozon`). Un gîte est facultatif : sans
+   hébergement pour ce lieu, la carte masque d'elle-même le curseur « Trajet
+   depuis le gîte » et la clé de légende correspondante.
+2. Dupliquer `vallee-drome-diois/` en `<lieu>/`. Deux chaînes à changer dans
+   son `index.html` : le `<title>` et le `<h1 class="titre">`. Tout le reste
+   (chemins `../`, CSP, `modulepreload`, `data-donnees`) est relatif et
+   fonctionne tel quel.
+3. Depuis le repo de génération (voir plus bas), **une seule commande** :
+   `uv run scripts/tout_regenerer.py`
+   — base → temps de trajet → puis, **pour chaque lieu présent en base**,
+   export puis copie. La liste des lieux vient des données
+   (`SELECT DISTINCT lieu FROM falaise`), jamais d'une énumération à tenir à
+   jour. `--lieu <x>` restreint à un seul.
+
+   > Ne pas lancer les scripts un par un. `build_db.py` **vide** le cache des
+   > temps de trajet (alimenté par l'API IGN, jamais par les CSV) : enchaîner
    > directement sur l'export produit un site où le curseur « Trajet depuis le
-   > gîte » disparaît sans le moindre message. `tout_regenerer.py` impose
-   > l'ordre et refuse de publier si ce cache est vide.
-3. Ajouter une entrée dans la liste de `index.html` (racine).
-4. `initCarte('data.geojson')` reste inchangé — aucune autre modif de code requise.
+   > gîte » disparaît sans le moindre message. Et `data/web/` ne contient
+   > **qu'un lieu à la fois** (l'export y fait table rase des `routes/`) :
+   > exporter les deux avant de copier ne publierait que le dernier.
+   > `tout_regenerer.py` impose l'ordre et refuse de publier sur un cache vide.
+4. Ajouter une entrée dans la liste de `index.html` (racine) et deux lignes
+   dans le `PRECACHE` de `sw.js` (`./<lieu>/index.html`, `./<lieu>/data.geojson`).
+   **Les deux sont vérifiés par un test statique** : un lieu absent de l'accueil
+   est introuvable, un lieu absent du `PRECACHE` s'affiche parfaitement en ligne
+   et ne marche pas hors ligne — c'est-à-dire au seul moment où on en a besoin.
+5. `initCarte('data.geojson')` reste inchangé : chaque page charge le
+   `data.geojson` **de son propre dossier**, et `routes/` s'en déduit. Il n'y a
+   aucune logique inter-lieu côté site — l'isolation est faite en amont, par
+   l'export.
+
+Les tests découvrent les lieux tout seuls (tout dossier portant un
+`data.geojson`) : un lieu ajouté est couvert dès sa première régénération, sans
+toucher aux fichiers de test. Un garde-fou vérifie en plus que **l'étendue d'un
+lieu reste régionale** — la Drôme mesure 67 km de diagonale, un mélange
+Drôme + Bretagne en ferait 897, et rien à l'œil ne distinguerait la carte
+fautive d'une carte normale simplement dézoomée.
 
 La génération vit dans un repo séparé (`escalade/` : base DuckDB +
 `scripts/export_geojson.py`) ; ce repo-ci ne fait que servir les exports.
@@ -224,7 +256,7 @@ au-dessus de `nom` en description complète — donc aucun champ supplémentaire
 à remplir. `trajet_gite_min` : temps de trajet routier réel (API IGN), en
 minutes, ou absent si pas encore calculé.
 
-**Gîte** (facultatif, un seul par sortie)
+**Gîte** (facultatif, un seul par lieu — un lieu sans gîte est légitime)
 `nom`, `categorie` ("hebergement")
 
 `trajet_gite_min` (côté parking) n'a de sens visuel que si un point `gite` existe

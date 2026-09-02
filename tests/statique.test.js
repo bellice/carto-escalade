@@ -14,6 +14,25 @@ import { join } from 'node:path';
 const RACINE = fileURLToPath(new URL('..', import.meta.url));
 const lire = (rel) => readFile(join(RACINE, rel), 'utf8');
 
+// Les lieux ne sont PAS énumérés à la main : on retient tout dossier portant un
+// data.geojson. Sans ça, ajouter un lieu laisserait tout ce fichier braqué sur
+// le premier, et le nouveau ne serait couvert par rien — un oubli invisible,
+// puisque la suite resterait verte.
+async function trouverLieux() {
+  const entrees = await readdir(RACINE, { withFileTypes: true });
+  const lieux = [];
+  for (const e of entrees) {
+    if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules') continue;
+    try {
+      await readFile(join(RACINE, e.name, 'data.geojson'), 'utf8');
+      lieux.push(e.name);
+    } catch { /* pas un dossier de lieu */ }
+  }
+  return lieux.sort();
+}
+const LIEUX = await trouverLieux();
+const geojsonDe = async (lieu) => JSON.parse(await lire(`${lieu}/data.geojson`));
+
 // --- Contraste WCAG : même formule que la recommandation ---
 function luminance(hex) {
   const h = hex.replace('#', '');
@@ -72,16 +91,28 @@ describe('Service worker : pré-cache', () => {
   });
 });
 
-describe('Données exportées', () => {
+describe('Lieux publiés', () => {
+  test('au moins un lieu est présent', () => {
+    assert.ok(LIEUX.length > 0,
+      'Aucun dossier portant un data.geojson : tous les tests par lieu ci-dessous ' +
+      'passeraient à vide sans que rien ne le signale.');
+  });
+});
+
+for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
   // Régression réelle : une reconstruction de la base efface le cache des
   // temps de trajet (alimenté par API, jamais par les CSV). trajet_gite_min
   // repassait à null partout et le curseur « Trajet depuis le gîte »
   // disparaissait du site — silencieusement.
+  // Le test ne s'applique qu'aux lieux QUI ONT un hébergement : un lieu sans
+  // gîte est légitime, le site y masque de lui-même curseur et clé de légende.
   test('les parkings ont tous un temps de trajet depuis le gîte', async () => {
-    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
+    const geo = await geojsonDe(lieu);
     const parkings = geo.features.filter((f) => f.properties.categorie === 'parking');
+    const aGite = geo.features.some((f) => f.properties.categorie === 'hebergement');
 
-    assert.ok(parkings.length > 0, 'Aucun parking dans data.geojson');
+    assert.ok(parkings.length > 0, `${lieu} : aucun parking dans data.geojson`);
+    if (!aGite) return;
     const sansTrajet = parkings.filter((p) => p.properties.trajet_gite_min == null);
     assert.deepEqual(sansTrajet.map((p) => p.properties.nom), [],
       'trajet_gite_min manquant : relancer scripts/refresh_trajet_gite.py ' +
@@ -89,8 +120,8 @@ describe('Données exportées', () => {
   });
 
   test('la table des sources porte auteur et année exploitables', async () => {
-    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
-    assert.ok(Array.isArray(geo.sources) && geo.sources.length, 'geojson.sources absent');
+    const geo = await geojsonDe(lieu);
+    assert.ok(Array.isArray(geo.sources) && geo.sources.length, `${lieu} : geojson.sources absent`);
 
     for (const s of geo.sources) {
       if (s.type && s.type.includes('topo')) {
@@ -108,10 +139,10 @@ describe('Données exportées', () => {
   // faudrait télécharger routes/*.json (350 Ko) juste pour savoir quelles
   // falaises afficher.
   test('chaque falaise sportive embarque sa répartition de cotations', async () => {
-    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
+    const geo = await geojsonDe(lieu);
     const sportives = geo.features.filter((f) => (f.properties.nb_voie_sportive || 0) > 0);
 
-    assert.ok(sportives.length > 0, 'Aucune falaise sportive dans data.geojson');
+    assert.ok(sportives.length > 0, `${lieu} : aucune falaise sportive dans data.geojson`);
     for (const f of sportives) {
       const p = f.properties;
       assert.ok(p.cotations && Object.keys(p.cotations).length,
@@ -126,21 +157,75 @@ describe('Données exportées', () => {
   });
 
   test('chaque falaise avec des voies pointe vers un fichier routes existant', async () => {
-    const geo = JSON.parse(await lire('vallee-drome-diois/data.geojson'));
-    const fichiers = new Set(await readdir(join(RACINE, 'vallee-drome-diois/routes')));
+    const geo = await geojsonDe(lieu);
+    const fichiers = new Set(await readdir(join(RACINE, `${lieu}/routes`)));
 
     for (const f of geo.features) {
       const p = f.properties;
       if (!p.routes) continue;
       assert.ok(fichiers.has(`${p.routes}.json`),
-        `${p.nom} référence routes/${p.routes}.json, absent du dépôt`);
+        `${lieu} : ${p.nom} référence routes/${p.routes}.json, absent du dépôt`);
     }
   });
 
-  // Un marqueur = un couple site+secteur, PAS une falaise : seulement 37 noms
-  // de falaise se partagent les 111 enregistrements (Grand Regardé en compte 6
-  // à lui seul). Un libellé posé sur UN marqueur peut rester approximatif, un
-  // COMPTE non — l'accueil annonçait « 111 falaises » à tort.
+  // Le défaut que la colonne `lieu` existe pour empêcher. Avant elle, toutes
+  // les requêtes de export_geojson.py étaient sans portée : un second jeu de
+  // données saisi dans les mêmes CSV se serait retrouvé dans TOUS les
+  // data.geojson, et la carte de la Drôme aurait affiché la Bretagne.
+  // Rien à l'œil ne le signalerait — la carte s'ouvre, elle est juste cadrée
+  // sur la France entière.
+  // Seuil : la Drôme mesure 67 km de diagonale, Crozon ~30 ; un mélange
+  // Drôme+Bretagne en ferait 897. 300 km laisse la place à n'importe quelle
+  // région française tout en attrapant la fuite d'un facteur trois.
+  test('l\'étendue du lieu reste régionale (aucune fuite d\'un autre lieu)', async () => {
+    const geo = await geojsonDe(lieu);
+    const points = geo.features.map((f) => f.geometry.coordinates);
+    const lons = points.map((c) => c[0]);
+    const lats = points.map((c) => c[1]);
+    const diagonale = distanceKm(
+      [Math.min(...lons), Math.min(...lats)],
+      [Math.max(...lons), Math.max(...lats)],
+    );
+    assert.ok(diagonale < 300,
+      `${lieu} : ${Math.round(diagonale)} km de diagonale — des points d'un autre ` +
+      'lieu ont fui dans cet export (export_geojson.py --lieu filtre-t-il bien ?)');
+  });
+});
+
+// Distance orthodromique, en kilomètres.
+function distanceKm([lon1, lat1], [lon2, lat2]) {
+  const R = 6371;
+  const rad = (d) => (d * Math.PI) / 180;
+  const dPhi = rad(lat2 - lat1);
+  const dLambda = rad(lon2 - lon1);
+  const a = Math.sin(dPhi / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLambda / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+describe('Étanchéité entre lieux', () => {
+  // Complément du test d'étendue ci-dessus : celui-là attrape une fuite
+  // massive, celui-ci une fuite d'un seul point (deux régions voisines, où la
+  // diagonale ne dirait rien). Sans second lieu il passe à vide — c'est voulu,
+  // il attend le jour où il aura quelque chose à comparer.
+  test('aucun point n\'apparaît dans deux lieux à la fois', async () => {
+    const parLieu = new Map();
+    for (const lieu of LIEUX) {
+      const geo = await geojsonDe(lieu);
+      parLieu.set(lieu, new Set(geo.features.map(
+        (f) => `${f.properties.categorie}|${f.properties.nom}|${f.geometry.coordinates.join(',')}`
+      )));
+    }
+    for (const a of LIEUX) {
+      for (const b of LIEUX) {
+        if (a >= b) continue;
+        const communs = [...parLieu.get(a)].filter((c) => parLieu.get(b).has(c));
+        assert.deepEqual(communs, [],
+          `${communs.length} point(s) présent(s) à la fois dans ${a} et ${b} — ` +
+          'le filtrage par lieu de l\'export laisse passer.');
+      }
+    }
+  });
 });
 
 describe('Accessibilité : jetons de couleur', () => {
@@ -363,7 +448,7 @@ describe('Manifeste et installation', () => {
   });
 
   test('chaque page lie le manifeste par un chemin qui résout', async () => {
-    for (const page of ['index.html', 'vallee-drome-diois/index.html']) {
+    for (const page of ['index.html', ...LIEUX.map((l) => `${l}/index.html`)]) {
       const html = await lire(page);
       const lien = /<link\s+rel="manifest"\s+href="([^"]+)"/.exec(html);
       assert.ok(lien, `${page} : pas de <link rel="manifest">`);
@@ -375,7 +460,7 @@ describe('Manifeste et installation', () => {
 });
 
 describe('Pages HTML', () => {
-  const pages = ['index.html', '404.html', 'vallee-drome-diois/index.html'];
+  const pages = ['index.html', '404.html', ...LIEUX.map((l) => `${l}/index.html`)];
 
   test('chaque page a exactement un <h1>', async () => {
     for (const page of pages) {
@@ -405,24 +490,63 @@ describe('Pages HTML', () => {
     }
   });
 
-  test('la CSP de la page carte autorise le worker MapLibre depuis le CDN', async () => {
-    const html = await lire('vallee-drome-diois/index.html');
-    // On extrait la valeur de l'attribut content, PAS le HTML brut : le
-    // commentaire qui précède la balise mentionne lui aussi « worker-src »,
-    // et une recherche naïve tomberait dessus (erreur commise en écrivant ce
-    // test — il passait sur le commentaire, pas sur la directive réelle).
-    const balise = /<meta\s+http-equiv="Content-Security-Policy"\s+content="([\s\S]*?)"\s*\/?>/.exec(html);
-    assert.ok(balise, 'Balise CSP introuvable');
-    const politique = balise[1];
+  // Sur CHAQUE page carte : un lieu dupliqué dont on aurait rogné la CSP en la
+  // recopiant repartirait avec une carte vide, sans erreur visible.
+  test('la CSP de chaque page carte autorise le worker MapLibre depuis le CDN', async () => {
+    for (const lieu of LIEUX) {
+      const html = await lire(`${lieu}/index.html`);
+      // On extrait la valeur de l'attribut content, PAS le HTML brut : le
+      // commentaire qui précède la balise mentionne lui aussi « worker-src »,
+      // et une recherche naïve tomberait dessus (erreur commise en écrivant ce
+      // test — il passait sur le commentaire, pas sur la directive réelle).
+      const balise = /<meta\s+http-equiv="Content-Security-Policy"\s+content="([\s\S]*?)"\s*\/?>/.exec(html);
+      assert.ok(balise, `${lieu} : balise CSP introuvable`);
+      const politique = balise[1];
 
-    const directive = /worker-src[^;]*/.exec(politique);
-    assert.ok(directive, 'worker-src absent de la CSP');
-    // Piège vérifié : MapLibre charge maplibre-gl-worker.mjs directement
-    // depuis jsdelivr. L'omettre laisse la carte vide SANS aucune violation
-    // visible dans la console (une violation dans un worker ne remonte pas).
-    assert.match(directive[0], /cdn\.jsdelivr\.net/,
-      'worker-src doit inclure le CDN : sinon la carte reste vide, silencieusement.');
-    assert.doesNotMatch(politique, /script-src[^;]*unsafe-inline/,
-      'script-src ne doit pas autoriser unsafe-inline (scripts externalisés).');
+      const directive = /worker-src[^;]*/.exec(politique);
+      assert.ok(directive, `${lieu} : worker-src absent de la CSP`);
+      // Piège vérifié : MapLibre charge maplibre-gl-worker.mjs directement
+      // depuis jsdelivr. L'omettre laisse la carte vide SANS aucune violation
+      // visible dans la console (une violation dans un worker ne remonte pas).
+      assert.match(directive[0], /cdn\.jsdelivr\.net/,
+        `${lieu} : worker-src doit inclure le CDN, sinon la carte reste vide, silencieusement.`);
+      assert.doesNotMatch(politique, /script-src[^;]*unsafe-inline/,
+        `${lieu} : script-src ne doit pas autoriser unsafe-inline (scripts externalisés).`);
+    }
+  });
+});
+
+describe('Service worker : les lieux', () => {
+  // Oubli silencieux : un lieu absent du PRECACHE s'affiche parfaitement en
+  // ligne et ne marche pas hors ligne — c'est-à-dire au seul moment où on en a
+  // besoin, en falaise, sans moyen de s'en rendre compte avant d'y être.
+  test('chaque lieu a sa page et son data.geojson dans PRECACHE', async () => {
+    const sw = await lire('sw.js');
+    const manquants = [];
+    for (const lieu of LIEUX) {
+      for (const fichier of ['index.html', 'data.geojson']) {
+        if (!sw.includes(`'./${lieu}/${fichier}'`)) manquants.push(`${lieu}/${fichier}`);
+      }
+    }
+    assert.deepEqual(manquants, [],
+      `Absents du PRECACHE de sw.js : ${manquants.join(', ')}. ` +
+      'Ces lieux ne se chargeraient pas hors ligne.');
+  });
+
+  test('PRECACHE ne cite aucun lieu inexistant', async () => {
+    const sw = await lire('sw.js');
+    const cites = [...sw.matchAll(/'\.\/([\w-]+)\/data\.geojson'/g)].map((m) => m[1]);
+    const fantomes = cites.filter((l) => !LIEUX.includes(l));
+    assert.deepEqual(fantomes, [],
+      `PRECACHE cite des lieux absents du dépôt : ${fantomes.join(', ')} — ` +
+      'l\'install du service worker échouerait entièrement.');
+  });
+
+  test('chaque lieu est atteignable depuis l\'accueil', async () => {
+    const html = await lire('index.html');
+    const orphelins = LIEUX.filter((l) => !html.includes(`href="${l}/"`));
+    assert.deepEqual(orphelins, [],
+      `Lieux publiés mais absents de la liste de l'accueil : ${orphelins.join(', ')} — ` +
+      'personne ne peut y arriver autrement qu\'en devinant l\'URL.');
   });
 });
