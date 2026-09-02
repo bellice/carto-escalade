@@ -13,9 +13,11 @@ import { chromium } from 'playwright';
 
 import { demarrerServeur } from './serveur.js';
 import {
-  REPERES, CHEMIN_SORTIE,
+  REPERES, CHEMIN_SORTIE, trouverLieux,
   exposerCarte, attendreCarte, ouvrirFalaise, nouveauContexte,
 } from './aide-carte.js';
+
+const LIEUX = await trouverLieux();
 
 let serveur;
 let navigateur;
@@ -28,6 +30,35 @@ before(async () => {
 after(async () => {
   await navigateur?.close();
   await serveur?.arreter();
+});
+
+// Les parcours détaillés du reste du fichier se jouent sur la Drôme, dont les
+// REPERES sont des falaises précises. Ici, un seul test par lieu : la carte
+// s'ouvre-t-elle ? C'est ce qui manquerait le jour où un lieu est ajouté — sa
+// page dupliquée peut très bien pointer sur le mauvais data.geojson ou avoir
+// perdu une directive CSP, et rien d'autre dans la suite ne le verrait.
+describe('Chaque lieu publié démarre', () => {
+  for (const lieu of LIEUX) {
+    test(`${lieu} : la carte s'ouvre et peint ses falaises`, { timeout: 90000 }, async () => {
+      const { contexte, page, erreurs, violationsCsp } = await nouveauContexte(navigateur);
+      try {
+        await exposerCarte(page);
+        await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+
+        const etat = await page.evaluate(() => ({
+          style: window.__carteTest.isStyleLoaded(),
+          falaises: window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length,
+        }));
+        assert.equal(etat.style, true, `${lieu} : le style du fond n'est pas chargé (CSP ? réseau ?)`);
+        assert.ok(etat.falaises > 0, `${lieu} : aucune falaise peinte — data.geojson bien rattaché ?`);
+        assert.deepEqual(violationsCsp, [], `${lieu} : violations CSP`);
+        assert.deepEqual(erreurs, [], `${lieu} : erreurs JavaScript`);
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
 });
 
 describe('Démarrage', () => {
