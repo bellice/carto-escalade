@@ -507,6 +507,30 @@ describe('Pages HTML', () => {
     }
   });
 
+  // Convention : chaque page carte porte DEUX libellés du même lieu, le nom
+  // complet et sa forme courte, et le CSS bascule à 641px (voir .titre-long
+  // dans style-carte.css). Un lieu dupliqué dont on n'aurait renommé qu'un
+  // seul des deux afficherait le nom du lieu précédent sur la moitié des
+  // écrans — sans que rien d'autre ne le signale.
+  test('chaque page carte porte un nom long et un nom court', async () => {
+    for (const lieu of LIEUX) {
+      const html = await lire(`${lieu}/index.html`);
+      const long = /<span class="titre-long">([^<]+)<\/span>/.exec(html);
+      const court = /<span class="titre-court">([^<]+)<\/span>/.exec(html);
+      assert.ok(long, `${lieu} : pas de <span class="titre-long"> dans le <h1>`);
+      assert.ok(court, `${lieu} : pas de <span class="titre-court"> dans le <h1>`);
+      assert.ok(long[1].length > court[1].length,
+        `${lieu} : « ${long[1]} » n'est pas plus long que « ${court[1]} » — ` +
+        'deux libellés identiques ne servent à rien, en garder un seul.');
+
+      // Le <title> de l'onglet porte le nom complet, jamais la forme courte :
+      // c'est lui qu'on voit dans un favori ou un onglet épinglé.
+      const titre = /<title>([^<]+)<\/title>/.exec(html);
+      assert.ok(titre && titre[1].startsWith(long[1]),
+        `${lieu} : le <title> (« ${titre?.[1]} ») devrait commencer par le nom complet « ${long[1]} »`);
+    }
+  });
+
   // Sur CHAQUE page carte : un lieu dupliqué dont on aurait rogné la CSP en la
   // recopiant repartirait avec une carte vide, sans erreur visible.
   test('la CSP de chaque page carte autorise le worker MapLibre depuis le CDN', async () => {

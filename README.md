@@ -152,10 +152,31 @@ cartes, et `--lieu` ne nommait que le dossier de destination.
    valeur de `lieu` (ex. `presquile-crozon`). Un gîte est facultatif : sans
    hébergement pour ce lieu, la carte masque d'elle-même le curseur « Trajet
    depuis le gîte » et la clé de légende correspondante.
-2. Dupliquer `vallee-drome-diois/` en `<lieu>/`. Deux chaînes à changer dans
-   son `index.html` : le `<title>` et le `<h1 class="titre">`. Tout le reste
-   (chemins `../`, CSP, `modulepreload`, `data-donnees`) est relatif et
-   fonctionne tel quel.
+2. Dupliquer `vallee-drome-diois/` en `<lieu>/`, puis changer **trois
+   libellés** dans son `index.html` — le reste (chemins `../`, CSP,
+   `modulepreload`, `data-donnees`) est relatif et fonctionne tel quel :
+
+   | où | quoi | exemple |
+   |---|---|---|
+   | `<title>` | le nom complet | `Presqu'île de Crozon - Tokelau` |
+   | `<span class="titre-long">` | le nom complet | `Presqu'île de Crozon` |
+   | `<span class="titre-court">` | la forme courte | `Crozon` |
+
+   **Pourquoi deux libellés.** L'en-tête de la carte affiche le nom complet à
+   partir de 641px et la forme courte en dessous (voir `.titre-long` dans
+   `style-carte.css`). Le titre y dispose de la largeur de l'écran moins 243px,
+   une fois retranchés le lien de retour et le bouton « Préparer » à son
+   libellé le plus large — soit ~400px au seuil de bascule. Un nom qui n'y
+   tient pas fait échouer un test navigateur, qui dit lequel raccourcir.
+
+   La forme courte se construit en retirant le qualificatif géographique, pas
+   en tronquant : `Vallée de la Drôme et Diois` → `Drôme et Diois`,
+   `Presqu'île de Crozon` → `Crozon`.
+
+   **Le nom du lieu nomme la région, pas les sites qu'on y a saisis.**
+   `penhir-argol` a dû être renommé en `presquile-crozon` dès qu'Argol est
+   arrivé, et aurait dû l'être encore au site suivant — un renommage coûte une
+   URL morte chez tous ceux qui avaient le lien.
 3. Depuis le repo de génération (voir plus bas), **une seule commande** :
    `uv run scripts/tout_regenerer.py`
    — base → temps de trajet → puis, **pour chaque lieu présent en base**,
