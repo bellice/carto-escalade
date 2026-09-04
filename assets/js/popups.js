@@ -159,6 +159,8 @@ export function popupFalaise(p, lat, lon, cle) {
   if (p.nb_voie_total) cols.push(col('Voies', p.nb_voie_total));
   const grimpe = styleGrimpe(p);
   if (grimpe) cols.push(col('Grimpe', grimpe));
+  const haut = colonneHauteur(p);
+  if (haut) cols.push(col(haut.label, haut.valeur));
   if (p.type_roche) cols.push(col('Roche', p.type_roche));
   let contenuCaractere = cols.length ? `<div class="fiche-infos-cols">${cols.join('')}</div>` : '';
 
@@ -329,6 +331,28 @@ function champ(label, valeur) {
 // pleine largeur en dessous — pour une valeur à donner en évidence (ex. le
 // temps de trajet "71 min en voiture" dans la popup parking) plutôt que
 // serrée à droite d'un libellé.
+// hauteur_max_voie_m est un PLAFOND DE SECTEUR, jamais la hauteur d'une voie
+// et jamais une longueur de corde. Vérifié sur les données : un plafond de
+// 350 m coexiste avec une voie de 13 longueurs, et sur « L'Éperon » le plafond
+// saisi (150 m) est de l'ordre de la voie entière calculée (185 m), jamais
+// d'une longueur (50 m). C'est la hauteur de la paroi.
+//
+// D'où DEUX libellés, et c'est le libellé qui porte la distinction :
+//   secteur sans grande voie   « Hauteur 30 m »   se lit directement en corde
+//   secteur avec grande voie   « Paroi 350 m »    ne se confond avec rien
+//
+// C'est la seule donnée du site dont une mauvaise lecture a une conséquence
+// physique : annoncer « hauteur 350 m » sur une grande voie laisserait croire
+// qu'il faut une corde de 350 m. Ne jamais fusionner ces deux libellés.
+//
+// Renvoie null quand la donnée manque (12 secteurs sur 171) : la colonne
+// disparaît plutôt que d'afficher un tiret ou une valeur par défaut.
+export function colonneHauteur(p) {
+  const m = p && p.hauteur_max_voie_m;
+  if (typeof m !== 'number' || !(m > 0)) return null;
+  return { label: (p.nb_gv || 0) > 0 ? 'Paroi' : 'Hauteur', valeur: `${m} m` };
+}
+
 function champBloc(label, valeur) {
   return `<div class="info-bloc"><span class="info-label">${label}</span><span class="info-valeur">${escapeHtml(String(valeur))}</span></div>`;
 }

@@ -353,6 +353,51 @@ describe('Vocabulaire de la légende', () => {
   }
 });
 
+// La colonne de hauteur change de LIBELLÉ selon le secteur, et c'est tout
+// l'enjeu : « Hauteur 20 m » se lit en corde sur une couenne, « Paroi 130 m »
+// ne se confond avec aucune longueur sur une grande voie. Le test statique
+// couvre la règle ; celui-ci vérifie qu'elle atteint bien l'écran.
+describe('Hauteur sur la fiche', () => {
+  for (const [quoi, repere, attendu] of [
+    ['couennes seules', REPERES.lesRoches, 'Hauteur'],
+    ['grandes voies', REPERES.chironne, 'Paroi'],
+  ]) {
+    test(`${quoi} : la colonne s'intitule « ${attendu} »`, { timeout: 90000 }, async () => {
+      const { contexte, page } = await nouveauContexte(navigateur, { viewport: { width: 390, height: 844 } });
+      try {
+        await exposerCarte(page);
+        await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+        await ouvrirFalaise(page, repere);
+
+        const r = await page.evaluate(() => {
+          const bloc = document.querySelector('.popup .fiche-infos-cols');
+          const cols = [...(bloc?.querySelectorAll('.col') || [])].map((e) => ({
+            label: e.querySelector('.col-label')?.textContent,
+            valeur: e.querySelector('.col-valeur')?.textContent,
+          }));
+          return {
+            cols,
+            // Quatre colonnes doivent tenir sans pousser la fiche à défiler
+            // latéralement : mesuré à 390px, elles tiennent sur une ligne.
+            deborde: bloc ? bloc.scrollWidth > bloc.clientWidth + 1 : false,
+          };
+        });
+
+        const hauteur = r.cols.find((c) => c.label === 'Hauteur' || c.label === 'Paroi');
+        assert.ok(hauteur, `${repere.nom} : aucune colonne de hauteur — le champ est-il exporté ?`);
+        assert.equal(hauteur.label, attendu,
+          `${repere.nom} : intitulé « ${hauteur.label} » au lieu de « ${attendu} ». ` +
+          'Sur une grande voie, « Hauteur » laisserait croire à une longueur de corde.');
+        assert.match(hauteur.valeur, /^\d+ m$/, `Valeur inattendue : « ${hauteur.valeur} »`);
+        assert.equal(r.deborde, false, 'Les colonnes débordent horizontalement');
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+});
+
 describe('Recherche', () => {
   // Le champ ne cherchait que dans « nom · secteur » : taper « Saoû » ne
   // renvoyait RIEN, alors que 40 des 111 secteurs en dépendent et que c'est le
@@ -646,7 +691,11 @@ describe('Fiche falaise', () => {
       }));
 
       assert.equal(fiche.titre, 'Les Roches');
-      assert.deepEqual(fiche.colonnes, ['Voies', 'Grimpe', 'Roche']);
+      // « Hauteur » s'intercale entre Grimpe et Roche : Les Roches n'a que des
+      // couennes, d'où ce libellé plutôt que « Paroi » (voir colonneHauteur).
+      // L'ORDRE compte et reste figé ici : Voies d'abord (le chiffre qui fait
+      // choisir un site), puis le style, puis la hauteur, puis la roche.
+      assert.deepEqual(fiche.colonnes, ['Voies', 'Grimpe', 'Hauteur', 'Roche']);
       assert.equal(fiche.cases, 44, 'Une case par voie sportive');
       assert.deepEqual(fiche.groupes, ['Accès', 'Topo papier', 'Pour aller plus loin']);
       assert.deepEqual(fiche.badgesPage, ['p. 34']);
