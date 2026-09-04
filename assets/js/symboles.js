@@ -157,11 +157,17 @@ export function construireSourceFalaises(entries, mode, maxima) {
 // pour les marqueurs réels : sinon le repère "1" ne correspondrait pas à la
 // taille qu'aurait une vraie falaise à 1 voie sur la carte.
 export function construireLegendeFalaises(max, median, remplissage, simplifie, echelle) {
-  // Pastille "Falaises" (à côté de Parkings/Gîte dans .legende-cats),
+  // Pastille des secteurs (à côté de Parkings/Gîte dans .legende-cats),
   // couleur du mode "Cercles" actif.
+  // « Secteurs » et non « Falaises » : un point de la carte est un couple
+  // site+secteur — 111 points pour 37 noms de falaise en Drôme, 60 pour 10 en
+  // Bretagne. Le libellé était faux d'un facteur 3 à 6, même erreur que le
+  // « 111 falaises » corrigé sur l'accueil.
+  // Ce bloc RÉÉCRIT le HTML de la page : corriger le libellé dans
+  // <lieu>/index.html seul n'a aucun effet, c'est cette ligne qui gagne.
   const zoneFalaises = document.getElementById('cle-falaises-zone');
   if (zoneFalaises) {
-    zoneFalaises.innerHTML = `<span class="cle"><span class="dot" style="background:${remplissage}"></span> Falaises</span>`;
+    zoneFalaises.innerHTML = `<span class="cle"><span class="dot" style="background:${remplissage}"></span> Secteurs</span>`;
   }
 
   const conteneur = document.getElementById('legende-falaises');

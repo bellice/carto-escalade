@@ -269,7 +269,7 @@ export function popupFalaise(p, lat, lon, cle) {
       <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"><span class="poignee-texte">Réduire</span></button>
       <div class="popup-entete">
         <div class="popup-titre-bloc">
-          <span class="cat-tag falaise">Falaise</span>
+          <span class="cat-tag falaise">Secteur</span>
           <h3>${escapeHtml(p.nom)}</h3>
           ${secteur ? `<p class="sous-titre">${escapeHtml(secteur)}</p>` : ''}
         </div>
@@ -412,7 +412,9 @@ function champLiensFalaises(falaises) {
   // un fait unique) : le libellé reste seul sur sa ligne, la liste suit en
   // pleine largeur en dessous, en flux (plusieurs sommets courts peuvent
   // partager une ligne plutôt que d'en forcer chacun une).
-  const etiquette = '<div class="info-ligne"><span class="info-label">Falaises</span></div>';
+  // « Secteurs » et non « Falaises » : ce sont des couples site+secteur, et le
+  // résumé du repli dit déjà « N secteurs » — les deux se contredisaient.
+  const etiquette = '<div class="info-ligne"><span class="info-label">Secteurs</span></div>';
   const liste = `<div class="liens-detail">${groupes}</div>`;
   if (falaises.length <= SEUIL_REPLI_FALAISES) return etiquette + liste;
 
