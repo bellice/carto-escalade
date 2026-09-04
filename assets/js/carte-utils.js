@@ -23,10 +23,10 @@ function largeurToken(nom, repli) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(nom);
   return parseInt(v, 10) || repli;
 }
-export function largeurPanneauGauche() {
+function largeurPanneauGauche() {
   return largeurToken('--largeur-panneau-gauche', 300);
 }
-export function largeurPanneauDroit() {
+function largeurPanneauDroit() {
   return largeurToken('--largeur-panneau-droit', 380);
 }
 

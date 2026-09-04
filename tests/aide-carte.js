@@ -101,8 +101,14 @@ export async function ouvrirFalaise(page, repere) {
 // Contexte prêt à l'emploi : collecte les erreurs console et les violations
 // CSP, que chaque test peut ensuite vérifier.
 export async function nouveauContexte(navigateur, options = {}) {
+  // hasTouch/isMobile transmis explicitement : sans eux, `(pointer: coarse)`
+  // ne matche pas et un test qui croit mesurer un téléphone mesure une
+  // souris. Le défaut est silencieux — les chiffres sont plausibles, ils
+  // décrivent juste le mauvais appareil.
   const contexte = await navigateur.newContext({
     viewport: options.viewport || { width: 1280, height: 900 },
+    ...(options.hasTouch ? { hasTouch: true } : {}),
+    ...(options.isMobile ? { isMobile: true } : {}),
     ...(options.serviceWorkers ? { serviceWorkers: options.serviceWorkers } : {}),
   });
   const page = await contexte.newPage();

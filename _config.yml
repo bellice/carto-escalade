@@ -1,0 +1,22 @@
+# Ce que GitHub Pages NE publie PAS.
+#
+# Pages sert la racine du dépôt telle quelle : sans ce fichier, le code des
+# tests, la documentation interne et les fichiers de projet répondaient 200
+# sur tokelau.fr — vérifié. Rien de confidentiel n'y figure, mais rien n'y a
+# d'usage pour un visiteur non plus.
+#
+# Jekyll tourne déjà par défaut sur Pages ; ce fichier n'ajoute qu'une liste
+# d'exclusion, il ne change pas le traitement des pages. Aucune n'a d'en-tête
+# YAML et aucune ne contient de syntaxe Liquid (vérifié) : elles sont donc
+# copiées à l'octet près, comme aujourd'hui.
+#
+# NE PAS y ajouter de dossier de lieu (vallee-drome-diois, penhir-argol…) :
+# c'est le site lui-même.
+exclude:
+  - tests/
+  - outils/
+  - node_modules/
+  - package.json
+  - package-lock.json
+  - README.md
+  - charte-graphique.html

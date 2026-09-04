@@ -107,6 +107,28 @@ html, body {
 a { color: var(--forest); }
 a:visited { color: var(--forest); }
 
+/* Repli de focus clavier pour TOUT le site. Il n'y en avait aucun ici : les
+   pages héritaient du contour par défaut du navigateur, 1px, qui se perd sur
+   un fond de carte chargé. Reprend la convention déjà posée au cas par cas
+   dans style-carte.css (marqueurs, libellés de site, champ de recherche) :
+   2px --forest. Les règles plus spécifiques de cette feuille continuent de
+   primer, celle-ci ne fait que combler les trous. */
+:focus-visible {
+  outline: 2px solid var(--forest);
+  outline-offset: 2px;
+}
+
+/* Le lien de la 404 est le SEUL contrôle de sa page, et mesurait 118x17.
+   Au doigt seulement : à la souris le pointeur est précis, et la règle
+   n'existe que pour le tactile (même raisonnement que .legende-toggle). */
+@media (pointer: coarse) {
+  .home p a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
 /* ===== Home page (liste des sorties) ===== */
 .home {
   max-width: 640px;
