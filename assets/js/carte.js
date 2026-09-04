@@ -838,16 +838,26 @@ export function initCarte(dataUrl) {
 
   // Filtre "Depuis le gîte" : masqué par défaut (voir HTML, attribut hidden)
   // tant qu'on n'a pas confirmé qu'au moins une falaise a un temps calculable
-  // — un slider sans borne réelle n'aurait rien à montrer. Bornes arrondies
-  // au multiple de 5 le plus proche (ex. 5→120 sur ce jeu de données) pour un
-  // pas de slider net plutôt que des valeurs à la minute près, qui
-  // n'apportent rien de plus utile ici.
+  // — un slider sans borne réelle n'aurait rien à montrer. Bornes au multiple
+  // de 5, pour un pas net plutôt que des valeurs à la minute près.
   function configurerFiltreTemps(tempsDepuisGite) {
     const tempsValeurs = Array.from(tempsDepuisGite.values());
     if (!tempsValeurs.length || !filtreTemps || !filtreTempsValeur || !legendeTemps) return;
 
-    const plancher = Math.floor(Math.min(...tempsValeurs) / 5) * 5;
+    // Les DEUX bornes arrondissent AU-DESSUS. Le plancher était un
+    // Math.floor : avec un minimum réel de 8 min il donnait 5, position à
+    // laquelle aucune falaise ne passe le filtre — un cran mort en tête de
+    // course, vérifié sur les deux lieux. Arrondir au-dessus garantit qu'à la
+    // position la plus basse il reste au moins la falaise la plus proche.
+    const plancher = Math.ceil(Math.min(...tempsValeurs) / 5) * 5;
     const plafond = Math.ceil(Math.max(...tempsValeurs) / 5) * 5;
+    // Tous les trajets dans le même cran de 5 min : le curseur n'offrirait
+    // aucun choix. Cas réel de Pen-Hir, dont les parkings sont à 4 et 5 min
+    // du gîte — il s'affichait avec deux positions, dont une qui masquait
+    // les 49 falaises. Un réglage qui ne peut rien changer vaut moins que pas
+    // de réglage : même règle que les modes couenne/grande voie, retirés
+    // quand aucune voie n'est typée.
+    if (plancher >= plafond) return;
     filtres.tempsGitePlafond = plafond;
     filtres.tempsMaxGite = plafond;
     filtreTemps.min = String(plancher);

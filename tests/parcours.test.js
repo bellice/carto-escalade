@@ -117,6 +117,49 @@ describe('Démarrage', () => {
   });
 });
 
+// Le curseur promet un choix : chacune de ses positions doit laisser au moins
+// une falaise. Défaut mesuré sur les DEUX lieux avant correction — la borne
+// basse était un Math.floor, donc « ≤ 5 min » alors que la falaise la plus
+// proche est à 8 : un cran de tête qui vidait la carte. Pire à Pen-Hir, dont
+// les parkings sont à 4 et 5 min du gîte : le curseur n'avait que deux
+// positions, dont une qui masquait les 49 falaises.
+describe('Filtre « depuis le gîte »', () => {
+  for (const lieu of LIEUX) {
+    test(`${lieu} : aucune position du curseur ne vide la carte`, { timeout: 90000 }, async () => {
+      const { contexte, page } = await nouveauContexte(navigateur);
+      try {
+        await exposerCarte(page);
+        await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+
+        const r = await page.evaluate(async () => {
+          const sl = document.getElementById('filtre-temps');
+          const bloc = document.getElementById('legende-temps');
+          // Masqué : soit aucun gîte, soit tous les trajets dans le même cran
+          // — dans les deux cas il n'y a pas de choix à offrir, c'est correct.
+          if (!sl || !bloc || bloc.hidden) return { masque: true };
+          const compte = () => window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length;
+          const vides = [];
+          for (let v = Number(sl.min); v <= Number(sl.max); v += Number(sl.step)) {
+            sl.value = String(v);
+            sl.dispatchEvent(new Event('input', { bubbles: true }));
+            await new Promise((res) => setTimeout(res, 110));
+            if (compte() === 0) vides.push(v);
+          }
+          return { masque: false, min: sl.min, max: sl.max, vides };
+        });
+
+        if (r.masque) return;
+        assert.deepEqual(r.vides, [],
+          `${lieu} : position(s) ${r.vides.join(', ')} min du curseur (${r.min}-${r.max}) ` +
+          "ne laissent aucune falaise — un cran qui vide la carte n'offre aucun choix.");
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+});
+
 describe('Recherche', () => {
   // Le champ ne cherchait que dans « nom · secteur » : taper « Saoû » ne
   // renvoyait RIEN, alors que 40 des 111 secteurs en dépendent et que c'est le
