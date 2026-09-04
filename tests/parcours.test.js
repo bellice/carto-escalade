@@ -241,6 +241,12 @@ describe('Cibles tactiles', () => {
         const petits = await onglet.evaluate(() => {
           const out = [];
           for (const el of document.querySelectorAll('a, button, input, select, summary, [role=button]')) {
+            // Les noms de site sont exemptés au titre du « contrôle
+            // équivalent » de WCAG 2.5.8 : la recherche centre sur un site
+            // aussi bien qu'eux, et elle est conforme. Les agrandir captait
+            // les clics destinés aux falaises en dessous — mesuré, 8 points
+            // sur 20. Voir le commentaire de .label-site dans style-carte.css.
+            if (el.classList.contains('label-site')) continue;
             const b = el.getBoundingClientRect();
             if (!b.width) continue;
             const ap = getComputedStyle(el, '::after');

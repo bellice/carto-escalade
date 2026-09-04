@@ -676,20 +676,16 @@
     height: 44px;
     transform: translateY(-50%);
   }
-  /* Même procédé pour les noms de site, cliquables et hauts de 22px : les
-     grossir VISUELLEMENT encombrerait la carte, qui est le contenu. La zone
-     s'étend donc au-delà de l'étiquette, dans les deux dimensions — 48px de
-     large mesurés sur « Argol », c'est le plus étroit. */
-  .label-site { position: relative; }
-  .label-site::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: 44px;
-    transform: translateY(-50%);
-  }
+  /* PAS de zone étendue sur .label-site, et c'est un retour en arrière
+     mesuré : la porter à 44px captait les clics jusqu'à 20px au-dessus et en
+     dessous de l'étiquette — 8 points sur 20 sondés — alors qu'ils
+     atteignaient la carte avant. labels.js prévenait déjà que ces étiquettes
+     « peuvent occasionnellement intercepter un clic destiné à un marqueur
+     juste en dessous » ; doubler leur hauteur rendait l'occasionnel courant.
+     Ouvrir une falaise est l'action principale de la carte, centrer sur un
+     site est secondaire — et la recherche le fait aussi. C'est exactement
+     l'exception « contrôle équivalent » de WCAG 2.5.8, le champ de recherche
+     (199x39) et son bouton « Voir » (55x39) étant tous deux conformes. */
 }
 
 .legende-toggle-icone {
