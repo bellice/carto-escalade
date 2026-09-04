@@ -315,6 +315,44 @@ describe('Nom du lieu selon la largeur', () => {
   }
 });
 
+// Un point de la carte est un couple site+secteur, pas une falaise : 111 points
+// pour 37 noms de falaise en Drôme, 60 pour 10 en Bretagne. La légende annonçait
+// « Falaises », faux d'un facteur 3 à 6 — même erreur que le « 111 falaises »
+// corrigé sur l'accueil.
+// Test NAVIGATEUR et non statique : construireLegendeFalaises (symboles.js)
+// réécrit ce bloc à chaque changement de mode. Corriger le libellé dans le HTML
+// des pages ne changeait rien — piège vérifié en le faisant.
+describe('Vocabulaire de la légende', () => {
+  for (const lieu of LIEUX) {
+    test(`${lieu} : la légende dit « Secteurs », dans tous les modes`, { timeout: 90000 }, async () => {
+      const { contexte, page } = await nouveauContexte(navigateur, { viewport: { width: 390, height: 844 } });
+      try {
+        await exposerCarte(page);
+        await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+        await page.waitForTimeout(700);
+
+        const fautifs = await page.evaluate(async () => {
+          const sel = document.getElementById('mode-figure');
+          const mauvais = [];
+          for (const mode of [...sel.options].map((o) => o.value)) {
+            sel.value = mode;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            await new Promise((r) => setTimeout(r, 200));
+            const texte = document.querySelector('#cle-falaises-zone .cle')?.textContent.trim() || '';
+            if (!/secteur/i.test(texte)) mauvais.push(`${mode} → « ${texte} »`);
+          }
+          return mauvais;
+        });
+        assert.deepEqual(fautifs, [],
+          `${lieu} : la clé de légende ne parle pas de secteurs — ${fautifs.join(', ')}`);
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+});
+
 describe('Recherche', () => {
   // Le champ ne cherchait que dans « nom · secteur » : taper « Saoû » ne
   // renvoyait RIEN, alors que 40 des 111 secteurs en dépendent et que c'est le
