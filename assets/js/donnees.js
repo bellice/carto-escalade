@@ -177,9 +177,25 @@ export function approximerCotation(cotation) {
   // dans une colonne qui semblerait être une autre cotation réelle).
   let m = /^(\d)([abc])-$/.exec(texte);
   if (m) return { label: `${m[1]}${m[2]}` };
+  // Fourchette ("6c/7a", "2b/3b", "7b-7c") : on retient la BORNE HAUTE.
+  // Apparue avec le topo de Pen-Hir, absente des donnees dromoises.
+  // Le separateur doit avoir quelque chose a sa droite, sinon "6a-" (suffixe,
+  // traite juste au-dessus) serait lu comme une fourchette vide.
+  // La borne haute est renvoyee telle quelle si elle est DEJA standard : y
+  // recurser rendrait null, cette fonction ne traitant que le non-standard.
+  const fourchette = /^(.+?)[/-](.+)$/.exec(texte);
+  if (fourchette) {
+    const haute = fourchette[2].trim();
+    return cotationVersValeur(haute) != null ? { label: haute } : approximerCotation(haute);
+  }
   // Chiffre seul + "-" (ex. "4-", ancienne cotation) : bas de fourchette.
   m = /^(\d)-$/.exec(texte);
   if (m) return { label: `${m[1]}a` };
+  // Chiffre seul + "+" (ex. "4+") : haut de fourchette. Symetrique de "4-",
+  // qui existait deja -- son absence laissait 6 voies de Pen-Hir hors de
+  // l'histogramme sans raison.
+  m = /^(\d)\+$/.exec(texte);
+  if (m) return { label: `${m[1]}c` };
   // Chiffre seul (ex. "4") : milieu de fourchette.
   m = /^(\d)$/.exec(texte);
   if (m) return { label: `${m[1]}b` };

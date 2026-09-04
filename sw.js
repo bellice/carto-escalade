@@ -57,6 +57,8 @@ const PRECACHE = [
   // Sorties (une entrée par dossier) :
   './vallee-drome-diois/index.html',
   './vallee-drome-diois/data.geojson',
+  './penhir-argol/index.html',
+  './penhir-argol/data.geojson',
 ];
 
 // Sans ce pré-cache, la première ouverture d'une fiche paie une latence
