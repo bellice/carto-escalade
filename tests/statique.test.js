@@ -395,6 +395,51 @@ describe('Lisibilité : échelle typographique', () => {
 });
 
 describe('Sécurité : échappement', () => {
+  // hauteur_max_voie_m est un plafond de SECTEUR : la hauteur de la paroi,
+  // jamais celle d'une voie et jamais une longueur de corde. Vérifié sur les
+  // données — un plafond de 350 m coexiste avec une voie de 13 longueurs.
+  // Annoncer « hauteur 350 m » sur une grande voie laisserait croire qu'il
+  // faut 350 m de corde : c'est la seule donnée du site dont une mauvaise
+  // lecture a une conséquence physique, d'où deux libellés qu'il ne faut
+  // jamais fusionner.
+  test('la hauteur ne se présente jamais comme une corde sur une grande voie', async () => {
+    const { colonneHauteur } = await import('../assets/js/popups.js');
+
+    assert.deepEqual(colonneHauteur({ hauteur_max_voie_m: 30, nb_gv: 0 }),
+      { label: 'Hauteur', valeur: '30 m' }, 'Secteur de couennes : lisible en corde');
+    assert.deepEqual(colonneHauteur({ hauteur_max_voie_m: 350, nb_gv: 4 }),
+      { label: 'Paroi', valeur: '350 m' }, 'Dès une grande voie : « Paroi », jamais « Hauteur »');
+    // Une seule grande voie suffit à basculer : le libellé doit protéger le
+    // cas le plus dangereux du secteur, pas le cas majoritaire.
+    assert.equal(colonneHauteur({ hauteur_max_voie_m: 150, nb_gv: 1, nb_couenne: 40 }).label, 'Paroi');
+
+    // Donnée absente : la colonne disparaît, jamais de tiret ni de valeur par défaut.
+    for (const p of [{ nb_gv: 0 }, { hauteur_max_voie_m: null }, { hauteur_max_voie_m: 0 }, {}]) {
+      assert.equal(colonneHauteur(p), null, `Devrait ne rien afficher : ${JSON.stringify(p)}`);
+    }
+  });
+
+  // Le même contrôle, mais sur les données réellement publiées : c'est là
+  // qu'une régénération pourrait introduire un secteur mal étiqueté.
+  test('aucun secteur publié ne porte « Hauteur » alors qu\'il a une grande voie', async () => {
+    const { colonneHauteur } = await import('../assets/js/popups.js');
+    const fautifs = [];
+    let avec = 0;
+    for (const lieu of LIEUX) {
+      const geo = await geojsonDe(lieu);
+      for (const f of geo.features) {
+        const p = f.properties;
+        if (p.categorie !== 'falaise') continue;
+        const c = colonneHauteur(p);
+        if (!c) continue;
+        avec++;
+        if (c.label === 'Hauteur' && (p.nb_gv || 0) > 0) fautifs.push(`${lieu}/${p.secteur}`);
+      }
+    }
+    assert.deepEqual(fautifs, [], `Étiquetés « Hauteur » malgré des grandes voies : ${fautifs.join(', ')}`);
+    assert.ok(avec > 0, 'Aucun secteur ne porte de hauteur — le champ est-il bien exporté ?');
+  });
+
   test('escapeHtml échappe aussi les guillemets (contexte attribut)', async () => {
     const { escapeHtml } = await import('../assets/js/utils.js');
     // Le piège d'origine : textContent->innerHTML n'échappe pas " ni ',

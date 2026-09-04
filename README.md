@@ -236,8 +236,17 @@ position à position — même à 1 seul parking), `nb_voie_total`,
 `nb_voie_moulinette` (invariant : total = la somme des quatre),
 `nb_couenne`, `nb_gv` (compteurs **précalculés** à la
 génération — voir `export_geojson.py` ; le client ne les calcule plus),
-`cotations` (voir ci-dessous), et `routes` (id_falaise si la falaise a des
-voies sportives, sinon `null`).
+`hauteur_max_voie_m` (voir l'encadré ci-dessous), `cotations` (voir plus bas),
+et `routes` (id_falaise si la falaise a des voies sportives, sinon `null`).
+
+> **`hauteur_max_voie_m` est la hauteur de la PAROI, jamais une longueur de
+> corde.** Vérifié sur les données : un plafond de 350 m coexiste avec une voie
+> de 13 longueurs. La fiche change donc de libellé selon le secteur —
+> « Hauteur 30 m » quand il n'y a que des couennes (lisible en corde),
+> « Paroi 350 m » dès qu'une grande voie existe. Un libellé unique induirait en
+> erreur sur du matériel de sécurité ; deux tests statiques et un test
+> navigateur interdisent de les fusionner. Voir `colonneHauteur()` dans
+> `popups.js`.
 
 `cotations` est un résumé compact `{cotation: nombre de voies}` des voies
 **sportives** de la falaise, cotations laissées **brutes** (les formes non
