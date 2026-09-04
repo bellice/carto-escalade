@@ -160,6 +160,62 @@ describe('Filtre « depuis le gîte »', () => {
   }
 });
 
+// Au parking, les deux gestes utiles sont « Itinéraire » et le relevé GPS.
+// Ils étaient poussés hors de l'écran par la liste des secteurs desservis :
+// au parking principal de Pen-Hir, 45 liens occupaient 396 px alors que la
+// partie visible de la fiche mobile en fait 380. La liste se replie désormais
+// au-delà d'un seuil ; ce test vérifie l'effet, pas le mécanisme.
+describe('Fiche parking chargée', () => {
+  for (const lieu of LIEUX) {
+    test(`${lieu} : le parking le plus fourni garde ses actions visibles`, { timeout: 90000 }, async () => {
+      const { contexte, page } = await nouveauContexte(navigateur, { viewport: { width: 390, height: 844 } });
+      try {
+        await exposerCarte(page);
+        await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+
+        // Le parking qui dessert le plus de secteurs : c'est lui qui fait mal.
+        const cible = await page.evaluate(async () => {
+          const geo = await (await fetch('data.geojson')).json();
+          const compte = new Map();
+          for (const f of geo.features) {
+            for (const nom of f.properties.parking_associe || []) {
+              compte.set(nom, (compte.get(nom) || 0) + 1);
+            }
+          }
+          const [nom, n] = [...compte.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+          if (!nom) return null;
+          const el = [...document.querySelectorAll('.maplibregl-marker')]
+            .find((e) => (e.getAttribute('aria-label') || '').includes(nom));
+          if (!el) return null;
+          el.click();
+          return { nom, n };
+        });
+        assert.ok(cible, `${lieu} : aucun marqueur de parking trouvé`);
+
+        await page.waitForSelector('.popup .actions', { timeout: 10000 });
+        await page.waitForTimeout(400);
+
+        const vu = await page.evaluate(() => {
+          const pop = document.querySelector('.popup');
+          const act = pop.querySelector('.actions');
+          const r = act.getBoundingClientRect();
+          return {
+            actionsVisibles: r.top >= 0 && r.bottom <= innerHeight,
+            basActions: Math.round(r.bottom),
+            vue: innerHeight,
+          };
+        });
+        assert.equal(vu.actionsVisibles, true,
+          `${lieu} : « ${cible.nom} » dessert ${cible.n} secteurs et repousse ses actions ` +
+          `jusqu'à ${vu.basActions}px sur une vue de ${vu.vue}px — replier la liste.`);
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+});
+
 describe('Recherche', () => {
   // Le champ ne cherchait que dans « nom · secteur » : taper « Saoû » ne
   // renvoyait RIEN, alors que 40 des 111 secteurs en dépendent et que c'est le

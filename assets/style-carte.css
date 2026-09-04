@@ -1504,6 +1504,32 @@
   cursor: pointer;
 }
 
+/* Liste repliée au-delà de SEUIL_REPLI_FALAISES entrées (voir popups.js).
+   <details> natif : ouverture au clavier et annonce par lecteur d'écran sans
+   une ligne de JS, et rien à ajouter au répartiteur de clics des fiches.
+   Le marqueur par défaut (triangle) est retiré des deux façons qu'il faut
+   (list-style pour les navigateurs récents, ::-webkit-details-marker pour
+   Safari) et remplacé par un chevron textuel, comme le repli de la légende —
+   le site n'emploie aucun pictogramme. min-height : la cible tactile de 44px
+   du reste du site. */
+.popup .liens-replies > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--forest);
+  text-decoration: underline;
+}
+.popup .liens-replies > summary::-webkit-details-marker { display: none; }
+.popup .liens-replies > summary::after {
+  content: '▾';
+  text-decoration: none;
+  font-size: var(--fs-xs);
+}
+.popup .liens-replies[open] > summary::after { content: '▴'; }
+
 /* Listes des parkings d'une falaise (voir champParkingAssocie) : une ligne
    cliquable par parking, uniforme entre 1 et N — [P] Parking [n] - X min à
    pied. La ligne entière navigue vers le parking (le badge P relie aux
