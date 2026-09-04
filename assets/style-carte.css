@@ -640,13 +640,48 @@
 }
 @media (pointer: coarse) {
   .legende-toggle { min-height: 44px; padding: 4px 12px; }
+  /* Curseur de trajet : 254x16 mesuré. La piste reste fine (le navigateur la
+     centre dans la boite), seule la zone attrapable grandit — c'est elle
+     qu'on vise en glissant le pouce. */
+  #filtre-temps { min-height: 44px; }
   /* Le bouton de l'en-tête ne peut PAS grandir : l'en-tête a une hauteur
      fixe (--hauteur-entete) dont dépend le calage de la carte. On étend donc
      la zone tactile au-delà de la boîte visible, via un pseudo-élément
      transparent — la cible fait bien 44px au doigt, la mise en page ne bouge
      pas d'un pixel. */
+  /* La SEULE sortie de la carte, et sa plus petite cible : 74x16 mesuré.
+     Même procédé que .btn-preparer ci-dessous, et pour une raison de plus :
+     étirer le lien (align-self:stretch + display:flex) donnait bien 44px,
+     mais faisait de lui un conteneur flex — ce qui neutralisait le mécanisme
+     même du défaut que surveille le test « aucun libellé du bouton ne déforme
+     la navigation ». Le test continuait de passer en ayant retiré
+     flex-shrink ET white-space. Le pseudo-élément ne touche à rien. */
+  .map-header a { position: relative; }
+  .map-header a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
   .btn-preparer { position: relative; }
   .btn-preparer::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+  /* Même procédé pour les noms de site, cliquables et hauts de 22px : les
+     grossir VISUELLEMENT encombrerait la carte, qui est le contenu. La zone
+     s'étend donc au-delà de l'étiquette, dans les deux dimensions — 48px de
+     large mesurés sur « Argol », c'est le plus étroit. */
+  .label-site { position: relative; }
+  .label-site::after {
     content: "";
     position: absolute;
     left: 0;

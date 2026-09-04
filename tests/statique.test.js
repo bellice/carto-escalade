@@ -532,6 +532,30 @@ describe('Pages HTML', () => {
   });
 });
 
+describe('Ce que le site publie', () => {
+  // GitHub Pages sert la racine du dépôt telle quelle : /tests/parcours.test.js,
+  // /package.json et /README.md répondaient 200 sur le site en ligne. Rien de
+  // confidentiel, mais aucune raison d'y être. _config.yml les exclut ; ce test
+  // le verrouille, parce qu'un fichier retiré de la liste ne se voit pas.
+  test('les fichiers internes sont exclus de la publication', async () => {
+    const conf = await lire('_config.yml');
+    const attendus = ['tests/', 'outils/', 'package.json', 'package-lock.json', 'README.md'];
+    const manquants = attendus.filter((f) => !conf.includes(f));
+    assert.deepEqual(manquants, [],
+      `_config.yml ne les exclut plus : ${manquants.join(', ')} — ils redeviendraient publics.`);
+  });
+
+  // L'inverse du test ci-dessus : exclure un dossier de lieu retirerait la
+  // carte elle-même du site, et la suite resterait verte puisque les fichiers
+  // sont toujours là sur le disque.
+  test("aucun dossier de lieu n'est exclu par erreur", async () => {
+    const conf = await lire('_config.yml');
+    const exclus = LIEUX.filter((l) => new RegExp(`^\s*-\s*${l}/?\s*$`, 'm').test(conf));
+    assert.deepEqual(exclus, [],
+      `_config.yml exclut ${exclus.join(', ')} — ces cartes ne seraient plus publiées.`);
+  });
+});
+
 describe('Service worker : les lieux', () => {
   // Oubli silencieux : un lieu absent du PRECACHE s'affiche parfaitement en
   // ligne et ne marche pas hors ligne — c'est-à-dire au seul moment où on en a

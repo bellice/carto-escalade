@@ -50,6 +50,11 @@ function tuileDe(lon, lat, z) {
 // Ensemble dédupliqué de tuiles couvrant un disque autour de chaque point.
 // Set de chaînes "z/x/y" : deux falaises voisines partagent leurs tuiles, on
 // ne les compte (et ne les télécharge) qu'une fois.
+// EXPORTÉ sans être importé par un autre module du site, et c'est voulu :
+// fonction pure, appelée depuis un script d'analyse pour chiffrer
+// l'empreinte hors-ligne d'un lieu AVANT de le publier (99 tuiles pour
+// Pen-Hir, 463 pour la Drôme). Sans l'export il faudrait dupliquer le
+// calcul, et les deux chiffres finiraient par diverger.
 export function tuilesPourPoints(points, zMin = ZOOM_MIN, zMax = ZOOM_MAX, marge = MARGE_TUILES) {
   const tuiles = new Set();
   for (let z = zMin; z <= zMax; z++) {
@@ -149,7 +154,7 @@ async function telechargerLot(urls, { onProgres, signal }) {
   return { faits, echoues };
 }
 
-export function lireEtatPreparation() {
+function lireEtatPreparation() {
   try {
     return JSON.parse(localStorage.getItem(CLE_STOCKAGE) || 'null');
   } catch {

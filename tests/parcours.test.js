@@ -216,6 +216,52 @@ describe('Fiche parking chargée', () => {
   }
 });
 
+// WCAG 2.5.8 : 24px minimum pour une cible de pointage. Le site s'impose 44px
+// AU DOIGT — c'est une contrainte tactile, pas universelle (voir le
+// commentaire du bloc @media (pointer: coarse) dans style-carte.css), d'où la
+// mesure en contexte tactile.
+// Défaut réel : « ← Accueil », seule sortie de la carte, faisait 74x16 — la
+// plus petite cible de la page, à côté d'un bouton « Préparer » à 44px.
+// La zone attrapable n'est pas toujours la boîte visible : deux contrôles
+// l'étendent par un ::after transparent, pour ne pas encombrer la carte.
+describe('Cibles tactiles', () => {
+  const PAGES = ['/index.html', '/404.html', ...LIEUX.map((l) => `/${l}/index.html`)];
+  for (const page of PAGES) {
+    test(`${page} : aucune cible sous 24px au doigt`, { timeout: 90000 }, async () => {
+      const carte = !['/index.html', '/404.html'].includes(page);
+      const { contexte, page: onglet } = await nouveauContexte(navigateur,
+        { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+      try {
+        if (carte) await exposerCarte(onglet);
+        // networkidle et non domcontentloaded : à DCL la feuille de style
+        // peut ne pas être appliquée, et tout se mesurerait avant les règles.
+        await onglet.goto(serveur.base + page, { waitUntil: carte ? 'domcontentloaded' : 'networkidle' });
+        if (carte) { await attendreCarte(onglet); await onglet.waitForTimeout(800); }
+
+        const petits = await onglet.evaluate(() => {
+          const out = [];
+          for (const el of document.querySelectorAll('a, button, input, select, summary, [role=button]')) {
+            const b = el.getBoundingClientRect();
+            if (!b.width) continue;
+            const ap = getComputedStyle(el, '::after');
+            const etendue = (ap.content && ap.content !== 'none' && ap.position === 'absolute')
+              ? (parseFloat(ap.height) || 0) : 0;
+            const h = Math.max(b.height, etendue);
+            if (h < 24 || b.width < 24) {
+              out.push(`${Math.round(b.width)}x${Math.round(h)} « ${(el.getAttribute('aria-label') || el.textContent || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 30)} »`);
+            }
+          }
+          return out;
+        });
+        assert.deepEqual(petits, [],
+          `${page} : cible(s) sous 24px au doigt — ${petits.join(' | ')}`);
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+});
+
 describe('Recherche', () => {
   // Le champ ne cherchait que dans « nom · secteur » : taper « Saoû » ne
   // renvoyait RIEN, alors que 40 des 111 secteurs en dépendent et que c'est le
@@ -451,6 +497,38 @@ describe('En-tête sur mobile', () => {
       const faite = (await mesurer('Prête')).bouton;
       assert.ok(faite <= action,
         `Le libellé de l'état préparé (${faite}px) doit tenir dans celui de l'action (${action}px)`);
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
+// Le test ci-dessus tourne à 390px, et à cette largeur il avait cessé de
+// mordre : retirer flex-shrink ET white-space de .map-header a le laissait
+// passer. Le titre absorbe désormais la pression par son ellipsis
+// (min-width: 0), si bien que le lien n'est plus jamais comprimé — à 390px.
+// Mesuré : le défaut d'origine réapparaît à 320px, où il fait tomber le lien
+// sur deux lignes (63x32). C'est une largeur réelle (iPhone SE, petits
+// Android), et c'est là que la protection compte encore.
+describe('En-tête sur écran étroit', () => {
+  test('à 320px, le lien de retour ne se comprime pas', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur, { viewport: { width: 320, height: 800 } });
+    try {
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.btn-preparer', { timeout: 20000 });
+
+      // « Espace plein » est le libellé le plus large que le bouton puisse
+      // prendre (113px) : c'est le pire cas réel pour l'en-tête.
+      const m = await page.evaluate(() => {
+        document.querySelector('.btn-preparer').textContent = 'Espace plein';
+        const a = document.querySelector('.map-header a').getBoundingClientRect();
+        return { w: Math.round(a.width), h: Math.round(a.height),
+                 deborde: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+      });
+      assert.ok(m.h < 24,
+        `À 320px, « Espace plein » fait passer le lien de retour sur deux lignes (${m.w}x${m.h}) — ` +
+        'flex-shrink: 0 et white-space: nowrap sur .map-header a sont-ils toujours là ?');
+      assert.equal(m.deborde, false, 'Débordement horizontal à 320px');
     } finally {
       await contexte.close();
     }

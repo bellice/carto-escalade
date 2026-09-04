@@ -97,7 +97,7 @@ export function infosLegendePourMode(mode, maxima) {
 // ici car carte.js en a aussi besoin (construireSourceFalaises, tri par
 // valeur décroissante dans la source), sans dupliquer ce mapping mode ->
 // propriété.
-export function valeurPourMode(entree, mode) {
+function valeurPourMode(entree, mode) {
   return mode === 'couenne' ? entree.nbCouenne
     : mode === 'gv' ? entree.nbGrandeVoie
     : mode === 'cotation' ? entree.nbDansFourchette
