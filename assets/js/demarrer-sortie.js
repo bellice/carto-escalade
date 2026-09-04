@@ -11,8 +11,22 @@
 import { initCarte } from './carte.js';
 import { enregistrerServiceWorker } from './sw-client.js';
 
+// La feuille de MapLibre est déclarée en <link rel="preload"> dans la page :
+// son téléchargement a donc déjà commencé, sans bloquer le premier rendu (voir
+// le commentaire de la balise). On la promeut ici en feuille de style, juste
+// avant initCarte — donc avant que MapLibre ne crée le moindre élément à
+// styler. Le fichier étant déjà dans le cache HTTP, l'application est
+// immédiate : pas de fenêtre où des contrôles s'afficheraient sans style.
+const feuille = document.createElement('link');
+feuille.rel = 'stylesheet';
+feuille.href = 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css';
+document.head.appendChild(feuille);
+
 const conteneur = document.getElementById('map');
 initCarte((conteneur && conteneur.dataset.donnees) || 'data.geojson');
 
-// Scope racine : le SW couvre aussi l'accueil et les autres sorties.
-enregistrerServiceWorker('../../sw.js', { scope: '../../' });
+// Scope racine : le SW couvre aussi l'accueil et les autres lieux.
+// '../' et non '../../' : les dossiers de lieu sont à UN niveau depuis
+// l'abandon de sorties/<date>/. L'ancien chemin se repliait sur la racine
+// (une URL ne remonte pas au-dessus), donc il marchait — par accident.
+enregistrerServiceWorker('../sw.js', { scope: '../' });
