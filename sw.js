@@ -62,8 +62,11 @@ const PRECACHE = [
 ];
 
 // Sans ce pré-cache, la première ouverture d'une fiche paie une latence
-// réseau pleine pour ~2 Ko — très visible sur réseau faible. Le total d'une
-// sortie est négligeable (~170 Ko), autant tout prendre à l'install.
+// réseau pleine pour ~2 Ko — très visible sur réseau faible. Le total reste
+// négligeable une fois compressé : 393 Ko bruts pour les deux lieux, mais
+// ~32 Ko sur le fil (ces fichiers compressent à 12:1). Autant tout prendre à
+// l'install. Le chiffre annoncé ici était « ~170 Ko » et datait d'un seul
+// lieu à moitié saisi ; c'est la taille BRUTE qui a triplé, pas le coût.
 // Les identifiants viennent de data.geojson : aucune liste à maintenir.
 function precacherRoutes() {
   const sorties = PRECACHE.filter((u) => u.endsWith('/data.geojson'));

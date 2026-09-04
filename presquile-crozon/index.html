@@ -60,7 +60,15 @@
        fichier serait téléchargé deux fois. -->
   <link rel="preload" href="data.geojson" as="fetch" crossorigin />
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css" />
+  <!-- preload et NON stylesheet : une feuille de style tierce bloque le
+       PREMIER RENDU jusqu’à ce que le CDN réponde. Mesuré à 200ms de
+       latence : 388ms contre 84ms sans elle — un aller-retour d’écran
+       blanc avant même que « Chargement de la carte… » ne s’affiche.
+       Le preload lance le téléchargement tout de suite sans rien bloquer ;
+       demarrer-sortie.js la promeut en feuille de style juste avant que
+       MapLibre ne crée son DOM. URL identique, donc le pré-cache du
+       service worker la couvre toujours. -->
+  <link rel="preload" as="style" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css" />
   <link rel="stylesheet" href="../assets/style.css" />
   <link rel="stylesheet" href="../assets/style-carte.css" />
 </head>

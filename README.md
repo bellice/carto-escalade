@@ -210,7 +210,7 @@ fautive d'une carte normale simplement dézoomée.
 
 La génération vit dans un repo séparé (`escalade/` : base DuckDB +
 `scripts/export_geojson.py`) ; ce repo-ci ne fait que servir les exports.
-`data.readable.geojson` (détail des voies inclus, pour référence humaine)
+`data.readable.<lieu>.geojson` (détail des voies inclus, pour référence humaine)
 reste dans `data/web/` du repo de génération, pas ici.
 
 ## Schéma `data.geojson`
@@ -266,7 +266,7 @@ part dans `routes/<slug-site>.json` (un fichier par site, indexé par
 `id_falaise` — plusieurs falaises d'un même site partagent le fichier) et
 chargé à la demande (voir `marqueurs.js`, `popup.on('open')`), avec un cache
 en mémoire pour les réouvertures. La version lisible complète est
-`data.readable.geojson` (repo de génération).
+`data.readable.<lieu>.geojson` (repo de génération).
 
 **Parking**
 `nom`, `categorie` ("parking"), `trajet_gite_min`

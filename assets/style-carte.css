@@ -2021,12 +2021,6 @@
   border-radius: var(--radius);
   padding: 2px 4px;
 }
-.legende-cotation-resume {
-  margin: 6px 0 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
 
 /* ===== Champs de saisie sur mobile : 16 px minimum =====
    iOS Safari ZOOME automatiquement la page quand on met le focus sur un
