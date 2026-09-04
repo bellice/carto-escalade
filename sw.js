@@ -15,7 +15,7 @@ const CACHE_PREFIXE = 'sorties-escalade-v';
 // paresseux — s'il n'est pas pré-caché, le premier chargement hors ligne
 // échoue à l'import et fait tomber toute la carte (constaté en test). C'est
 // le cas type qui justifie encore un bump.
-const CACHE_NAME = `${CACHE_PREFIXE}7`;
+const CACHE_NAME = `${CACHE_PREFIXE}8`;
 
 // Cache SÉPARÉ du fond de carte, à ne surtout pas fusionner avec la coquille :
 // il n'est pas versionné par CACHE_NAME, sans quoi bumper la coquille pour
@@ -57,8 +57,8 @@ const PRECACHE = [
   // Sorties (une entrée par dossier) :
   './vallee-drome-diois/index.html',
   './vallee-drome-diois/data.geojson',
-  './penhir-argol/index.html',
-  './penhir-argol/data.geojson',
+  './presquile-crozon/index.html',
+  './presquile-crozon/data.geojson',
 ];
 
 // Sans ce pré-cache, la première ouverture d'une fiche paie une latence

@@ -10,7 +10,7 @@
 # YAML et aucune ne contient de syntaxe Liquid (vérifié) : elles sont donc
 # copiées à l'octet près, comme aujourd'hui.
 #
-# NE PAS y ajouter de dossier de lieu (vallee-drome-diois, penhir-argol…) :
+# NE PAS y ajouter de dossier de lieu (vallee-drome-diois, presquile-crozon…) :
 # c'est le site lui-même.
 exclude:
   - tests/
