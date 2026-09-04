@@ -169,7 +169,8 @@ for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
   });
 
   // Régression réelle : une falaise portait « penhir-argol » dans sa colonne
-  // `nom` — le slug du lieu recopié par mégarde. Rien ne l'a signalé, et elle
+  // `nom` — le slug du lieu recopié par mégarde (il s'appelait alors ainsi,
+  // renommé depuis en presquile-crozon). Rien ne l'a signalé, et elle
   // s'affichait sous ce nom sur la carte jusqu'à ce qu'un œil humain la voie.
   // Un nom de falaise identique au dossier qui la contient n'a aucune raison
   // d'exister : c'est toujours un copier-coller.
