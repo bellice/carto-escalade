@@ -78,7 +78,7 @@ export function initCarte(dataUrl) {
   // popupOuverte.estPanneauFalaise.
   const panneauFalaiseOuvert = () => estDesktop() && document.getElementById('panneau-falaise')?.classList.contains('ouvert');
 
-  const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbFaciles, nbGrandeVoie, nbCouenne, tempsGite }
+  const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbGrandeVoie, nbCouenne, tempsGite }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
   let labelsSecteurs = []; // [{el, marker, nom}], peuplé une fois le geojson chargé
   let labelsSites = []; // [{el, marker, site}], peuplé une fois le geojson chargé — voir appliquerAntiCollisionSites

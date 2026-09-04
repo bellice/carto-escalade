@@ -154,7 +154,6 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
       // dans le libellé, il sert uniquement à la correspondance.
       recherche: `${libelleFalaise(p)} ${p.site || ''}`.toLowerCase(),
       nbVoies: p.nb_voie_total ?? 0,
-      nbFaciles: p.nb_faciles ?? 0,
       // {cotation: nombre} : permet le filtre par fourchette sans télécharger
       // routes/*.json.
       cotations: p.cotations || null,
@@ -285,7 +284,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     marker, cat, nom: p.nom, secteur: null, cle, recherche: p.nom.toLowerCase(),
     parkingAssocie,
     nbVoies: p.nb_voie_total ?? 0,
-    nbFaciles: 0, nbGrandeVoie: 0, nbCouenne: 0,
+    nbGrandeVoie: 0, nbCouenne: 0,
   };
 
   return entree;

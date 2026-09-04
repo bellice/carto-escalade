@@ -47,7 +47,7 @@ export function indexerParkingInfos(geojson) {
   return infos;
 }
 
-// nb_couenne/nb_gv/nb_faciles ne sont PLUS calculés ici : précalculés à la
+// nb_couenne/nb_gv ne sont PLUS calculés ici : précalculés à la
 // GÉNÉRATION (voir scripts/export_geojson.py, repo escalade — le SQL y doit
 // rester le miroir de ce que cotationVersValeur + la règle "facile ≤ 6a+"
 // produisaient côté client). Ça permet de ne pas embarquer le détail
@@ -108,20 +108,18 @@ export function indexerSources(geojson) {
 }
 
 export function calculerMaxima(geojson) {
-  const totaux = [], couennes = [], gvs = [], faciles = [];
+  const totaux = [], couennes = [], gvs = [];
   geojson.features.forEach(f => {
     if (f.properties.categorie !== 'falaise') return;
     const p = f.properties;
     totaux.push(p.nb_voie_total || 0);
     couennes.push(p.nb_couenne || 0);
     gvs.push(p.nb_gv || 0);
-    faciles.push(p.nb_faciles || 0);
   });
   return {
     total: Math.max(0, ...totaux), totalMedian: mediane(totaux),
     couenne: Math.max(0, ...couennes), couenneMedian: mediane(couennes),
     gv: Math.max(0, ...gvs), gvMedian: mediane(gvs),
-    faciles: Math.max(0, ...faciles), facilesMedian: mediane(faciles),
   };
 }
 

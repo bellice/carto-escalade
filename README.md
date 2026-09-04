@@ -211,8 +211,9 @@ d'abord plutôt que supposer qu'une clé existe.
 `orientation` (tableau), `lien_oblyk`, `lien_camptocamp`, `source_id`,
 `parking_associe`/`approche_min`/`approche_metre` (tableaux, alignés
 position à position — même à 1 seul parking), `nb_voie_total`,
-`nb_voie_sportive`, `nb_voie_autres` (invariant : total = sportive + autres),
-`nb_couenne`, `nb_gv`, `nb_faciles` (compteurs **précalculés** à la
+`nb_voie_sportive`, `nb_voie_trad`, `nb_voie_artificielle`,
+`nb_voie_moulinette` (invariant : total = la somme des quatre),
+`nb_couenne`, `nb_gv` (compteurs **précalculés** à la
 génération — voir `export_geojson.py` ; le client ne les calcule plus),
 `cotations` (voir ci-dessous), et `routes` (id_falaise si la falaise a des
 voies sportives, sinon `null`).
