@@ -169,7 +169,7 @@ export function popupFalaise(p, lat, lon, cle) {
     // Grimpe (mixte, le cas échéant) signalent l'écart avec le total de la
     // colonne Voies. data-autres-disciplines : calculé ici (p est déjà
     // disponible), relu par chargerDetailVoies au moment du rendu différé.
-    const autresDisciplines = (p.nb_voie_trad || p.nb_voie_artificielle) ? '1' : '0';
+    const autresDisciplines = (p.nb_voie_trad || p.nb_voie_artificielle || p.nb_voie_moulinette) ? '1' : '0';
     contenuCaractere += `<div class="voies-histo-placeholder" data-route="${escapeHtml(String(p.routes))}" data-route-falaise="${escapeHtml(String(p.routes_falaise))}" data-autres-disciplines="${autresDisciplines}"></div>`;
   }
   if (p.parking_associe && p.parking_associe.length) {
@@ -409,20 +409,19 @@ function champLiensFalaises(falaises) {
 // nb_voie_artificielle) : on ne déduit plus le style d'un vague "autres".
 function styleGrimpe(p) {
   const total = p.nb_voie_total ?? 0;
-  const sportive = p.nb_voie_sportive ?? 0;
-  const trad = p.nb_voie_trad ?? 0;
-  const artificielle = p.nb_voie_artificielle ?? 0;
   if (total <= 0) return '';
-  // Nombre de disciplines réellement présentes : une seule -> son nom ;
-  // plusieurs -> "mixte".
-  const disciplines = [sportive > 0, trad > 0, artificielle > 0].filter(Boolean).length;
-  if (disciplines <= 1) {
-    if (sportive > 0) return 'sportive';
-    if (trad > 0) return 'trad';
-    if (artificielle > 0) return 'artificielle';
-    return '';
-  }
-  return 'mixte';
+  // Ordre = ordre d'affichage quand une seule discipline est présente.
+  // « moulinette » comptait auparavant comme sportive, faute d'exister dans
+  // le modèle : elle était donc annoncée à tort comme grimpe en tête.
+  const styles = [
+    ['sportive', p.nb_voie_sportive ?? 0],
+    ['trad', p.nb_voie_trad ?? 0],
+    ['artificielle', p.nb_voie_artificielle ?? 0],
+    ['moulinette', p.nb_voie_moulinette ?? 0],
+  ].filter(([, n]) => n > 0);
+  // Une seule discipline -> son nom ; plusieurs -> "mixte".
+  if (styles.length === 1) return styles[0][0];
+  return styles.length ? 'mixte' : '';
 }
 
 // Histogramme « 1 case = 1 voie » : une colonne par cotation RÉELLEMENT
@@ -498,7 +497,10 @@ export function construireHistogramme(voiesSportives, aAutresDisciplines) {
   // l'histogramme ne les couvre pas (comptés mais non détaillés), et un titre
   // par inclusion laisserait croire l'inverse face au total « Voies » plus
   // haut. Sur une falaise 100 % sportive la mention n'exclurait plus rien.
-  const titre = aAutresDisciplines ? 'Cotation (hors trad et artificielle)' : 'Cotation';
+  // Dit ce qui EST montré plutôt que d'énumérer ce qui ne l'est pas : la
+  // liste des autres styles s'allonge (moulinette est arrivée avec Pen-Hir),
+  // pas le titre.
+  const titre = aAutresDisciplines ? 'Cotation (voies sportives seules)' : 'Cotation';
   // Répartition couenne/grande voie ÉNONCÉE DANS L'aria-label : dans le
   // graphique, cette distinction ne repose que sur la couleur des cases
   // (WCAG 1.4.1). L'encodage par la couleur est le bon choix sémiologique

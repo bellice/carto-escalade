@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- CSP en <meta> : GitHub Pages n'autorise pas d'en-têtes HTTP.
+       PIÈGE : worker-src DOIT inclure jsdelivr — MapLibre v6 charge
+       maplibre-gl-worker.mjs depuis le CDN, et une violation CSP survenue
+       dans un worker ne remonte PAS au document : l'omettre laisse la carte
+       vide sans la moindre erreur en console.
+       style-src garde 'unsafe-inline' (MapLibre pose des styles en ligne sur
+       ses marqueurs) ; script-src peut s'en passer, les scripts inline ayant
+       été externalisés. frame-ancestors est absent volontairement : cette
+       directive est ignorée en <meta>, l'anti-clickjacking reste hors de
+       portée sur GitHub Pages. Rationnel complet : README.md. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://cdn.jsdelivr.net;
+    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+    img-src 'self' data: blob: https://tiles.openfreemap.org;
+    font-src 'self' data:;
+    connect-src 'self' https://tiles.openfreemap.org https://cdn.jsdelivr.net;
+    worker-src 'self' blob: https://cdn.jsdelivr.net;
+    child-src 'self' blob: https://cdn.jsdelivr.net;
+    base-uri 'none';
+    form-action 'none';
+    object-src 'none'
+  " />
+
+  <title>Pen-Hir et Argol - Tokelau</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
+  <meta name="theme-color" content="#fbfaf6" />
+
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://tiles.openfreemap.org" />
+
+  <!-- Sans ces indices, le graphe d'imports ES ne se découvre qu'au fil du
+       parsing de chaque module, en 2-3 aller-retours séquentiels.
+       crossorigin est requis sur maplibre-gl.mjs (autre origine) : sans lui
+       le navigateur le retélécharge à l'import réel. -->
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs" crossorigin />
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl-shared.mjs" crossorigin />
+  <link rel="modulepreload" href="../assets/js/carte.js" />
+  <link rel="modulepreload" href="../assets/js/actions-fiche.js" />
+  <link rel="modulepreload" href="../assets/js/carte-utils.js" />
+  <link rel="modulepreload" href="../assets/js/marqueurs.js" />
+  <link rel="modulepreload" href="../assets/js/popups.js" />
+  <link rel="modulepreload" href="../assets/js/symboles.js" />
+  <link rel="modulepreload" href="../assets/js/labels.js" />
+  <link rel="modulepreload" href="../assets/js/donnees.js" />
+  <link rel="modulepreload" href="../assets/js/hors-ligne.js" />
+  <link rel="modulepreload" href="../assets/js/utils.js" />
+
+  <!-- crossorigin même en same-origin : fetch() est en mode "cors" par
+       défaut, et un preload sans crossorigin ne matche pas ce mode — le
+       fichier serait téléchargé deux fois. -->
+  <link rel="preload" href="data.geojson" as="fetch" crossorigin />
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="../assets/style.css" />
+  <link rel="stylesheet" href="../assets/style-carte.css" />
+</head>
+<body>
+
+  <header class="map-header">
+    <a href="../">← Accueil</a>
+    <h1 class="titre">Pen-Hir et Argol</h1>
+    <div id="preparation-hors-ligne"></div>
+  </header>
+
+  <div id="panneau-lateral" role="region" aria-label="Recherche et légende de la carte">
+    <div class="recherche">
+      <div class="recherche-champ">
+        <!-- Le champ cherche dans le site, le nom de falaise, le secteur et
+             les noms de parking : « Chercher une falaise » en cachait les
+             trois quarts. Placeholder court par contrainte de largeur (161px
+             utiles) ; l'aria-label, lui, est complet — il n'a pas cette
+             contrainte. -->
+        <input type="search" list="falaises-liste" placeholder="Site, falaise, secteur…" aria-label="Rechercher un site, une falaise, un secteur ou un parking" />
+        <button type="button" class="btn-effacer" aria-label="Effacer la recherche" hidden>×</button>
+      </div>
+      <datalist id="falaises-liste"></datalist>
+      <button type="button" class="btn-centrer" aria-label="Voir le résultat de la recherche">Voir</button>
+    </div>
+
+    <div class="legende">
+      <div class="legende-entete">
+        <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu" aria-label="Réduire la légende">
+          <span class="legende-toggle-texte">Masquer</span>
+          <span class="legende-toggle-icone" aria-hidden="true">▾</span>
+        </button>
+      </div>
+      <div class="legende-contenu" id="legende-contenu">
+        <div class="legende-cats">
+          <span id="cle-falaises-zone"><span class="cle"><span class="dot"></span> Falaises</span></span>
+          <span class="cle"><span class="dot parking"></span> Parkings</span>
+          <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
+        </div>
+        <!-- Le sélecteur est le TITRE des cercles proportionnels rendus juste
+             en dessous : sa place au-dessus de #legende-falaises est voulue. -->
+        <div class="legende-figure">
+          <select id="mode-figure" aria-label="Nombre représenté par la taille des cercles">
+            <option value="aucun">Toutes les voies</option>
+            <option value="cotation">Voies par cotation</option>
+            <option value="couenne" id="option-couenne">Couennes</option>
+            <option value="gv" id="option-gv">Grandes voies</option>
+          </select>
+        </div>
+        <div class="legende-cotation" id="legende-cotation" hidden>
+          <div class="legende-cotation-bornes">
+            <label for="cotation-min">De</label>
+            <select id="cotation-min"></select>
+            <label for="cotation-max">à</label>
+            <select id="cotation-max"></select>
+          </div>
+        </div>
+        <div class="legende-falaises" id="legende-falaises"></div>
+        <div class="legende-temps" id="legende-temps" hidden>
+          <div class="legende-temps-ligne1">
+            <label for="filtre-temps">Trajet depuis le gîte</label>
+            <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
+          </div>
+          <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sibling de #panneau-lateral, PAS imbriqué dedans : il s'ancre à droite,
+       indépendamment du panneau gauche, qui doit rester stable quand celui-ci
+       s'ouvre. Voir style-carte.css @media (min-width: 641px). -->
+  <aside id="panneau-falaise" aria-label="Détails de la falaise" inert>
+    <div class="panneau-falaise-interieur">
+      <button type="button" class="panneau-falaise-fermer" aria-label="Fermer le panneau">×</button>
+      <div class="panneau-falaise-contenu"></div>
+    </div>
+  </aside>
+
+  <!-- data-donnees est lu par demarrer-sortie.js ; le chemin reste relatif à
+       CETTE page, chaque lieu ayant son propre data.geojson. -->
+  <div id="map" data-donnees="data.geojson"></div>
+
+  <div id="etat-chargement" class="etat-chargement">Chargement de la carte…</div>
+
+  <!-- Externalisé pour que la CSP puisse refuser 'unsafe-inline'. -->
+  <script type="module" src="../assets/js/demarrer-sortie.js"></script>
+</body>
+</html>
