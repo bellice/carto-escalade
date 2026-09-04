@@ -168,6 +168,22 @@
   color: var(--forest);
 }
 
+/* Deux libellés pour un même lieu : le nom complet quand l'en-tête a la place,
+   la forme courte sinon. Le titre dispose de (largeur d'écran − 243px), une
+   fois retranchés le lien de retour et le bouton « Préparer » à son libellé le
+   plus large — mesuré.
+   « Vallée de la Drôme et Diois » fait 183px et tiendrait donc dès ~430px,
+   mais le seuil retenu est 641px, celui du reste du site : une seule rupture
+   dimensionnelle à retenir, et ~400px de budget au lieu de 4px de marge. C'est
+   ce qui laisse la place au prochain nom de région sans avoir à re-mesurer.
+   Un test statique vérifie que chaque page carte porte bien les deux formes,
+   et un test navigateur qu'aucune ne déborde à sa largeur. */
+.map-header .titre-long { display: none; }
+@media (min-width: 641px) {
+  .map-header .titre-long { display: inline; }
+  .map-header .titre-court { display: none; }
+}
+
 #map {
   position: absolute;
   top: var(--hauteur-entete); bottom: 0; left: 0; right: 0;

@@ -268,6 +268,53 @@ describe('Cibles tactiles', () => {
   }
 });
 
+// Le nom complet du lieu s'affiche dès 641px, la forme courte en dessous.
+// Le test qui compte est celui de 641px : c'est la largeur la plus étroite où
+// le nom complet est montré, donc celle où un futur nom de région trop long
+// se ferait tronquer. Il échouera alors en disant lequel raccourcir, plutôt
+// que de laisser un « Vallée de la Drôme et Di… » partir en ligne.
+describe('Nom du lieu selon la largeur', () => {
+  for (const lieu of LIEUX) {
+    test(`${lieu} : le nom bascule sans jamais déborder`, { timeout: 90000 }, async () => {
+      for (const [largeur, attendu] of [[641, 'titre-long'], [640, 'titre-court'], [390, 'titre-court']]) {
+        const { contexte, page } = await nouveauContexte(navigateur, { viewport: { width: largeur, height: 700 } });
+        try {
+          await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
+          await page.waitForSelector('.btn-preparer', { timeout: 20000 });
+
+          const r = await page.evaluate(() => {
+            // Pire cas réel : c'est le libellé le plus large que le bouton
+            // puisse prendre, donc le budget minimal laissé au titre.
+            document.querySelector('.btn-preparer').textContent = 'Espace plein';
+            const h1 = document.querySelector('.map-header .titre');
+            const visibles = [...h1.querySelectorAll('span')]
+              .filter((e) => getComputedStyle(e).display !== 'none');
+            return {
+              classes: visibles.map((e) => e.className),
+              texte: visibles.map((e) => e.textContent).join(''),
+              tronque: h1.scrollWidth > h1.clientWidth + 1,
+              deborde: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            };
+          });
+
+          assert.deepEqual(r.classes, [attendu],
+            `${lieu} à ${largeur}px : ${r.classes.length} libellé(s) visible(s) (${r.classes.join(', ')}), attendu « ${attendu} » seul`);
+          assert.equal(r.deborde, false, `${lieu} à ${largeur}px : débordement horizontal`);
+          // À 641px le nom complet vient d'apparaître : s'il ne tient pas là,
+          // il ne tiendra nulle part où on le montre.
+          if (largeur === 641) {
+            assert.equal(r.tronque, false,
+              `${lieu} : « ${r.texte} » est tronqué à 641px, la largeur la plus étroite où le nom ` +
+              "complet s'affiche. Raccourcir ce nom, ou relever le seuil dans style-carte.css.");
+          }
+        } finally {
+          await contexte.close();
+        }
+      }
+    });
+  }
+});
+
 describe('Recherche', () => {
   // Le champ ne cherchait que dans « nom · secteur » : taper « Saoû » ne
   // renvoyait RIEN, alors que 40 des 111 secteurs en dépendent et que c'est le
