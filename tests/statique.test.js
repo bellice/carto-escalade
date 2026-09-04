@@ -168,6 +168,22 @@ for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
     }
   });
 
+  // Régression réelle : une falaise portait « penhir-argol » dans sa colonne
+  // `nom` — le slug du lieu recopié par mégarde. Rien ne l'a signalé, et elle
+  // s'affichait sous ce nom sur la carte jusqu'à ce qu'un œil humain la voie.
+  // Un nom de falaise identique au dossier qui la contient n'a aucune raison
+  // d'exister : c'est toujours un copier-coller.
+  test('aucune falaise ne porte le nom de son lieu', async () => {
+    const geo = await geojsonDe(lieu);
+    const fautives = geo.features
+      .filter((f) => f.properties.categorie === 'falaise')
+      .filter((f) => [f.properties.nom, f.properties.site, f.properties.secteur]
+        .some((v) => (v || '').toLowerCase() === lieu.toLowerCase()))
+      .map((f) => `${f.properties.nom} / ${f.properties.secteur}`);
+    assert.deepEqual(fautives, [],
+      `${lieu} : nom, site ou secteur vaut le slug du lieu — copier-coller dans falaise.csv.`);
+  });
+
   // Le défaut que la colonne `lieu` existe pour empêcher. Avant elle, toutes
   // les requêtes de export_geojson.py étaient sans portée : un second jeu de
   // données saisi dans les mêmes CSV se serait retrouvé dans TOUS les
