@@ -86,10 +86,10 @@ export function infosLegendePourMode(mode, maxima) {
 // Redessine une falaise selon le mode choisi dans le sélecteur "Cercles".
 // La taille encode toujours UNE seule grandeur quantitative à la fois (cf.
 // sémiologie graphique) — laquelle dépend du mode : nombre de voies total,
-// ou nombre en couenne/grande voie/faciles (≤6a+) seul quand on veut comparer
-// spécifiquement une sous-catégorie entre falaises (comptage brut, pas une
-// proportion — plus lisible et plus actionnable pour la logistique que "part
-// de voies faciles", qui masquait la taille réelle du secteur). Le
+// ou nombre en couenne / grande voie / dans la fourchette de cotation seul,
+// quand on veut comparer spécifiquement une sous-catégorie entre falaises
+// (comptage brut, pas une proportion — plus lisible et plus actionnable pour
+// la logistique qu'une "part", qui masquait la taille réelle du secteur). Le
 // remplissage suit la même logique : uni / teinte dédiée par sous-catégorie
 // / teinte répartie (grande voie-couenne, catégorielle donc couleur, pas
 // taille).
