@@ -147,15 +147,27 @@ export function reinitialiserPadding(map) {
 // légende qui s'allonge) sans que quiconque pense à le remonter ; en partant
 // de la vue déjà obtenue, la marge reste toujours cohérente avec ce qui est
 // effectivement affiché, quel que soit le padding utilisé.
+// zoomPlancher : le dézoom doit pouvoir ATTEINDRE ce niveau, pas seulement s'en
+// approcher. Un ratio fixe de marge (l'ancien 50 %, gardé ici comme plancher)
+// ne suffit plus sur un lieu compact : mesuré sur les Dentelles de Montmirail,
+// vue initiale à 14,18, un ratio de 50 % ne laissait dézoomer qu'à 13,18 —
+// au-dessus du seuil de simplification en petits points (13, voir
+// ZOOM_SIMPLIFICATION dans carte.js), le rendant structurellement inatteignable
+// alors que Crozon et la Drôme (vues initiales à 10-11) l'atteignaient sans
+// difficulté avec le même ratio. Doubler la largeur de la vue = 1 niveau de
+// zoom arrière : on calcule donc le ratio qui donne exactement l'agrandissement
+// nécessaire pour couvrir l'écran à zoomPlancher, et jamais moins que 50 %.
 // Appelée juste après la création de la carte : le cadrage initial est passé
 // au constructeur (bounds + fitBoundsOptions, voir carte.js), il n'y a donc
 // plus de moveend à attendre pour poser ces limites.
-export function limiterZoneCarte(map) {
+export function limiterZoneCarte(map, zoomPlancher) {
   const vue = map.getBounds();
   const sw = vue.getSouthWest();
   const ne = vue.getNorthEast();
-  const margeLng = (ne.lng - sw.lng) * 0.5 || 0.8;
-  const margeLat = (ne.lat - sw.lat) * 0.5 || 0.8;
+  const ratioPourPlancher = (2 ** (map.getZoom() - zoomPlancher) - 1) / 2;
+  const ratio = Math.max(0.5, ratioPourPlancher);
+  const margeLng = (ne.lng - sw.lng) * ratio || 0.8;
+  const margeLat = (ne.lat - sw.lat) * ratio || 0.8;
   map.setMaxBounds([
     [sw.lng - margeLng, sw.lat - margeLat],
     [ne.lng + margeLng, ne.lat + margeLat],

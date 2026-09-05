@@ -645,8 +645,9 @@ export function initCarte(dataUrl) {
     });
     // La vue initiale est déjà la bonne (pas d'animation au chargement) : on
     // peut poser immédiatement les limites de dérive, sans attendre un
-    // moveend (ex- fitToMarkers).
-    limiterZoneCarte(map);
+    // moveend (ex- fitToMarkers). ZOOM_SIMPLIFICATION - 1 : garantit de
+    // pouvoir dézoomer jusqu'à la vue en petits points, pas juste l'effleurer.
+    limiterZoneCarte(map, ZOOM_SIMPLIFICATION - 1);
     // Câble le bouton fermer (×) du panneau falaise desktop — sans effet
     // sur mobile, le panneau reste display:none hors media query.
     cablerFermetureManuellePanneau(map, ctxPanneau);
