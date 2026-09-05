@@ -59,6 +59,8 @@ const PRECACHE = [
   './vallee-drome-diois/data.geojson',
   './presquile-crozon/index.html',
   './presquile-crozon/data.geojson',
+  './dentelles-montmirail/index.html',
+  './dentelles-montmirail/data.geojson',
 ];
 
 // Sans ce pré-cache, la première ouverture d'une fiche paie une latence
