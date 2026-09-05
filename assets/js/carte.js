@@ -22,6 +22,16 @@ import { cablerActionsFiche } from './actions-fiche.js';
 // ajuster après un premier test réel sur le terrain.
 const ZOOM_SIMPLIFICATION = 13;
 
+// Plafond de la vue d'ensemble (cadrage initial et bouton "Tout voir") : au
+// plus près de ZOOM_SIMPLIFICATION sans l'atteindre (le seuil ci-dessus est
+// une inégalité STRICTE — s'arrêter pile à 13 afficherait encore les cercles
+// pleine taille). Volontairement PAS ZOOM_SIMPLIFICATION - 1 : ce plafond n'a
+// besoin que de franchir le seuil, pas de laisser de la marge pour explorer
+// en mode points (c'est le rôle du plancher de dézoom dans limiterZoneCarte,
+// qui lui garde ce -1). Une marge plus large ici zoomerait plus arrière que
+// nécessaire sur un lieu compact, avec un vide inutile autour du massif.
+const ZOOM_VUE_ENSEMBLE_MAX = ZOOM_SIMPLIFICATION - 0.1;
+
 // Au-delà de ce zoom, les parkings sont visibles par défaut, sans recherche
 // ni falaise sélectionnée (voir appliquerVisibiliteParkings). Calé sur
 // ZOOM_LABELS_SECTEUR (labels.js) : le repère "vue détaillée", où l'info
@@ -640,14 +650,14 @@ export function initCarte(dataUrl) {
       // aussi plus vite.
       style: 'https://tiles.openfreemap.org/styles/positron',
       bounds: borneGlobale,
-      // ZOOM_SIMPLIFICATION - 1, pas un plafond arbitraire : sur un lieu
+      // ZOOM_VUE_ENSEMBLE_MAX, pas un plafond arbitraire : sur un lieu
       // compact (Dentelles de Montmirail), ajuster pile aux marqueurs
-      // dépassait ce seuil et affichait les cercles proportionnels pleine
-      // taille dès l'arrivée — mesuré, 99 paires de cercles sur 51 se
-      // chevauchaient, jusqu'à 94% de recouvrement, rendant leur taille
-      // illisible. Sur Crozon et la Drôme, le zoom d'ajustement naturel est
-      // déjà sous ce seuil : rien ne change pour eux.
-      fitBoundsOptions: { padding: margeToutVoir(), maxZoom: ZOOM_SIMPLIFICATION - 1 },
+      // dépassait le seuil de simplification et affichait les cercles
+      // proportionnels pleine taille dès l'arrivée — mesuré, 99 paires de
+      // cercles sur 51 se chevauchaient, jusqu'à 94% de recouvrement, rendant
+      // leur taille illisible. Sur Crozon et la Drôme, le zoom d'ajustement
+      // naturel est déjà sous ce seuil : rien ne change pour eux.
+      fitBoundsOptions: { padding: margeToutVoir(), maxZoom: ZOOM_VUE_ENSEMBLE_MAX },
       attributionControl: false,
     });
     // La vue initiale est déjà la bonne (pas d'animation au chargement) : on
@@ -675,7 +685,7 @@ export function initCarte(dataUrl) {
       // Même plafond que le cadrage initial (voir ce commentaire) : "Tout
       // voir" doit revenir à la même vue qu'à l'arrivée, pas à une vue plus
       // zoomée qui réintroduirait le chevauchement des cercles.
-      if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: ZOOM_SIMPLIFICATION - 1 });
+      if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: ZOOM_VUE_ENSEMBLE_MAX });
       // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
       // recherche active — sinon la caméra revient mais les marqueurs
       // restent restreints, contradiction avec "tout voir".
