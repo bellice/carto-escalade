@@ -640,7 +640,14 @@ export function initCarte(dataUrl) {
       // aussi plus vite.
       style: 'https://tiles.openfreemap.org/styles/positron',
       bounds: borneGlobale,
-      fitBoundsOptions: { padding: margeToutVoir(), maxZoom: 15 },
+      // ZOOM_SIMPLIFICATION - 1, pas un plafond arbitraire : sur un lieu
+      // compact (Dentelles de Montmirail), ajuster pile aux marqueurs
+      // dépassait ce seuil et affichait les cercles proportionnels pleine
+      // taille dès l'arrivée — mesuré, 99 paires de cercles sur 51 se
+      // chevauchaient, jusqu'à 94% de recouvrement, rendant leur taille
+      // illisible. Sur Crozon et la Drôme, le zoom d'ajustement naturel est
+      // déjà sous ce seuil : rien ne change pour eux.
+      fitBoundsOptions: { padding: margeToutVoir(), maxZoom: ZOOM_SIMPLIFICATION - 1 },
       attributionControl: false,
     });
     // La vue initiale est déjà la bonne (pas d'animation au chargement) : on
@@ -665,7 +672,10 @@ export function initCarte(dataUrl) {
       // en contradiction avec « panneau ouvert <=> falaise sélectionnée ».
       if (popupOuverte) popupOuverte.remove();
       reinitialiserPadding(map);
-      if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: 15 });
+      // Même plafond que le cadrage initial (voir ce commentaire) : "Tout
+      // voir" doit revenir à la même vue qu'à l'arrivée, pas à une vue plus
+      // zoomée qui réintroduirait le chevauchement des cercles.
+      if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: ZOOM_SIMPLIFICATION - 1 });
       // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
       // recherche active — sinon la caméra revient mais les marqueurs
       // restent restreints, contradiction avec "tout voir".
