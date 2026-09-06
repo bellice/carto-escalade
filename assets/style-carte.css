@@ -868,6 +868,31 @@
   background: var(--paper);
   color: var(--ink);
 }
+/* Dans .legende-figure, à côté du select : même ligne, pas une barre à part
+   en dessous. flex-shrink:0 — sur mobile, c'est le SELECT qui doit céder de
+   la place (il a déjà min-width:0 juste en dessous), pas ce bouton, dont le
+   texte ("Épurer"/"Détailler") deviendrait tronqué et illisible s'il rétrécissait.
+   Style repris de .recherche button (bouton "dans le panneau", pas flottant
+   sur la carte comme .legende-toggle — pas besoin de son ombre portée ici) ;
+   l'état "actif" (rempli, texte blanc) reprend .btn-tri-voies.actif — même
+   langage visuel pour "ce bouton-interrupteur est enclenché" partout sur le
+   site. */
+.btn-epuree {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  padding: 4px 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn-epuree[aria-pressed="true"] {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: white;
+}
 
 /* Filtre "Depuis le gîte" — slider à un seul seuil (voir carte.js) : montre
    tout par défaut (poignée au maximum), glisser vers la gauche resserre
@@ -2079,6 +2104,11 @@
   .btn-preparer:hover { background: var(--stone); }
   .btn-preparer:disabled:hover { background: var(--paper); }
   .legende-toggle:hover { background: var(--stone-dark); }
+  .btn-epuree:hover { background: var(--stone-dark); }
+  /* Plus spécifique que la règle ci-dessus : survoler le bouton enclenché ne
+     doit pas effacer le "rempli" qui signale l'état actif (même logique que
+     .btn-preparer:disabled:hover juste au-dessus). */
+  .btn-epuree[aria-pressed="true"]:hover { background: var(--forest); }
   .btn-voir-detail-voies:hover { background: var(--stone); }
   .btn-retour-fiche:hover { background: var(--stone); }
   .popup .lien-secteur:hover { color: var(--clay); }

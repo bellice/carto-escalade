@@ -496,6 +496,68 @@ describe('Filtre par fourchette de cotation', () => {
   });
 });
 
+// Bouton "Épurer" : ajouté pour une raison esthétique assumée, pas
+// fonctionnelle — désencombrer les cercles proportionnels sans changer de
+// zoom (donc sans perdre les libellés de secteur). Séparé du sélecteur de
+// mode (pas une 6e option) : celui-ci répond à « quel nombre représente la
+// taille ? », le bouton répond à une question différente (« faut-il une
+// taille du tout ? ») — d'où le test de composition avec un mode actif.
+describe('Bouton Épurer', () => {
+  for (const lieu of LIEUX) {
+    test(`${lieu} : cercles uniformes, légende sans taille, filtre conservé`, { timeout: 90000 }, async () => {
+      const { contexte, page } = await nouveauContexte(navigateur);
+      try {
+        await exposerCarte(page);
+        await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+
+        // Un filtre actif (Grandes voies) AVANT d'épurer : doit rester actif
+        // après — les deux contrôles sont indépendants, pas mutuellement
+        // exclusifs comme l'étaient les options d'un même sélecteur.
+        await page.selectOption('#mode-figure', 'gv');
+        await page.waitForTimeout(400);
+        const avant = await page.evaluate(() =>
+          window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length);
+
+        await page.click('.btn-epuree');
+        await page.waitForTimeout(600);
+
+        const r = await page.evaluate(() => {
+          const feats = window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] });
+          const rayons = new Set(feats.map((f) => f.properties.r));
+          const conteneur = document.getElementById('legende-falaises');
+          const bouton = document.querySelector('.btn-epuree');
+          return {
+            nbFalaises: feats.length,
+            nbRayonsDistincts: rayons.size,
+            aDesReperes: Boolean(conteneur.querySelector('.cercle-repere')),
+            messageLegende: conteneur.textContent.trim(),
+            arePressed: bouton.getAttribute('aria-pressed'),
+            texteBouton: bouton.textContent.trim(),
+          };
+        });
+
+        assert.ok(r.nbFalaises > 0, `${lieu} : aucune falaise rendue en vue épurée`);
+        assert.equal(r.nbFalaises, avant,
+          `${lieu} : épurer a changé le nombre de falaises filtrées par "Grandes voies" (${avant} avant, ${r.nbFalaises} après)`);
+        assert.equal(r.nbRayonsDistincts, 1,
+          `${lieu} : les cercles n'ont pas tous le même rayon en vue épurée (${r.nbRayonsDistincts} valeurs)`);
+        assert.equal(r.aDesReperes, false,
+          `${lieu} : la légende affiche encore des cercles de référence en vue épurée`);
+        // Message distinct de celui du zoom ("Zoomez pour...") : dézoomer ne
+        // changerait rien tant que le bouton est enclenché, le dire serait faux.
+        assert.match(r.messageLegende, /épurée/i,
+          `${lieu} : le message de légende ne mentionne pas la vue épurée (« ${r.messageLegende} »)`);
+        assert.equal(r.arePressed, 'true', `${lieu} : aria-pressed ne reflète pas l'état enclenché`);
+        assert.equal(r.texteBouton, 'Détailler',
+          `${lieu} : le libellé du bouton ne propose pas l'action inverse une fois enclenché`);
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+});
+
 describe('Légende sur mobile', () => {
   // Deux débordements distincts sont déjà passés par là, d'où les DEUX
   // largeurs testées :

@@ -107,6 +107,9 @@ export function initCarte(dataUrl) {
   const filtres = { recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity };
   const blocCotation = document.getElementById('legende-cotation');
   let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
+  // Bouton "Épurer" : indépendant de modeFigureActuel (voir construireSourceFalaises)
+  // — un filtre couenne/gv/cotation actif le reste une fois la vue épurée.
+  let epureeActuelle = false;
   let falaiseSelectionneeCle = null; // falaise dont la popup est ouverte (ou origine/cible d'une navigation) — voir appliquerFiltres()
 
   // Déclarés tôt (référencés par allerVers/reinitialiserRecherche ci-dessous,
@@ -360,13 +363,17 @@ export function initCarte(dataUrl) {
   // Son map.on('zoom', ...) est enregistré dans creerCarte : map n'existe
   // pas encore à ce stade du code.
 
-  // Reconstruit la mini-légende falaises selon le mode "Cercles" courant ET
-  // l'état de simplification par zoom — sinon la légende continuerait de
-  // montrer des cercles de référence à une échelle où seuls des points
-  // uniformes sont réellement affichés (trompeur).
+  // Reconstruit la mini-légende falaises selon le mode "Cercles" courant, le
+  // bouton "Épurer" ET l'état de simplification par zoom — sinon la légende
+  // continuerait de montrer des cercles de référence à une échelle où seuls
+  // des points uniformes sont réellement affichés (trompeur).
+  // Deux raisons distinctes de n'avoir aucune taille à légender, jamais
+  // confondues : "épurée" prime sur le zoom (un choix explicite, avec un
+  // message qui ne dit pas "zoomez" — dézoomer n'y changerait rien).
   function rafraichirLegendeFalaises() {
     const { max, median, remplissage } = infosLegendePourMode(modeFigureActuel, maxima);
-    construireLegendeFalaises(max, median, remplissage, modeSimplifieActuel, maxima.total);
+    const raisonSansTaille = epureeActuelle ? 'epuree' : modeSimplifieActuel ? 'zoom' : null;
+    construireLegendeFalaises(max, median, remplissage, raisonSansTaille, maxima.total);
   }
 
   // Couche native (rendu GPU) plutôt qu'un marqueur DOM par falaise : passe à
@@ -387,7 +394,7 @@ export function initCarte(dataUrl) {
       source: 'falaises',
       paint: {
         'circle-radius': ['step', ['zoom'], 3.5, ZOOM_SIMPLIFICATION, ['get', 'r']],
-        'circle-color': ['step', ['zoom'], COULEUR_ELOIGNE, ZOOM_SIMPLIFICATION, couleurFalaisePourMode('aucun')],
+        'circle-color': expressionCouleurCercles(),
         'circle-stroke-width': ['step', ['zoom'], 1, ZOOM_SIMPLIFICATION, 2],
         'circle-stroke-color': '#ffffff',
         'circle-opacity': ['case', ['boolean', ['feature-state', 'estompe'], false], 0.25, 1],
@@ -395,6 +402,41 @@ export function initCarte(dataUrl) {
     });
     map.on('mouseenter', 'falaises', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'falaises', () => { map.getCanvas().style.cursor = ''; });
+
+    // Cible tactile des cercles proportionnels : la couche est native (rendu
+    // GPU), pas de DOM à agrandir comme pour poserTailleMarqueur (marqueurs.js)
+    // — on élargit donc la ZONE DE RECHERCHE du clic plutôt que le cercle
+    // lui-même, qui doit rester visuellement petit (7px de rayon en vue
+    // épurée, 3.5px de très loin). Seulement au doigt : une souris pointe déjà
+    // avec précision, élargir n'y ferait qu'augmenter le risque de capter le
+    // mauvais cercle dans un groupe dense — exactement le cas que ce
+    // mécanisme sert par ailleurs (Clapis Nord/Sud, Gigondas Nord/Sud).
+    // MARGE_TACTILE_FALAISE (18px) vise un rayon de capture effectif proche
+    // de 22px (44px de diamètre, le repère tactile déjà utilisé ailleurs sur
+    // le site) même pour le plus petit cercle existant (3.5px de rayon).
+    // Le plus proche du point touché l'emporte si plusieurs cercles sont
+    // dans la zone élargie — sans quoi élargir referait exactement l'erreur
+    // déjà commise et corrigée sur les libellés de site (WCAG 2.5.8) : capter
+    // le clic destiné au voisin plutôt que la bonne cible.
+    const MARGE_TACTILE_FALAISE = 18;
+    function falaiseAuPoint(point) {
+      const direct = map.queryRenderedFeatures(point, { layers: ['falaises'] })[0];
+      if (direct) return direct.properties.cle;
+      if (!window.matchMedia('(pointer: coarse)').matches) return undefined;
+      const zone = [
+        [point.x - MARGE_TACTILE_FALAISE, point.y - MARGE_TACTILE_FALAISE],
+        [point.x + MARGE_TACTILE_FALAISE, point.y + MARGE_TACTILE_FALAISE],
+      ];
+      const candidats = map.queryRenderedFeatures(zone, { layers: ['falaises'] });
+      if (!candidats.length) return undefined;
+      const distance = (f) => {
+        const p = map.project(f.geometry.coordinates);
+        return Math.hypot(p.x - point.x, p.y - point.y);
+      };
+      candidats.sort((a, b) => distance(a) - distance(b));
+      return candidats[0].properties.cle;
+    }
+
     // UN SEUL écouteur, jamais un map.on('click','falaises') séparé : les deux
     // se déclenchent sur le même clic, et le premier change le padding caméra
     // de façon SYNCHRONE avant que le second ne s'exécute. Bug constaté :
@@ -411,8 +453,7 @@ export function initCarte(dataUrl) {
         return;
       }
 
-      const features = map.queryRenderedFeatures(e.point, { layers: ['falaises'] });
-      const cle = features[0] && features[0].properties.cle;
+      const cle = falaiseAuPoint(e.point);
       if (cle) {
         ouvrirFalaise(cle);
       } else if (popupOuverte && !(estDesktop() && popupOuverte.estPanneauFalaise)) {
@@ -462,6 +503,17 @@ export function initCarte(dataUrl) {
       : ouvrirPopupFalaise(map, entree, ctxPopup);
   }
 
+  // Couleur réellement affichée par la couche "falaises" : COULEUR_ELOIGNE
+  // (vue lointaine par zoom) OU teinte du mode "Cercles" — sauf si "Épurer"
+  // est enclenché, auquel cas COULEUR_ELOIGNE s'applique aussi zoomé, pour le
+  // même rendu neutre que la vue lointaine, quel que soit le mode filtré en
+  // dessous. Factorisé : appelé à la création de la couche ET à chaque
+  // changement de mode OU d'état épuré (deux déclencheurs distincts).
+  function expressionCouleurCercles() {
+    const couleur = epureeActuelle ? COULEUR_ELOIGNE : couleurFalaisePourMode(modeFigureActuel);
+    return ['step', ['zoom'], COULEUR_ELOIGNE, ZOOM_SIMPLIFICATION, couleur];
+  }
+
   // Change le mode "Cercles" et redessine tout ce qui en dépend — utilisé
   // par le sélecteur lui-même ET par allerVers (voir plus bas) : naviguer
   // vers une falaise doit garantir qu'elle reste visible, quitte à sortir
@@ -479,10 +531,12 @@ export function initCarte(dataUrl) {
     // voir construireSourceFalaises) et la couleur du thème. setData
     // remplace l'ancien dessinerFalaise + trierCerclesParTaille : le tri par
     // taille est fait dans construireSourceFalaises (valeur décroissante).
+    // epureeActuelle transmis tel quel : changer de mode ne doit pas
+    // désactiver la vue épurée en cours.
     const source = map.getSource('falaises');
-    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima));
+    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle));
     if (map.getLayer('falaises')) {
-      map.setPaintProperty('falaises', 'circle-color', ['step', ['zoom'], COULEUR_ELOIGNE, ZOOM_SIMPLIFICATION, couleurFalaisePourMode(modeFigureActuel)]);
+      map.setPaintProperty('falaises', 'circle-color', expressionCouleurCercles());
     }
     rafraichirLegendeFalaises();
     // Un changement de mode peut vider un thème entier (ex. "Grande voie" sur
@@ -1036,6 +1090,31 @@ export function initCarte(dataUrl) {
       // par construireSourceFalaises) — son parking ne doit pas rester
       // affiché seul, sans rien à proposer.
       appliquerFiltresEtSecteurs();
+    });
+  }
+
+  // --- Bouton "Épurer" (taille uniforme, indépendant du mode ci-dessus) ---
+  const btnEpuree = document.querySelector('.btn-epuree');
+  if (btnEpuree) {
+    btnEpuree.addEventListener('click', () => {
+      epureeActuelle = !epureeActuelle;
+      // aria-pressed porte à la fois l'état accessible ET le style visuel
+      // (voir .btn-epuree[aria-pressed="true"]) — une seule source de vérité
+      // pour l'état, pas une classe CSS à garder synchronisée avec lui.
+      btnEpuree.setAttribute('aria-pressed', String(epureeActuelle));
+      // Libellé VISIBLE = action à venir (comme "Masquer"/"Afficher" de la
+      // légende), pas l'état courant : "Épurer" propose de simplifier,
+      // "Détailler" propose de revenir aux tailles.
+      btnEpuree.textContent = epureeActuelle ? 'Détailler' : 'Épurer';
+      btnEpuree.setAttribute('aria-label', epureeActuelle
+        ? 'Réafficher la taille des cercles'
+        : "Simplifier l'affichage des cercles");
+      const source = map.getSource('falaises');
+      if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle));
+      if (map.getLayer('falaises')) {
+        map.setPaintProperty('falaises', 'circle-color', expressionCouleurCercles());
+      }
+      rafraichirLegendeFalaises();
     });
   }
 

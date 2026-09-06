@@ -128,7 +128,12 @@ export function couleurFalaisePourMode(mode) {
 //  - tempsGite : null si inconnu (filtre "Depuis le gîte")
 // Triées par valeur DÉCROISSANTE : le plus petit est peint en dernier (dessus),
 // même règle que l'ancien réordonnancement DOM des cercles.
-export function construireSourceFalaises(entries, mode, maxima) {
+// "epuree" (bouton "Épurer", indépendant du sélecteur de mode) : force un
+// rayon constant SANS toucher au filtrage/tri par "mode" — les deux
+// contrôles répondent à des questions différentes (quel sous-ensemble filtrer
+// / faut-il seulement une taille lisible), donc restent combinables : un
+// filtre "Grandes voies" actif reste actif une fois la vue épurée.
+export function construireSourceFalaises(entries, mode, maxima, epuree) {
   const features = [];
   entries.forEach((entree) => {
     if (entree.cat !== 'falaise') return;
@@ -139,7 +144,11 @@ export function construireSourceFalaises(entries, mode, maxima) {
       properties: {
         cle: entree.cle,
         valeur,
-        r: calculerRayon(valeur, maxima.total),
+        // RAYON_MIN (le plus petit cercle proportionnel existant) plutôt
+        // qu'un nouveau nombre — et plus grand que le point de très loin
+        // (3.5px, zoom < 13) : ici on reste zoomé, donc avec plus de place à
+        // l'écran pour chaque marqueur.
+        r: epuree ? RAYON_MIN : calculerRayon(valeur, maxima.total),
         recherche: entree.recherche,
         tempsGite: entree.tempsGite ?? null,
       },
@@ -156,7 +165,7 @@ export function construireSourceFalaises(entries, mode, maxima) {
 // Le rayon de chaque repère passe par calculerRayon(), la même formule que
 // pour les marqueurs réels : sinon le repère "1" ne correspondrait pas à la
 // taille qu'aurait une vraie falaise à 1 voie sur la carte.
-export function construireLegendeFalaises(max, median, remplissage, simplifie, echelle) {
+export function construireLegendeFalaises(max, median, remplissage, raisonSansTaille, echelle) {
   // Pastille des secteurs (à côté de Parkings/Gîte dans .legende-cats),
   // couleur du mode "Cercles" actif.
   // « Secteurs » et non « Falaises » : un point de la carte est un couple
@@ -173,12 +182,20 @@ export function construireLegendeFalaises(max, median, remplissage, simplifie, e
   const conteneur = document.getElementById('legende-falaises');
   if (!conteneur) return;
   if (!max) { conteneur.innerHTML = ''; return; }
-  // Sous ZOOM_SIMPLIFICATION, les falaises sont de petits points uniformes
-  // (voir .zoom-eloigne) : des cercles de référence proportionnels seraient
-  // trompeurs puisque rien de tel n'est réellement affiché à cette échelle.
-  if (simplifie) {
+  // Deux raisons distinctes de n'afficher aucune taille, deux messages : sous
+  // ZOOM_SIMPLIFICATION, les falaises sont de petits points uniformes (voir
+  // .zoom-eloigne) et zoomer résout la situation — mais avec le bouton
+  // "Épurer" enclenché, zoomer ne changerait rien, le dire serait trompeur.
+  // Dans les deux cas, des cercles de référence proportionnels seraient
+  // trompeurs puisque rien de tel n'est réellement affiché.
+  if (raisonSansTaille === 'zoom') {
     conteneur.innerHTML = `
       <span class="legende-note">Zoomez pour voir la taille proportionnelle</span>`;
+    return;
+  }
+  if (raisonSansTaille === 'epuree') {
+    conteneur.innerHTML = `
+      <span class="legende-note">Taille masquée — vue épurée</span>`;
     return;
   }
   // "max"/"median" restent propres au thème affiché (1/médiane/max réels de
