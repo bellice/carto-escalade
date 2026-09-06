@@ -171,18 +171,45 @@ a:visited { color: var(--forest); }
   border-radius: var(--radius);
 }
 
-/* sources.html : un topo par <li> (titre, auteur/année, lien) — <p> internes
-   resserrés à zéro, l'espacement porte sur la liste, pas sur chaque ligne. */
+/* sources.html : un topo par <li> — titre/auteur à gauche, achat à droite,
+   même motif que .topo-page-ligne (popups.js) et .gps-copie. DEUX COLONNES
+   FIXES, pas flex-wrap : un retour à la ligne qui dépend de la longueur du
+   titre ferait basculer chaque entrée indépendamment des autres à une même
+   largeur d'écran — repéré à l'usage, ça se voit et ça semble incohérent.
+   .source-info (flex:1, min-width:0) s'enroule sur lui-même si le titre est
+   long ; .source-achat (flex-shrink:0) reste au même endroit dans tous les
+   cas. Bascule en colonne pour TOUTES les entrées à la fois sous 640px
+   (seuil déjà utilisé ailleurs sur le site, voir estDesktop()), plutôt que
+   ligne par ligne selon leur contenu. */
 .liste-sources {
   list-style: none;
   padding: 0;
   margin: 20px 0;
 }
 .liste-sources li {
-  margin-bottom: 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 4px 16px;
+  /* Marge négative compensée par le padding : le texte garde le même bord
+     gauche que le reste de la page, le fond de survol (voir plus bas)
+     déborde discrètement au-delà pour ressembler à une ligne, pas à un lien. */
+  margin: 0 -12px 20px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
 }
 .liste-sources li:last-child {
   margin-bottom: 0;
+}
+.liste-sources .source-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .liste-sources li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
 }
 .liste-sources p {
   margin: 0;
@@ -195,8 +222,9 @@ a:visited { color: var(--forest); }
   font-size: var(--fs-sm);
   margin-top: 2px;
 }
-.liste-sources p:last-child {
-  margin-top: 6px;
+.liste-sources .source-achat {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Italique et NON monospace : la mono est la voix « donnée » du site
@@ -254,9 +282,6 @@ a:visited { color: var(--forest); }
   color: var(--ink);
 }
 
-.sortie-list a:hover,
-.sortie-list a:hover .nom { color: var(--clay); }
-
 /* Le seul élément actionnable de la page : même palier qu'un titre de fiche,
    les deux nommant la chose qu'on regarde.
    Et il DOIT ressembler à un lien. Il était en --ink sans soulignement, donc
@@ -292,4 +317,31 @@ a:visited { color: var(--forest); }
 }
 .pied-de-page a {
   color: var(--muted);
+}
+
+/* Réservé aux pointeurs qui survolent réellement — sur tactile, :hover ne se
+   "désenclenche" jamais après un tap (même raison que style-carte.css). */
+@media (hover: hover) {
+  /* Fond de LIGNE (pas de couleur de texte) : aide à suivre le titre jusqu'au
+     lien d'achat qui s'en écarte en colonne large — ne doit pas se lire comme
+     "tout le bloc est cliquable", ce qu'il n'est pas (deux liens distincts
+     à l'intérieur). Les liens eux-mêmes gardent leur propre survol ci-dessous. */
+  .liste-sources li:hover {
+    background: var(--stone-dark);
+  }
+  .liste-sources a:hover {
+    color: var(--clay);
+  }
+
+  /* Ici le bloc ENTIER est bien un seul lien (contrairement à .liste-sources) :
+     le fond couvre donc toute la zone cliquable, pas seulement le texte —
+     avant cette règle, survoler le padding autour du titre ne réagissait pas
+     du tout, alors que cette zone est cliquable au même titre que le texte. */
+  .sortie-list a:hover {
+    background: var(--stone-dark);
+    color: var(--clay);
+  }
+  .sortie-list a:hover .nom {
+    color: var(--clay);
+  }
 }

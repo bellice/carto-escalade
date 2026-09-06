@@ -26,38 +26,50 @@
 <body>
   <div class="home">
     <h1>Sources</h1>
-    <p>Les secteurs de ce site sont référencés dans les topos suivants.
-      Les acheter finance l'équipement et l'entretien des falaises. Ce site
-      aide à préparer une sortie et à s'y retrouver sur place. Il ne
-      remplace pas ces topos.</p>
+    <p>Chaque secteur de ce site est décrit dans l'un de ces topos. Les
+      acheter finance l'équipement et l'entretien des falaises. Ce site aide
+      à préparer une sortie et à s'y retrouver sur place. Il ne remplace
+      aucun de ces topos.</p>
 
     <!-- Seuls les topos PAYANTS (source.type = "topo payant" dans
          escalade/data/raw/source.csv) : une brochure gratuite ou un site
          collaboratif (Oblyk, the Crag) n'ont rien à "acheter" — les lister
          ici brouillerait le seul message de cette page.
+         Le lieu associé à chaque topo est le topo_id réellement porté par
+         ses secteurs (vérifié dans les data.geojson, pas supposé) : un topo
+         peut n'en couvrir qu'une partie (Drôme provençale n'est qu'un
+         sous-ensemble de vallee-drome-diois), mais aucun n'en couvre deux.
          Liste tenue à la main, comme la liste des lieux sur l'accueil et le
          PRECACHE du service worker : à mettre à jour au même moment que
          source.csv quand un topo payant est ajouté ou retiré. -->
     <ul class="liste-sources">
       <li>
-        <p class="source-titre">Escalade en Drôme – Vallée de la Drôme & Diois</p>
-        <p class="source-auteur">FFME 26, 2020</p>
-        <p><a href="https://www.decitre.fr/livres/escalade-en-drome-9782357711174.html" target="_blank" rel="noopener">Acheter ce topo</a></p>
+        <div class="source-info">
+          <p class="source-titre">Escalade en Drôme – Vallée de la Drôme & Diois</p>
+          <p class="source-auteur">FFME 26, 2020 · <a href="vallee-drome-diois/">Vallée de la Drôme et Diois</a></p>
+        </div>
+        <a class="source-achat" href="https://www.decitre.fr/livres/escalade-en-drome-9782357711174.html" target="_blank" rel="noopener">Acheter ce topo</a>
       </li>
       <li>
-        <p class="source-titre">Escalade en Drôme provençale</p>
-        <p class="source-auteur">Club Silex, 2023</p>
-        <p><a href="https://www.naturagrimpe.com/post/la-r%C3%A9%C3%A9dition-du-topo-silex-escalade-en-dr%C3%B4me-proven%C3%A7ale-enfin-disponible" target="_blank" rel="noopener">Acheter ce topo</a></p>
+        <div class="source-info">
+          <p class="source-titre">Escalade en Drôme provençale</p>
+          <p class="source-auteur">Club Silex, 2023 · <a href="vallee-drome-diois/">Vallée de la Drôme et Diois</a></p>
+        </div>
+        <a class="source-achat" href="https://www.naturagrimpe.com/post/la-r%C3%A9%C3%A9dition-du-topo-silex-escalade-en-dr%C3%B4me-proven%C3%A7ale-enfin-disponible" target="_blank" rel="noopener">Acheter ce topo</a>
       </li>
       <li>
-        <p class="source-titre">Escalade à Pen-Hir et Argol</p>
-        <p class="source-auteur">FFME 29, 2019</p>
-        <p><a href="https://www.ffme.shop/bretagne/174-escalade-a-pen-hir-et-argol.html" target="_blank" rel="noopener">Acheter ce topo</a></p>
+        <div class="source-info">
+          <p class="source-titre">Escalade à Pen-Hir et Argol</p>
+          <p class="source-auteur">FFME 29, 2019 · <a href="presquile-crozon/">Presqu'île de Crozon</a></p>
+        </div>
+        <a class="source-achat" href="https://www.ffme.shop/bretagne/174-escalade-a-pen-hir-et-argol.html" target="_blank" rel="noopener">Acheter ce topo</a>
       </li>
       <li>
-        <p class="source-titre">Grimpe aux Dentelles 3</p>
-        <p class="source-auteur">FFCAM Avignon, 2023</p>
-        <p><a href="https://www.chullanka.com/fr/products/grimpe-aux-dentelles-3" target="_blank" rel="noopener">Acheter ce topo</a></p>
+        <div class="source-info">
+          <p class="source-titre">Grimpe aux Dentelles 3</p>
+          <p class="source-auteur">FFCAM Avignon, 2023 · <a href="dentelles-montmirail/">Dentelles de Montmirail</a></p>
+        </div>
+        <a class="source-achat" href="https://www.chullanka.com/fr/products/grimpe-aux-dentelles-3" target="_blank" rel="noopener">Acheter ce topo</a>
       </li>
     </ul>
 
