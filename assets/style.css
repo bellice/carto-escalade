@@ -156,6 +156,49 @@ a:visited { color: var(--forest); }
   color: var(--forest);
 }
 
+/* Mentions légales seule page à utiliser des h2/code dans .home — sections
+   courtes, pas un nouveau niveau de densité à calibrer. */
+.home h2 {
+  font-size: var(--fs-lg);
+  color: var(--forest);
+  margin: 28px 0 8px;
+}
+.home code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--stone-dark);
+  padding: 1px 4px;
+  border-radius: var(--radius);
+}
+
+/* sources.html : un topo par <li> (titre, auteur/année, lien) — <p> internes
+   resserrés à zéro, l'espacement porte sur la liste, pas sur chaque ligne. */
+.liste-sources {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.liste-sources li {
+  margin-bottom: 20px;
+}
+.liste-sources li:last-child {
+  margin-bottom: 0;
+}
+.liste-sources p {
+  margin: 0;
+}
+.liste-sources .source-titre {
+  font-weight: 600;
+}
+.liste-sources .source-auteur {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  margin-top: 2px;
+}
+.liste-sources p:last-child {
+  margin-top: 6px;
+}
+
 /* Italique et NON monospace : la mono est la voix « donnée » du site
    (légende, libellés de popup, compteurs). « toquer là-haut » est un mot, pas
    une donnée — et l'italique est la convention typographique d'une glose.
@@ -239,4 +282,14 @@ a:visited { color: var(--forest); }
   max-width: 34em;
   color: var(--muted);
   text-wrap: balance;
+}
+
+/* Discret : obligation légale (mentions légales), pas une invitation à
+   cliquer — ne doit pas concurrencer la liste des lieux ni la note ci-dessus. */
+.pied-de-page {
+  margin: 40px 0 0;
+  font-size: var(--fs-xs);
+}
+.pied-de-page a {
+  color: var(--muted);
 }
