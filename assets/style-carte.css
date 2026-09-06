@@ -868,15 +868,11 @@
   background: var(--paper);
   color: var(--ink);
 }
-/* Dans .legende-figure, à côté du select : même ligne, pas une barre à part
-   en dessous. flex-shrink:0 — sur mobile, c'est le SELECT qui doit céder de
-   la place (il a déjà min-width:0 juste en dessous), pas ce bouton, dont le
-   texte ("Épurer"/"Détailler") deviendrait tronqué et illisible s'il rétrécissait.
-   Style repris de .recherche button (bouton "dans le panneau", pas flottant
-   sur la carte comme .legende-toggle — pas besoin de son ombre portée ici) ;
-   l'état "actif" (rempli, texte blanc) reprend .btn-tri-voies.actif — même
-   langage visuel pour "ce bouton-interrupteur est enclenché" partout sur le
-   site. */
+/* Même ligne que le select, pas une barre à part. flex-shrink:0 : sur mobile
+   c'est le select (déjà min-width:0) qui doit céder la place, pas ce texte.
+   Style repris de .recherche button (dans le panneau, sans l'ombre de
+   .legende-toggle qui flotte lui sur la carte) ; l'état "actif" reprend
+   .btn-tri-voies.actif — même langage visuel partout sur le site. */
 .btn-epuree {
   flex-shrink: 0;
   font-family: var(--font-mono);

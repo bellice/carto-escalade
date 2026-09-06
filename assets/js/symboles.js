@@ -128,11 +128,9 @@ export function couleurFalaisePourMode(mode) {
 //  - tempsGite : null si inconnu (filtre "Depuis le gîte")
 // Triées par valeur DÉCROISSANTE : le plus petit est peint en dernier (dessus),
 // même règle que l'ancien réordonnancement DOM des cercles.
-// "epuree" (bouton "Épurer", indépendant du sélecteur de mode) : force un
-// rayon constant SANS toucher au filtrage/tri par "mode" — les deux
-// contrôles répondent à des questions différentes (quel sous-ensemble filtrer
-// / faut-il seulement une taille lisible), donc restent combinables : un
-// filtre "Grandes voies" actif reste actif une fois la vue épurée.
+// "epuree" (bouton "Épurer") : force un rayon constant sans toucher au
+// filtrage par "mode" — questions différentes, donc combinables (un filtre
+// "Grandes voies" actif le reste une fois la vue épurée).
 export function construireSourceFalaises(entries, mode, maxima, epuree) {
   const features = [];
   entries.forEach((entree) => {
@@ -144,10 +142,8 @@ export function construireSourceFalaises(entries, mode, maxima, epuree) {
       properties: {
         cle: entree.cle,
         valeur,
-        // RAYON_MIN (le plus petit cercle proportionnel existant) plutôt
-        // qu'un nouveau nombre — et plus grand que le point de très loin
-        // (3.5px, zoom < 13) : ici on reste zoomé, donc avec plus de place à
-        // l'écran pour chaque marqueur.
+        // RAYON_MIN, pas un nouveau nombre — plus grand que le point de très
+        // loin (3.5px) : ici on reste zoomé, plus de place à l'écran.
         r: epuree ? RAYON_MIN : calculerRayon(valeur, maxima.total),
         recherche: entree.recherche,
         tempsGite: entree.tempsGite ?? null,
@@ -182,12 +178,9 @@ export function construireLegendeFalaises(max, median, remplissage, raisonSansTa
   const conteneur = document.getElementById('legende-falaises');
   if (!conteneur) return;
   if (!max) { conteneur.innerHTML = ''; return; }
-  // Deux raisons distinctes de n'afficher aucune taille, deux messages : sous
-  // ZOOM_SIMPLIFICATION, les falaises sont de petits points uniformes (voir
-  // .zoom-eloigne) et zoomer résout la situation — mais avec le bouton
-  // "Épurer" enclenché, zoomer ne changerait rien, le dire serait trompeur.
-  // Dans les deux cas, des cercles de référence proportionnels seraient
-  // trompeurs puisque rien de tel n'est réellement affiché.
+  // Deux raisons de n'afficher aucune taille, deux messages : zoomer résout
+  // le mode "zoom", pas le mode "épurée" (bouton enclenché) — dire "zoomez"
+  // dans ce cas serait trompeur.
   if (raisonSansTaille === 'zoom') {
     conteneur.innerHTML = `
       <span class="legende-note">Zoomez pour voir la taille proportionnelle</span>`;

@@ -89,7 +89,10 @@
      vérité, et l'en-tête y est CONTRAINT (height, pas min-height). */
   --hauteur-entete: 44px;
 
-  --largeur-panneau-gauche: 300px; /* bloc compact recherche+légende, desktop */
+  /* 320px, pas 300 : mesuré au pire cas (option la plus longue du select +
+     bouton "Proportionner"), 300px tombait pile à l'exact pixel disponible,
+     zéro marge pour une variation de rendu de police entre systèmes. */
+  --largeur-panneau-gauche: 320px; /* bloc compact recherche+légende, desktop */
   --largeur-panneau-droit: 380px;  /* panneau fiche falaise, desktop */
 }
 

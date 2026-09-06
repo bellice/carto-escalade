@@ -496,12 +496,9 @@ describe('Filtre par fourchette de cotation', () => {
   });
 });
 
-// Bouton "Épurer" : ajouté pour une raison esthétique assumée, pas
-// fonctionnelle — désencombrer les cercles proportionnels sans changer de
-// zoom (donc sans perdre les libellés de secteur). Séparé du sélecteur de
-// mode (pas une 6e option) : celui-ci répond à « quel nombre représente la
-// taille ? », le bouton répond à une question différente (« faut-il une
-// taille du tout ? ») — d'où le test de composition avec un mode actif.
+// Bouton "Épurer" : désencombre les cercles sans changer de zoom (donc sans
+// perdre les libellés de secteur). Séparé du select de mode, pas une 6e
+// option — d'où le test de composition avec un mode actif ci-dessous.
 describe('Bouton Épurer', () => {
   for (const lieu of LIEUX) {
     test(`${lieu} : cercles uniformes, légende sans taille, filtre conservé`, { timeout: 90000 }, async () => {
@@ -549,7 +546,7 @@ describe('Bouton Épurer', () => {
         assert.match(r.messageLegende, /épurée/i,
           `${lieu} : le message de légende ne mentionne pas la vue épurée (« ${r.messageLegende} »)`);
         assert.equal(r.arePressed, 'true', `${lieu} : aria-pressed ne reflète pas l'état enclenché`);
-        assert.equal(r.texteBouton, 'Détailler',
+        assert.equal(r.texteBouton, 'Proportionner',
           `${lieu} : le libellé du bouton ne propose pas l'action inverse une fois enclenché`);
       } finally {
         await contexte.close();

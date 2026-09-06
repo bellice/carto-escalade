@@ -403,21 +403,12 @@ export function initCarte(dataUrl) {
     map.on('mouseenter', 'falaises', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'falaises', () => { map.getCanvas().style.cursor = ''; });
 
-    // Cible tactile des cercles proportionnels : la couche est native (rendu
-    // GPU), pas de DOM à agrandir comme pour poserTailleMarqueur (marqueurs.js)
-    // — on élargit donc la ZONE DE RECHERCHE du clic plutôt que le cercle
-    // lui-même, qui doit rester visuellement petit (7px de rayon en vue
-    // épurée, 3.5px de très loin). Seulement au doigt : une souris pointe déjà
-    // avec précision, élargir n'y ferait qu'augmenter le risque de capter le
-    // mauvais cercle dans un groupe dense — exactement le cas que ce
-    // mécanisme sert par ailleurs (Clapis Nord/Sud, Gigondas Nord/Sud).
-    // MARGE_TACTILE_FALAISE (18px) vise un rayon de capture effectif proche
-    // de 22px (44px de diamètre, le repère tactile déjà utilisé ailleurs sur
-    // le site) même pour le plus petit cercle existant (3.5px de rayon).
-    // Le plus proche du point touché l'emporte si plusieurs cercles sont
-    // dans la zone élargie — sans quoi élargir referait exactement l'erreur
-    // déjà commise et corrigée sur les libellés de site (WCAG 2.5.8) : capter
-    // le clic destiné au voisin plutôt que la bonne cible.
+    // Cible tactile des cercles : couche native (GPU), pas de DOM à agrandir
+    // comme poserTailleMarqueur — on élargit donc la RECHERCHE du clic, pas
+    // le cercle. Seulement au doigt (souris déjà précise) ; le plus proche
+    // l'emporte s'il y a plusieurs candidats, pour ne pas répéter l'erreur
+    // déjà corrigée sur les libellés de site (WCAG 2.5.8) : capter le clic
+    // du voisin. 18px vise ~44px de capture même sur le plus petit cercle.
     const MARGE_TACTILE_FALAISE = 18;
     function falaiseAuPoint(point) {
       const direct = map.queryRenderedFeatures(point, { layers: ['falaises'] })[0];
@@ -503,12 +494,9 @@ export function initCarte(dataUrl) {
       : ouvrirPopupFalaise(map, entree, ctxPopup);
   }
 
-  // Couleur réellement affichée par la couche "falaises" : COULEUR_ELOIGNE
-  // (vue lointaine par zoom) OU teinte du mode "Cercles" — sauf si "Épurer"
-  // est enclenché, auquel cas COULEUR_ELOIGNE s'applique aussi zoomé, pour le
-  // même rendu neutre que la vue lointaine, quel que soit le mode filtré en
-  // dessous. Factorisé : appelé à la création de la couche ET à chaque
-  // changement de mode OU d'état épuré (deux déclencheurs distincts).
+  // Couleur de la couche "falaises" : COULEUR_ELOIGNE (vue lointaine) OU
+  // teinte du mode — sauf "Épurer" enclenché, qui impose COULEUR_ELOIGNE
+  // aussi zoomé. Factorisé : deux déclencheurs distincts (mode, épuré).
   function expressionCouleurCercles() {
     const couleur = epureeActuelle ? COULEUR_ELOIGNE : couleurFalaisePourMode(modeFigureActuel);
     return ['step', ['zoom'], COULEUR_ELOIGNE, ZOOM_SIMPLIFICATION, couleur];
@@ -1102,10 +1090,9 @@ export function initCarte(dataUrl) {
       // (voir .btn-epuree[aria-pressed="true"]) — une seule source de vérité
       // pour l'état, pas une classe CSS à garder synchronisée avec lui.
       btnEpuree.setAttribute('aria-pressed', String(epureeActuelle));
-      // Libellé VISIBLE = action à venir (comme "Masquer"/"Afficher" de la
-      // légende), pas l'état courant : "Épurer" propose de simplifier,
-      // "Détailler" propose de revenir aux tailles.
-      btnEpuree.textContent = epureeActuelle ? 'Détailler' : 'Épurer';
+      // Libellé = action à venir, comme Masquer/Afficher. "Proportionner" :
+      // terme du module qui dessine ces cercles (voir l'en-tête de symboles.js).
+      btnEpuree.textContent = epureeActuelle ? 'Proportionner' : 'Épurer';
       btnEpuree.setAttribute('aria-label', epureeActuelle
         ? 'Réafficher la taille des cercles'
         : "Simplifier l'affichage des cercles");

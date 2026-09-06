@@ -124,13 +124,9 @@
             <option value="couenne" id="option-couenne">Couennes</option>
             <option value="gv" id="option-gv">Grandes voies</option>
           </select>
-          <!-- Bouton, pas une 6e option du select ci-dessus : celui-ci répond
-               à « quel nombre représente la taille ? », ceci répond à une
-               autre question (« veut-on voir une taille du tout ? »). Les
-               mélanger forçait un aria-label bancal ("... ou vue sans
-               taille") — signe qu'elles n'étaient pas la même chose.
-               Indépendant du mode courant : bascule la taille sans changer
-               le filtre actif (couenne/gv/cotation restent combinables). -->
+          <!-- Bouton, pas une 6e option du select : question différente
+               (« taille du tout ? » vs « quelle grandeur ? »), indépendant
+               du mode courant — un filtre couenne/gv/cotation actif le reste. -->
           <button type="button" class="btn-epuree" aria-pressed="false" aria-label="Simplifier l'affichage des cercles">Épurer</button>
         </div>
         <div class="legende-cotation" id="legende-cotation" hidden>
