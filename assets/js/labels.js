@@ -131,9 +131,11 @@ function construireGeojsonSecteurs(geojson) {
 // le risque n'est plus le cercle en dessous mais un secteur VOISIN (voir
 // appliquerAntiCollisionSecteurs) — même exception WCAG 2.5.8 que
 // .label-site, voir style-carte.css et le test "Cibles tactiles".
-// Renvoie {el, marker, nom} (pas juste l'élément) : appliquerAntiCollisionSecteurs
+// Renvoie {el, marker, nom, cle} (pas juste l'élément) : appliquerAntiCollisionSecteurs
 // (carte.js) a besoin de la position de chaque marqueur pour son
-// anti-collision à l'écran.
+// anti-collision à l'écran, et cle sert à retrouver l'étiquette d'un secteur
+// depuis un évènement de la couche native (survol du cercle, voir
+// ajouterLabelsDeSecteur).
 export function ajouterLabelsSecteurs(map, geojson, onClicSecteur) {
   return construireGeojsonSecteurs(geojson).map((secteur) => {
     const el = document.createElement('div');
@@ -153,6 +155,6 @@ export function ajouterLabelsSecteurs(map, geojson, onClicSecteur) {
     const marker = new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 14] })
       .setLngLat(secteur.coordinates)
       .addTo(map);
-    return { el, marker, nom: secteur.nom };
+    return { el, marker, nom: secteur.nom, cle: secteur.cle };
   });
 }

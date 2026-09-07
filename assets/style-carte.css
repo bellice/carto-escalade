@@ -2092,6 +2092,16 @@
   .label-secteur:hover {
     background: var(--stone-dark);
   }
+  /* Pas des :hover : déclenchées en JS au survol du CERCLE (couche native,
+     donc sans :hover CSS possible), voir ajouterLabelsDeSecteur dans
+     carte.js. Même déclencheur qu'un survol direct de l'étiquette
+     ci-dessus, pour que les deux figurés d'une même cible réagissent pareil
+     à la souris — le nom de secteur ou celui du site selon le zoom, jamais
+     les deux en même temps (voir ZOOM_LABELS_SECTEUR). */
+  .label-secteur.survole,
+  .label-site.survole {
+    background: var(--stone-dark);
+  }
   .recherche-champ .btn-effacer:hover { background: var(--stone-dark); }
   .recherche button:hover { background: var(--stone-dark); }
   .recherche button:disabled:hover { background: var(--paper); }

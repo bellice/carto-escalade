@@ -90,7 +90,7 @@ export function initCarte(dataUrl) {
 
   const entries = []; // { marker, cat, nom, secteur, cle, recherche, parkingAssocie, nbVoies, nbGrandeVoie, nbCouenne, tempsGite }
   const index = new Map(); // cle -> entree, pour naviguer vers un marqueur lié
-  let labelsSecteurs = []; // [{el, marker, nom}], peuplé une fois le geojson chargé
+  let labelsSecteurs = []; // [{el, marker, nom, cle}], peuplé une fois le geojson chargé
   let labelsSites = []; // [{el, marker, site}], peuplé une fois le geojson chargé — voir appliquerAntiCollisionSites
   const entriesParSecteur = new Map(); // clé de regroupement secteur -> entrees falaise, pour appliquerAntiCollisionSecteurs
   const entriesParSite = new Map(); // site -> entrees falaise, pour appliquerAntiCollisionSites
@@ -446,7 +446,29 @@ export function initCarte(dataUrl) {
 
       const cle = falaiseAuPoint(e.point);
       if (cle) {
-        ouvrirFalaise(cle);
+        // Sous ZOOM_LABELS_SECTEUR, les secteurs ne sont pas encore nommés
+        // individuellement (trop serrés pour rester lisibles, voir
+        // labels.js) : cliquer un cercle cadre alors sur son SITE, comme un
+        // clic sur le nom de ce site (zoomerSurSite, même fonction) — SAUF
+        // si ce site est déjà entièrement dans le cadre, auquel cas ce même
+        // cadrage ne bougerait rien : le clic zoome alors sur CE point
+        // précis, jusqu'au seuil où les secteurs deviennent cliquables un
+        // par un. Sans cette exception, un site étalé (cadrant sous
+        // ZOOM_LABELS_SECTEUR) menait à une impasse : le clic suivant
+        // relançait indéfiniment le même cadrage, sans jamais rien ouvrir
+        // (constaté en test réel, obligeant un zoom manuel). Au-delà du
+        // seuil, le secteur visé est déjà lisible : le clic ouvre
+        // directement sa fiche, comme un clic sur son étiquette (voir
+        // ajouterLabelsDeSecteur).
+        const entree = index.get(cle);
+        const falaisesSite = entree ? falaisesDuSite(entree.p.site) : [];
+        if (map.getZoom() >= ZOOM_LABELS_SECTEUR) {
+          ouvrirFalaise(cle);
+        } else if (falaisesSite.length && falaisesSite.every((en) => map.getBounds().contains([en.lon, en.lat]))) {
+          map.easeTo({ center: [entree.lon, entree.lat], zoom: ZOOM_LABELS_SECTEUR });
+        } else {
+          zoomerSurSite(entree?.p.site);
+        }
       } else if (popupOuverte && !(estDesktop() && popupOuverte.estPanneauFalaise)) {
         // Une popup FLOTTANTE (parking/gîte, ou fiche falaise mobile) est
         // ouverte : on ne ferme QUE celle-là. Les popups sont créées avec
@@ -828,25 +850,31 @@ export function initCarte(dataUrl) {
     if (cle && index.has(cle)) allerVers(cle);
   }
 
-  // Clic sur un label de site : cadre sur l'étendue de toutes ses falaises —
-  // pas de popup (ce n'est pas une entité unique), juste la caméra. La
-  // recherche se réinitialise (même logique qu'allerVers : une recherche
+  // Cadre sur l'étendue d'un site — pas de popup (ce n'est pas une entité
+  // unique), juste la caméra. Partagée entre le clic sur son nom (vue
+  // d'ensemble) et le clic sur un cercle de secteur avant que les secteurs ne
+  // soient nommés individuellement (voir le handler de clic de la carte).
+  // La recherche se réinitialise (même logique qu'allerVers : une recherche
   // active pourrait sinon masquer des falaises du site qu'on vient justement
   // de rejoindre) ; la sélection courante n'a pas besoin d'être touchée, elle
   // ne cache rien ici.
+  function falaisesDuSite(site) {
+    return entries.filter((en) => en.cat === 'falaise' && en.p.site === site);
+  }
+
+  function zoomerSurSite(site) {
+    const falaises = falaisesDuSite(site);
+    if (!falaises.length) return;
+    reinitialiserRecherche();
+    appliquerFiltresEtSecteurs();
+    const bounds = new maplibregl.LngLatBounds();
+    falaises.forEach((en) => bounds.extend([en.lon, en.lat]));
+    reinitialiserPadding(map);
+    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
+  }
+
   function ajouterLabelsDeSite(geojson) {
-    labelsSites = ajouterLabelsSites(map, geojson, (site) => {
-      const falaisesDuSite = geojson.features.filter(f =>
-        f.properties.categorie === 'falaise' && f.properties.site === site
-      );
-      if (!falaisesDuSite.length) return;
-      reinitialiserRecherche();
-      appliquerFiltresEtSecteurs();
-      const bounds = new maplibregl.LngLatBounds();
-      falaisesDuSite.forEach(f => bounds.extend(f.geometry.coordinates));
-      reinitialiserPadding(map);
-      map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
-    });
+    labelsSites = ajouterLabelsSites(map, geojson, (site) => zoomerSurSite(site));
     // Règle de hiérarchie des libellés : les noms de site ne s'affichent que
     // sous le seuil d'apparition des noms de secteur (zoom <
     // ZOOM_LABELS_SECTEUR), voir appliquerVisibiliteSites. À trancher dès
@@ -878,6 +906,29 @@ export function initCarte(dataUrl) {
     map.on('moveend', appliquerAntiCollisionSecteurs);
     map.on('zoomend', appliquerAntiCollisionSecteurs);
     appliquerVisibiliteSecteurs();
+
+    // Survol d'un cercle -> surbrillance de l'étiquette qu'un clic au même
+    // point activerait (même bascule de zoom que le clic ci-dessus) : sans
+    // ça, les deux figurés d'une même cible réagissaient différemment à la
+    // souris. Map plutôt qu'un .find() à chaque mousemove (évènement
+    // fréquent, un .find() y répéterait un parcours linéaire en continu).
+    const labelSecteurParCle = new Map(labelsSecteurs.map((l) => [l.cle, l.el]));
+    const labelSiteParNom = new Map(labelsSites.map((l) => [l.site, l.el]));
+    let elementSurvole = null;
+    const survoler = (el) => {
+      if (el === elementSurvole) return;
+      elementSurvole?.classList.remove('survole');
+      elementSurvole = el || null;
+      elementSurvole?.classList.add('survole');
+    };
+    map.on('mousemove', 'falaises', (e) => {
+      const cle = e.features[0]?.properties.cle;
+      if (!cle) { survoler(null); return; }
+      survoler(map.getZoom() >= ZOOM_LABELS_SECTEUR
+        ? labelSecteurParCle.get(cle)
+        : labelSiteParNom.get(index.get(cle)?.p.site));
+    });
+    map.on('mouseleave', 'falaises', () => survoler(null));
   }
 
   // Retire de la légende ce que CETTE sortie ne contient pas : un réglage qui
