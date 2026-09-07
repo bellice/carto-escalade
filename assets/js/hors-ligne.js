@@ -239,10 +239,7 @@ export function monterPreparationHorsLigne({ map, points, conteneur }) {
   // Seuls les deux états d'ERREUR s'autorisent à dépasser : ils sont
   // transitoires (4s) et doivent attirer l'œil.
   //
-  // « Préparer » et non « Hors-ligne » : un substantif seul dans un en-tête
-  // se lit comme un STATUT (« le site est hors ligne »), pas comme une
-  // action. L'infinitif lève l'ambiguïté ; l'objet (la carte) est donné par
-  // le contexte et par la description.
+  // Pourquoi "Préparer" et non "Hors-ligne" : redaction.html.
   // La disponibilité se recalcule ICI, à chaque changement de libellé, plutôt
   // que dans un chemin séparé qu'on oublierait de rappeler : hors ligne,
   // préparer est impossible — chaque tuile échouerait — donc le bouton se

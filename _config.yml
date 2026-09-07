@@ -20,3 +20,4 @@ exclude:
   - package-lock.json
   - README.md
   - charte-graphique.html
+  - redaction.html

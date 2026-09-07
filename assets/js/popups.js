@@ -365,9 +365,6 @@ function col(label, valeur) {
 
 
 
-// Le nom réel du parking (souvent « petit parking D136 ») n'aide pas à
-// décider : seul compte qu'il y en ait un. D'où un verbe d'action, et surtout
-// pas le mot « parking » une 2e fois, déjà porté par le libellé de gauche.
 // « min à pied » et non « min » : approche_min est un temps de MARCHE, à ne
 // pas confondre avec trajet_gite_min, en voiture — les deux se ressemblent
 // d'un coup d'œil sans ce qualificatif.

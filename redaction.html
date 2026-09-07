@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Rédaction — Tokelau</title>
+
+<!--
+  Charte éditoriale : pourquoi tel mot plutôt qu'un autre, telle formulation
+  plutôt qu'une variante écartée. Distincte de charte-graphique.html (le
+  visuel : couleurs, tailles, composants) et de escalade/PROCESSUS.html (le
+  pipeline de données).
+
+  Critère de tri avec le code source : un commentaire reste DANS le fichier
+  s'il empêche une régression silencieuse (CSP, cohérence d'un terme entre
+  plusieurs fichiers, un champ dont la mauvaise lecture aurait une
+  conséquence réelle). Il vient ICI s'il explique un choix d'écriture dont
+  l'absence, au pire, referait la même phrase un cran moins réfléchie —
+  jamais un site cassé. Repéré en le testant sur trois exemples concrets de
+  l'accueil, qui avaient dérivé du premier groupe vers le second sans qu'on
+  y prenne garde.
+-->
+<link rel="stylesheet" href="assets/style.css" />
+<style>
+  body {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+    background: var(--paper);
+  }
+  h1 {
+    font-size: 1.6rem;
+    color: var(--forest);
+    margin: 0 0 4px;
+  }
+  .intro {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0 0 40px;
+  }
+  h2 {
+    font-size: 1.1rem;
+    color: var(--ink);
+    border-bottom: 1px solid var(--stone-dark);
+    padding-bottom: 8px;
+    margin: 56px 0 20px;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    margin: 28px 0 10px;
+  }
+  .decision {
+    margin: 0 0 24px;
+    line-height: 1.6;
+  }
+  .decision .valeur {
+    font-family: var(--font-mono);
+    background: var(--stone-dark);
+    padding: 1px 5px;
+    border-radius: var(--radius);
+  }
+  .decision .ecarte {
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+  footer {
+    margin-top: 60px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    border-top: 1px solid var(--stone-dark);
+    padding-top: 14px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Rédaction</h1>
+<p class="intro">
+  Pourquoi le site dit les choses comme il les dit. Un choix par entrée,
+  l'alternative écartée quand il y en a une.
+</p>
+
+<h2>Accueil</h2>
+
+<h3>Le nom : « Tokelau »</h3>
+<p class="decision">
+  La glose <span class="valeur">toquer là-haut</span> sous le titre n'est pas
+  un ornement, c'est l'étymologie du nom : sans elle, un membre du club
+  arrive sur le nom d'une île polynésienne posé au-dessus d'une carte de la
+  Drôme, et rien sur la page ne l'éclaire.
+</p>
+<p class="decision">
+  Elle est accrochée au NOM, pas à la consigne « Préparez la carte » plus
+  bas : la souder à l'appel à l'action ferait porter le calembour par une
+  phrase qui a déjà un travail à faire (dire l'action), et le diluerait.
+</p>
+<p class="decision">
+  Jamais à la forme négative — <span class="ecarte">« ne pas être toqué
+  là-haut »</span> — : ça ne s'entend plus comme « toquer là-haut », mais
+  comme « ne sois pas cinglé ». La négation retourne le jeu de mots contre
+  le lecteur et fait perdre ce qui le rend drôle.
+</p>
+
+<h3>L'accroche : « falaises · parkings · approches · hors ligne »</h3>
+<p class="decision">
+  4ᵉ mot volontairement différent des trois premiers : les trois premiers
+  décrivent le CONTENU de la carte (ce que n'importe quel topo en ligne
+  pourrait dire), le 4ᵉ dit ce qui distingue ce site d'Oblyk ou theCrag —
+  le seul terrain où il peut gagner face à des bases de données bien plus
+  grandes.
+</p>
+<p class="decision">
+  <span class="valeur">hors ligne</span> plutôt que
+  <span class="ecarte">hors réseau</span> : au-delà de la cohérence
+  terminologique avec le reste du site (raison technique, gardée en
+  commentaire dans <code>index.html</code>), « hors réseau » nommait une
+  circonstance du terrain quand « hors ligne » nomme un MODE de la carte —
+  et l'ambiguïté n'aide personne (site non affilié à un réseau ? falaise
+  isolée ?).
+</p>
+
+<h3>La liste des lieux : sans compteurs ni date</h3>
+<p class="decision">
+  Retirés avec un seul lieu dans la liste : ni le nombre de secteurs/voies
+  ni une date de sortie ne changeaient la décision du lecteur — il cliquait
+  de toute façon sur l'unique lien. La date rouvrait en plus un modèle par
+  SORTIE (un évènement) abandonné au profit d'un modèle par LIEU (permanent)
+  — elle serait devenue fausse en novembre sans que rien ne le signale.
+</p>
+<p class="decision">
+  Le déclencheur pour les faire revenir était : « le jour où il y aura
+  plusieurs lieux à départager ». C'est désormais le cas (trois lieux) — à
+  rouvrir si départager entre eux redevient un vrai besoin pour le lecteur,
+  pas automatiquement parce que la condition est techniquement remplie.
+</p>
+
+<h3>La consigne : « Préparez la carte tant que vous avez du réseau »</h3>
+<p class="decision">
+  <span class="valeur">Préparez</span> est le verbe du bouton lui-même :
+  arrivé sur la carte, le lecteur reconnaît le mot sur <code>Préparer</code>
+  — inutile de lui dire où se trouve le bouton, une phrase qui désigne un
+  bouton d'une autre page prend une voix de mode d'emploi qu'on évite
+  ailleurs sur le site.
+</p>
+<p class="decision">
+  <span class="valeur">tant que vous avez du réseau</span> remplace
+  <span class="ecarte">avant de partir</span>, qui ne disait pas avant de
+  partir d'où — l'échéance réelle est le réseau, pas le départ. Écarté
+  aussi : <span class="ecarte">« En falaise, pas de réseau »</span>,
+  doublon du « hors ligne » de l'accroche ET surpromesse (beaucoup de
+  falaises ont du réseau — un lecteur qui a cinq barres à Saoû cesse de
+  croire le reste de la page).
+</p>
+
+<h2>404</h2>
+
+<h3>Le titre : « Cette voie n'est pas ouverte »</h3>
+<p class="decision">
+  « Ouvrir une voie », c'est établir une nouvelle ligne d'escalade ; une
+  voie est aussi un chemin. Une URL inexistante est donc littéralement un
+  chemin non ouvert. La ligne <span class="valeur">aucune page à cette
+  adresse</span> juste en dessous n'est pas redondante : elle dit le fait
+  à qui ne saisit pas le clin d'œil, et aux lecteurs d'écran.
+</p>
+
+<h2>Carte (interface commune aux trois lieux)</h2>
+
+<h3>Le bouton : « Préparer », pas « Hors-ligne »</h3>
+<p class="decision">
+  Un substantif seul dans un en-tête (<span class="ecarte">Hors-ligne</span>)
+  se lit comme un STATUT — « le site est hors ligne » — pas comme une
+  action. L'infinitif <span class="valeur">Préparer</span> lève l'ambiguïté ;
+  l'objet (la carte) est donné par le contexte et par la description
+  (<code>aria-label</code>/<code>title</code>). Les contraintes de largeur
+  du bouton (aucun libellé de repos au-delà de 98px) sont mesurées et
+  documentées dans <code>hors-ligne.js</code>, pas ici : les dépasser casse
+  vraiment la mise en page de l'en-tête.
+</p>
+
+<footer>
+  À compléter au fil des pages. Un choix qui n'a pas d'alternative écartée
+  ni de risque de dérive n'a pas besoin d'entrée ici — le critère de tri
+  reste celui de l'introduction.
+</footer>
+
+</body>
+</html>

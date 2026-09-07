@@ -609,7 +609,7 @@ describe('Ce que le site publie', () => {
   // le verrouille, parce qu'un fichier retiré de la liste ne se voit pas.
   test('les fichiers internes sont exclus de la publication', async () => {
     const conf = await lire('_config.yml');
-    const attendus = ['tests/', 'outils/', 'package.json', 'package-lock.json', 'README.md'];
+    const attendus = ['tests/', 'outils/', 'package.json', 'package-lock.json', 'README.md', 'charte-graphique.html', 'redaction.html'];
     const manquants = attendus.filter((f) => !conf.includes(f));
     assert.deepEqual(manquants, [],
       `_config.yml ne les exclut plus : ${manquants.join(', ')} — ils redeviendraient publics.`);
