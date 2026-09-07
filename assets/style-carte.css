@@ -90,7 +90,7 @@
    .label-site : le marqueur falaise en dessous est déjà interactif à ce
    niveau de zoom. Volontairement plus discret que .label-site (pas de
    majuscules/letter-spacing, plus petit, fond moins opaque) : un secteur est
-   un niveau EN DESSOUS du site dans la hiérarchie des noms de lieux — même
+   un niveau en dessous du site dans la hiérarchie des noms de lieux — même
    logique qu'une carte topo où un toponyme secondaire est rendu plus petit
    et plus léger qu'un toponyme principal, pas juste dans une autre couleur. */
 .label-secteur {
@@ -107,7 +107,7 @@
      très large. max-width fixe la largeur où ça coupe (indépendante de la
      longueur du nom) ; appliquerAntiCollisionSecteurs mesure la vraie
      hauteur (offsetHeight) à chaque fois, donc reste correct quel que soit
-     le nombre de lignes. line-clamp plafonne à 2 lignes PILE (repéré après
+     le nombre de lignes. line-clamp plafonne à 2 lignes pile (repéré après
      coup : sans plafond, un nom à 4 mots peut déborder sur 3 — "…" en fin de
      2e ligne si jamais un nom encore plus long apparaît). */
   max-width: 115px;
@@ -135,11 +135,11 @@
   font-size: var(--fs-md);
 }
 
-/* flex-shrink: 0 — sans lui, flex rétrécit TOUS les enfants souples quand
+/* flex-shrink: 0 — sans lui, flex rétrécit tous les enfants souples quand
    l'en-tête est à l'étroit, y compris ce lien : mesuré à 62px au lieu de 74,
    donc sous la largeur de son propre texte, qui repassait alors sur deux
    lignes (32px de haut dans un en-tête de 44px) — la flèche « se décalait ».
-   Le titre, lui, a min-width:0 + ellipse : c'est LUI qui doit céder, et lui
+   Le titre, lui, a min-width:0 + ellipse : c'est lui qui doit céder, et lui
    seul. Un élément de navigation ne se déforme pas. */
 .map-header a {
   flex-shrink: 0;
@@ -149,7 +149,7 @@
   font-size: var(--fs-base);
 }
 
-/* <h1> et non <span> : la page n'avait AUCUN titre de niveau 1, sa hiérarchie
+/* <h1> et non <span> : la page n'avait aucun titre de niveau 1, sa hiérarchie
    démarrait aux <h3> des popups (WCAG 1.3.1 / 2.4.6) — un lecteur d'écran
    n'avait aucun point d'entrée pour identifier la page. font-size/margin
    remis à plat : le rendu visuel est strictement identique à l'ancien span,
@@ -190,25 +190,21 @@
 }
 
 /* Panneau gauche (recherche + légende) et panneau droit (fiche falaise) —
-   overlays par-dessus la carte, PAS des colonnes qui la redimensionnent
+   overlays par-dessus la carte, pas des colonnes qui la redimensionnent
    (#map ne change jamais de taille, aucun map.resize() n'est appelé).
-   Historique de ce bloc, pour comprendre le "pourquoi" des choix ci-dessous :
-   1er jet : panneau falaise seul, docké à droite, contextuel (largeur 0 par
-   défaut). 2e jet : tout fusionné (recherche+légende+fiche) dans une seule
-   colonne gauche PERMANENTE, pleine hauteur — retour terrain : une fiche
-   longue poussait la légende hors de l'écran, obligeant à scroller pour
-   ajuster un filtre en cours de lecture. Design actuel (3e jet, "Option E") :
-   RECOMBINE les deux — panneau gauche COMPACT (recherche+légende seulement,
-   toujours visible, hauteur au contenu) + panneau droit CONTEXTUEL (fiche
-   falaise seule, plein hauteur, apparaît/disparaît à la sélection) — les
-   filtres restent lisibles EN PERMANENCE pendant la lecture du détail, sans
-   jamais se faire pousser hors champ ni scroller.
-   Masqué par défaut hors media query : ce filet de sécurité garantit que la
-   fiche reste invisible sur mobile quel que soit l'état JS (classe .ouvert). */
+   Deux designs écartés : une fiche seule dockée à droite, sans panneau de
+   filtres permanent ; puis tout fusionné dans une colonne gauche unique, où
+   une fiche longue poussait la légende hors écran et forçait à scroller pour
+   ajuster un filtre en cours de lecture. Design actuel : panneau gauche
+   compact (recherche + légende, toujours visible) et panneau droit
+   contextuel (fiche seule, apparaît à la sélection) — les filtres restent
+   lisibles pendant la lecture du détail.
+   Masqué par défaut hors media query : la fiche reste invisible sur mobile
+   quel que soit l'état JS (classe .ouvert). */
 #panneau-falaise { display: none; }
 
 @media (min-width: 641px) {
-  /* Bloc compact ancré en haut à gauche (PAS pleine hauteur comme le 2e jet)
+  /* Bloc compact ancré en haut à gauche (pas pleine hauteur comme le 2e jet)
      — se dimensionne à son contenu (recherche + légende), avec un plafond de
      hauteur + scroll interne en secours pour un petit écran ou une légende
      très développée. Traité comme une carte flottante (bordure+ombre sur
@@ -261,7 +257,7 @@
     white-space: normal;
   }
 
-  /* Sur desktop, .legende-contenu vit DANS la carte #panneau-lateral
+  /* Sur desktop, .legende-contenu vit dans la carte #panneau-lateral
      (bordure + fond + ombre sur tout le panneau) : son propre cadre
      (bordure/fond/padding) serait une "boîte dans la boîte" redondante. On
      l'aplatit — le contenu de la légende s'aligne alors sur les bords du
@@ -309,7 +305,7 @@
   }
   #panneau-falaise.ouvert { width: var(--largeur-panneau-droit); }
 
-  /* Largeur FIXE sur l'intérieur, indépendante du width animé du parent :
+  /* Largeur fixe sur l'intérieur, indépendante du width animé du parent :
      sans ça, le contenu se compresserait pendant les 200ms de transition
      puis "pop" à sa taille finale au dernier instant — avec une largeur
      fixe, seule la fenêtre de clipping (overflow du parent) grandit, le
@@ -327,7 +323,7 @@
     min-height: 0;
     overflow-y: auto; /* scroll propre au panneau droit, indépendant du panneau gauche */
     /* Le bouton fermer (position:absolute, right:8px) ne chevauche que le
-       bord DROIT de l'en-tête (titre à gauche, bouton à droite) : dégagé via
+       bord droit de l'en-tête (titre à gauche, bouton à droite) : dégagé via
        padding-right sur l'en-tête (voir #panneau-falaise .popup-entete), pas
        un grand padding-top qui poussait tout le contenu vers le bas. */
     padding: 14px 16px 14px;
@@ -356,8 +352,8 @@
     z-index: 1;
   }
 
-  /* Les contrôles MapLibre top-right (zoom, "Tout voir") sont rendus À
-     L'INTÉRIEUR de #map (map.addControl(..., 'top-right')) — le panneau
+  /* Les contrôles MapLibre top-right (zoom, "Tout voir") sont rendus à
+     l'intérieur de #map (map.addControl(..., 'top-right')) — le panneau
      droit (z-index 10, ancré right:0) les recouvrirait sinon pendant qu'il
      est ouvert. */
   body.panneau-falaise-ouvert .maplibregl-ctrl-top-right {
@@ -481,7 +477,7 @@
 }
 /* Bouton "Réessayer" du chargement initial : ici on assume un vrai bouton
    à cadre (et non un lien texte comme les actions secondaires de la fiche) —
-   c'est la SEULE action possible à cet instant, l'écran ne contient rien
+   c'est la seule action possible à cet instant, l'écran ne contient rien
    d'autre. Cible 44 px, même règle que partout ailleurs. */
 .btn-reessayer {
   min-height: 44px;
@@ -498,19 +494,13 @@
 /* Indicateur hors-ligne — non bloquant : il informe, il n'interrompt pas (le
    site reste pleinement utilisable en cache). role=status et non alert :
    annoncé sans voler le focus.
-
-   PERSISTANT et TEXTUEL, par principe : être hors ligne est un ÉTAT durable,
-   pas un évènement. Un message qui s'efface au bout de quelques secondes
-   laisserait sans réponse celui qui regarde l'écran cinq minutes plus tard
-   (visibilité de l'état du système) ; une simple marque colorée échouerait à
-   WCAG 1.4.1.
-
-   PUCE POSÉE SUR LA CARTE, et non plus barre pleine largeur ancrée en bas :
-   recouvrir le canevas est gratuit — rien d'actionnable n'y est caché —
-   tandis que recouvrir de l'interface coûte. En bas, mesuré à 390x844, il
-   masquait ENTIÈREMENT l'attribution OpenStreetMap (y 800-844, obligation de
-   crédit), mangeait 7px de la légende dépliée et 27px de la fiche mobile.
-   Ici il ne réserve aucune place : la carte ne perd pas un pixel. */
+   Persistant et textuel : être hors ligne est un état durable, pas un
+   évènement, et une simple marque colorée échouerait à WCAG 1.4.1.
+   Puce posée sur la carte, et non plus barre pleine largeur ancrée en bas :
+   recouvrir le canevas est gratuit, recouvrir de l'interface coûte. En bas,
+   mesuré à 390x844, elle masquait entièrement l'attribution OpenStreetMap
+   (obligation de crédit) et mangeait 7px de la légende dépliée. Ici elle ne
+   réserve aucune place : la carte ne perd pas un pixel. */
 .bandeau-hors-ligne {
   position: absolute;
   top: 101px; /* sous .recherche : top 54 + ~39 de hauteur + 8 d'air */
@@ -550,7 +540,7 @@
   cursor: pointer;
 }
 
-/* « Préparer le hors-ligne » (voir hors-ligne.js) — dans l'EN-TÊTE, plus
+/* « Préparer le hors-ligne » (voir hors-ligne.js) — dans l'en-tête, plus
    dans la légende : c'est une action de préparation ponctuelle (avant de
    partir, sur wifi), pas un réglage de carte. Elle y occupait 53 px alors
    que la légende couvrait déjà 49 % du viewport mobile.
@@ -609,7 +599,7 @@
 
 /* En-tête de la légende (titre + bouton de repli en icône compacte) : le
    panneau gauche ne recouvre rien d'important — masquer/afficher la légende
-   en entier reste le bon comportement, seule la FORME du bouton change
+   en entier reste le bon comportement, seule la forme du bouton change
    (chevron compact en haut, au lieu du gros bouton "Masquer" pleine largeur
    en bas). L'état replié/déplié est porté par aria-expanded (rotation du
    chevron, voir .legende-toggle-icone), explicité au lecteur d'écran par le
@@ -625,19 +615,19 @@
   color: var(--muted);
 }
 .legende-toggle {
-  /* Bouton à LIBELLÉ (pas un simple chevron 24x24, illisible) : le texte
+  /* Bouton à libellé (pas un simple chevron 24x24, illisible) : le texte
      "Masquer"/"Afficher" (mis à jour en JS selon aria-expanded) dit ce que
      fait le bouton, le chevron reste pour l'affordance de repli. */
   /* Trois corrections après essai sur mobile :
      - 44px de haut (il en faisait 21) : règle appliquée partout ailleurs sur
-       le site, oubliée ici alors que ce bouton est le SEUL moyen de rouvrir
+       le site, oubliée ici alors que ce bouton est le seul moyen de rouvrir
        la légende une fois repliée.
      - bordure --muted au lieu de --stone-dark : cette dernière ne fait que
        1.36:1 sur --paper, sous le seuil de 3:1 exigé pour la limite d'un
        contrôle (WCAG 1.4.11) — replié, le bouton flotte sur le fond de carte
        et sa bordure y disparaissait.
      - ombre portée : le détache du fond, quelle qu'en soit la densité. */
-  /* 44px seulement sur pointeur grossier : c'est une contrainte TACTILE
+  /* 44px seulement sur pointeur grossier : c'est une contrainte tactile
      (doigt), pas une règle universelle. À la souris le pointeur est précis,
      et imposer 44px ne fait qu'alourdir un bouton de réglage secondaire. */
   padding: 3px 10px;
@@ -660,18 +650,18 @@
      centre dans la boite), seule la zone attrapable grandit — c'est elle
      qu'on vise en glissant le pouce. */
   #filtre-temps { min-height: 44px; }
-  /* Le bouton de l'en-tête ne peut PAS grandir : l'en-tête a une hauteur
+  /* Le bouton de l'en-tête ne peut pas grandir : l'en-tête a une hauteur
      fixe (--hauteur-entete) dont dépend le calage de la carte. On étend donc
      la zone tactile au-delà de la boîte visible, via un pseudo-élément
      transparent — la cible fait bien 44px au doigt, la mise en page ne bouge
      pas d'un pixel. */
-  /* La SEULE sortie de la carte, et sa plus petite cible : 74x16 mesuré.
+  /* La seule sortie de la carte, et sa plus petite cible : 74x16 mesuré.
      Même procédé que .btn-preparer ci-dessous, et pour une raison de plus :
      étirer le lien (align-self:stretch + display:flex) donnait bien 44px,
      mais faisait de lui un conteneur flex — ce qui neutralisait le mécanisme
      même du défaut que surveille le test « aucun libellé du bouton ne déforme
      la navigation ». Le test continuait de passer en ayant retiré
-     flex-shrink ET white-space. Le pseudo-élément ne touche à rien. */
+     flex-shrink et white-space. Le pseudo-élément ne touche à rien. */
   .map-header a { position: relative; }
   .map-header a::after {
     content: "";
@@ -692,7 +682,7 @@
     height: 44px;
     transform: translateY(-50%);
   }
-  /* PAS de zone étendue sur .label-site, et c'est un retour en arrière
+  /* pas de zone étendue sur .label-site, et c'est un retour en arrière
      mesuré : la porter à 44px captait les clics jusqu'à 20px au-dessus et en
      dessous de l'étiquette — 8 points sur 20 sondés — alors qu'ils
      atteignaient la carte avant. labels.js prévenait déjà que ces étiquettes
@@ -823,7 +813,7 @@
   font-size: var(--fs-sm);
   color: var(--muted);
 }
-/* Contour seul, sans remplissage : ces cercles n'encodent que la TAILLE
+/* Contour seul, sans remplissage : ces cercles n'encodent que la taille
    (comparaison de valeurs) — la couleur, qui varie selon le mode "Cercles",
    est déjà portée par la pastille "Falaises" dans .legende-cats. Mélanger
    les deux dans le même repère suggérerait à tort que la couleur varie
@@ -835,7 +825,7 @@
   flex-shrink: 0;
 }
 
-/* Sélecteur de figuré : sert de TITRE aux cercles proportionnels rendus
+/* Sélecteur de figuré : sert de titre aux cercles proportionnels rendus
    juste en dessous (#legende-falaises) — placé au-dessus d'eux dans le HTML.
    La bordure du haut le sépare des catégories (Falaises/Parkings/Gîte), le
    margin-bottom laisse un peu d'air avant les cercles de référence. */
@@ -849,11 +839,11 @@
   font-size: var(--fs-base);
 }
 .legende-figure select {
-  /* Police du CORPS, pas mono — contrairement aux sélecteurs de cotation
+  /* Police du corps, pas mono — contrairement aux sélecteurs de cotation
      juste en dessous. Le site distingue deux voix : mono pour les boutons et
-     les VALEURS techniques (« ≤ 120 min », « 6a+ »), corps pour les libellés
+     les valeurs techniques (« ≤ 120 min », « 6a+ »), corps pour les libellés
      et les champs de formulaire (« Falaises », le champ de recherche). Ce
-     sélecteur porte des PHRASES (« Voies par cotation »), pas des codes : la
+     sélecteur porte des phrases (« Voies par cotation »), pas des codes : la
      voix mono lui allait mal, et lui coûtait 25 % de largeur en plus à
      taille égale (169px contre 127px pour « Voies par cotation » à 16px).
      Sur mobile la taille est forcée à 16px pour le zoom iOS (voir plus bas) :
@@ -894,7 +884,7 @@
    tout par défaut (poignée au maximum), glisser vers la gauche resserre
    progressivement aux falaises les plus proches. Label+valeur sur une ligne
    (comme .info-ligne des popups : libellé à gauche, valeur à droite), le
-   slider sur sa PROPRE ligne pleine largeur en dessous — repéré après test :
+   slider sur sa propre ligne pleine largeur en dessous — repéré après test :
    les trois sur une seule ligne (1er jet) laissaient le slider bien trop
    étroit pour rester maniable, le texte (surtout la précision "en voiture")
    lui volant l'essentiel de la largeur disponible. */
@@ -1011,7 +1001,7 @@
    le vocabulaire "dot" déjà utilisé dans la légende. Les pastilles ET les
    libellés sont des <span> positionnés par un transform calculé en JS
    (rotation + décalage + contre-rotation pour rester droit) ; top/left/margin
-   ci-dessous centrent chaque <span> sur l'anneau AVANT rotation, pour que le
+   ci-dessous centrent chaque <span> sur l'anneau avant rotation, pour que le
    pivot tombe bien au centre. Le conteneur (60px) est volontairement plus
    grand que l'anneau visible (24px) : les libellés dépassent de l'anneau à
    ~22px du centre, sans cette marge ils chevauchaient le texte "roche"
@@ -1098,7 +1088,7 @@
    (plutôt qu'un <dl> terme/description empilé verticalement — bien moins
    scannable pour une liste de faits courts). Les champs avec un visuel
    supplémentaire (jauge de cotation, grille de voies, liste de falaises)
-   ajoutent ce contenu en pleine largeur SOUS la ligne label/valeur, comme un
+   ajoutent ce contenu en pleine largeur sous la ligne label/valeur, comme un
    élément frère plutôt que niché dans .info-valeur — un visuel comme une
    jauge a besoin de toute la largeur pour rester lisible. */
 .popup .fiche-infos {
@@ -1115,9 +1105,9 @@
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   color: var(--muted);
-  /* Le libellé peut se replier sur DEUX lignes si nécessaire (ex. "Temps de
+  /* Le libellé peut se replier sur deux lignes si nécessaire (ex. "Temps de
      trajet depuis le gîte" dans une popup parking étroite, max-width 260px) :
-     sans min-width:0, un item flex avec flex-shrink:1 ne rétrécit JAMAIS sous
+     sans min-width:0, un item flex avec flex-shrink:1 ne rétrécit jamais sous
      son contenu texte (min-width:auto) et fait déborder la ligne au lieu de
      couper — bug réel : la valeur "82 min en voiture" sortait de la fiche. */
   min-width: 0;
@@ -1147,7 +1137,7 @@
    est l'info qui compte, mais pas au prix d'un déséquilibre visuel sur une
    ligne — la hiérarchie passe par la couleur (encre pleine vs gris muet), pas
    par la taille. Sans cette règle, .info-valeur héritait du corps de texte
-   du popup (police système, 0.85rem, plus grosse ET différente du libellé —
+   du popup (police système, 0.85rem, plus grosse et différente du libellé —
    ça se voyait, notamment sur "Roche"/"Calcaire"). */
 .popup .info-valeur {
   font-family: var(--font-mono);
@@ -1160,7 +1150,7 @@
 }
 
 /* Métadonnées clés de la fiche falaise (Roche / Voies, voir popupFalaise) en
-   COLONNES ÉTROITES : 2 mini-colonnes sans bordure, label en petite majuscule
+   colonnes étroites : 2 mini-colonnes sans bordure, label en petite majuscule
    au-dessus de la valeur — plus léger que des tuiles, plus structuré que des
    tags, et ça ne boxe pas la fiche. */
 .popup .fiche-infos-cols {
@@ -1256,7 +1246,7 @@
    la même cotation, la pile s'élargit plutôt que de s'empiler à l'infini —
    sans ça, une dizaine de voies sur une même cotation (déjà vu jusqu'à 8
    dans ce jeu de données) rendait la colonne bien plus haute que le reste
-   de la fiche. wrap-reverse : les nouvelles rangées s'ajoutent AU-DESSUS
+   de la fiche. wrap-reverse : les nouvelles rangées s'ajoutent au-dessus
    des précédentes (pas en dessous), pour garder la même lecture "empile
    depuis la base" qu'une seule colonne verticale. */
 .histo-cases {
@@ -1292,7 +1282,7 @@
   box-sizing: border-box;
 }
 /* --fs-xs (pas --fs-2xs comme le reste du vocabulaire de titres de la
-   fiche) : seul élément de ce groupe à porter une VALEUR à lire pour
+   fiche) : seul élément de ce groupe à porter une valeur à lire pour
    grimper (la cotation, ex. "6a+"), pas juste le nom d'une section --
    mérite un cran de confort de lecture en plus. */
 .histo-label {
@@ -1325,7 +1315,7 @@
 .histo-swatch.gv { background: var(--gv); }
 
 /* ===== Détail des voies (drill-down depuis "Voir le détail des voies") :
-   swap en place DANS .popup, partagé mobile/desktop — voir afficherDetailVoies/
+   swap en place dans .popup, partagé mobile/desktop — voir afficherDetailVoies/
    masquerDetailVoies (marqueurs.js). Seule la contrainte de hauteur du
    conteneur (media query plus bas, mobile uniquement) diffère entre les
    deux : desktop n'a besoin d'aucun CSS séparé (#panneau-falaise n'a pas de
@@ -1407,7 +1397,7 @@
   cursor: default;
 }
 
-/* "← Retour" ANCRÉ EN BAS (sticky), pas en haut à côté du titre (1er/2e jet,
+/* "← Retour" ancré en bas (sticky), pas en haut à côté du titre (1er/2e jet,
    abandonnés) : sur mobile, une fois la fiche quasi plein écran, un bouton
    en haut se retrouve à l'opposé du pouce dans une liste de 40+ voies —
    sticky le garde accessible en permanence, quelle que soit la position de
@@ -1417,7 +1407,7 @@
    (comme "Voir le détail des voies"), pas un lien souligné : plus prononcé,
    corrige aussi le manque d'affordance relevé sur la version précédente
    (texte simple à côté du titre, trop discret). Fond opaque (--paper)
-   indispensable : le contenu qui défile doit disparaître SOUS le bouton,
+   indispensable : le contenu qui défile doit disparaître sous le bouton,
    pas se voir par transparence ; l'ombre au-dessus le détache visuellement
    de ce contenu une fois collé en bas. */
 .btn-retour-fiche {
@@ -1442,8 +1432,8 @@
 }
 
 /* Grille (pas une simple liste flex) : chaque <li> passe en display:contents,
-   ses enfants deviennent directement des items de CETTE grille — alignement
-   en vraies colonnes sur TOUTE la liste (nom/cotation/points/hauteur),
+   ses enfants deviennent directement des items de cette grille — alignement
+   en vraies colonnes sur toute la liste (nom/cotation/points/hauteur),
    colonne par colonne, pas juste au sein d'une ligne isolée (ce qu'aurait
    donné un flex par <li>, chaque ligne se dimensionnant indépendamment). */
 .detail-voies-liste {
@@ -1452,21 +1442,21 @@
   padding: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto auto;
-  /* PAS de column-gap : un vrai "trou" entre les colonnes de grille, jamais
+  /* pas de column-gap : un vrai "trou" entre les colonnes de grille, jamais
      peint par le fond d'aucune cellule — avec le zébrage 1 ligne sur 2 (voir
      .detail-voie-impaire), ce trou coupait la bande de couleur (et la
      bordure du bas) à chaque séparation de colonne, discontinue au lieu
      d'une seule bande pleine largeur. L'espacement entre colonnes vient
-     maintenant du PADDING horizontal de chaque cellule (voir .detail-voie >
+     maintenant du padding horizontal de chaque cellule (voir .detail-voie >
      *) : les boîtes se touchent, mais chacune peint sa propre moitié de
      l'espacement — plus aucun trou non peint entre elles. */
   /* stretch (valeur par défaut, plus "baseline") : chaque cellule occupe
-     TOUTE la hauteur de sa ligne de grille, pas seulement celle de son
+     toute la hauteur de sa ligne de grille, pas seulement celle de son
      propre contenu — indispensable pour que les bordures du bas tombent
      toutes à la même hauteur (voir .detail-voie > * ci-dessous). Avec
      baseline (essayé, retiré), les cellules cotation/points/hauteur ont des
      tailles de police différentes (--fs-sm vs --fs-xs) donc des hauteurs de
-     ligne différentes : la bordure de chaque cellule suivait sa PROPRE
+     ligne différentes : la bordure de chaque cellule suivait sa propre
      hauteur au lieu de celle de la ligne entière, dessinant des traits
      décalés d'une colonne à l'autre (repéré : lignes du tableau visiblement
      désalignées vis-à-vis de cotation/points/hauteur). */
@@ -1474,7 +1464,7 @@
   font-size: var(--fs-sm);
 }
 .detail-voie { display: contents; }
-/* La bordure vit sur chaque CELLULE (pas sur .detail-voie, qui n'a plus de
+/* La bordure vit sur chaque cellule (pas sur .detail-voie, qui n'a plus de
    boîte propre en display:contents) : posée sur les 5 enfants, elle dessine
    quand même une ligne continue sous chaque voie. display:flex +
    align-items:center sur chaque cellule : stretch (ci-dessus) les rend
@@ -1488,7 +1478,7 @@
 }
 /* Fond alterné 1 ligne sur 2 : aide à suivre une ligne des yeux jusqu'à la
    colonne Hauteur, la plus éloignée du nom — surtout utile sur les longues
-   listes (jusqu'à 40+ voies). Posé sur les CELLULES (pas .detail-voie-impaire
+   listes (jusqu'à 40+ voies). Posé sur les cellules (pas .detail-voie-impaire
    directement, sans boîte propre en display:contents — un fond dessus
    n'aurait aucun effet visible). */
 .detail-voie-impaire > * { background: rgba(0, 0, 0, 0.03); }
@@ -1529,7 +1519,7 @@
    indépendante de plus dans la liste ; taille réduite (même voix que
    Points/Hauteur) car secondaire par rapport à cette ligne "voie". Le
    zébrage (.detail-voie-impaire) est piloté par l'appelant au niveau du
-   GROUPE (voir construireListePosition) : une grande voie et toutes ses
+   groupe (voir construireListePosition) : une grande voie et toutes ses
    longueurs partagent la même bande, jamais une alternance indépendante par
    longueur qui casserait la lecture "ceci est une seule voie". */
 .detail-voie-longueur .detail-voie-nom {
@@ -1542,7 +1532,7 @@
 }
 
 /* Liste de boutons .lien-secteur en flux (flex-wrap) : réutilisée pour la
-   liste "Falaises" (popup parking, plusieurs sommets) ET la liste "Parking"
+   liste "Falaises" (popup parking, plusieurs sommets) et la liste "Parking"
    (popup falaise, plusieurs parkings, voir champParkingAssocie) — même
    besoin dans les deux sens (label seul sur sa ligne, boutons qui s'enroulent
    en dessous), pas de raison d'avoir deux règles identiques. Corrige un texte
@@ -1609,7 +1599,7 @@
   margin-top: 2px;
 }
 /* Itinéraire + GPS, une fois déplacés dans "Accès" (voir popups.js,
-   popupFalaise) : simples <a>/<div> frères de .parkings-list, SANS le
+   popupFalaise) : simples <a>/<div> frères de .parkings-list, sans le
    gap:8px que fournissait avant .actions en display:flex — collés l'un à
    l'autre sans cette marge (repéré en test réel : "trop collé" entre la
    liste de parkings et le bouton Itinéraire). Ciblé sur .fiche-groupe-suivant
@@ -1748,21 +1738,15 @@
 }
 
 /* Groupe "Topo papier" (voir popups.js, groupeTopo) : même gabarit que
-   "Accès" (.fiche-groupe-suivant/.fiche-groupe-titre) — cohérence visuelle
-   entre les groupes de la fiche, pas de style bis. Alignement à gauche
-   (pas centré, contrairement à l'ancienne rangée compacte) pour matcher le
-   reste de .fiche-infos/.actions.
-   font-family: var(--font-body) (PAS --font-mono) : un titre de topo est
-   une vraie phrase (nom + auteur + année), pas un libellé technique court —
-   en monospace, chaque espace occupe la même largeur qu'une lettre, ce qui
-   fait paraître les espaces après une virgule ou un point anormalement
-   larges sur un texte de cette longueur (repéré en vrai : "... Diois (FFME
-   26, 2020), p. 86, 88, 90" avait l'air troué). --font-body (proportionnel)
-   règle ça sans rien changer à la charte : c'est déjà la police par défaut
-   de .maplibregl-popup-content, seulement écrasée ici par erreur au 1er jet.
-   --fs-base (pas --fs-sm) : c'est du contenu à LIRE (comme "10 min à pied"
-   dans .parking-ligne, qui hérite --fs-base via .fiche-infos) — --fs-sm
-   reste réservé aux libellés d'action courts (Oblyk, GPS...), pas à de la
+   "Accès", aligné à gauche comme .fiche-infos/.actions (pas centré comme
+   l'ancienne rangée compacte).
+   font-family: var(--font-body), pas --font-mono : un titre de topo est une
+   phrase (nom + auteur + année), et le monospace élargit anormalement les
+   espaces après une virgule sur ce genre de texte (repéré sur "... Diois
+   (FFME 26, 2020), p. 86, 88, 90", qui semblait troué). C'est déjà la police
+   par défaut de .maplibregl-popup-content, écrasée ici par erreur au 1er jet.
+   --fs-base, pas --fs-sm : c'est du contenu à lire (comme "10 min à pied"
+   dans .parking-ligne), pas à de la
    prose informative ; le confondre ici la faisait paraître trop petite. */
 .popup .topo-reference {
   margin: 0 0 4px;
@@ -1770,7 +1754,7 @@
   font-size: var(--fs-base);
   color: var(--muted);
 }
-/* Page(s) + lien d'achat sur la MÊME ligne (voir popups.js,
+/* Page(s) + lien d'achat sur la même ligne (voir popups.js,
    lignePageEtAchat) : badges à gauche, lien à droite — même motif que
    .gps-copie (valeur à gauche, "Copier" à droite) : économise une ligne de
    hauteur plutôt que d'empiler. flex-wrap : si les deux ne tiennent pas
@@ -1787,7 +1771,7 @@
 /* Page(s) en badges : c'est le repère le plus utile une fois qu'on a déjà
    le bon topo en main, mis en avant sans reprendre une ligne de texte de
    plus (essayé puis écarté : une 2e ligne "p. 34" faisait doublon avec la
-   référence juste au-dessus). Un badge PAR page (jamais "p. 86, 88, 90" en
+   référence juste au-dessus). Un badge par page (jamais "p. 86, 88, 90" en
    un seul badge) : reste compact quel que soit le nombre de pages. */
 .popup .topo-page {
   display: flex;
@@ -1804,14 +1788,14 @@
   background: var(--stone);
   color: var(--ink);
 }
-/* Lien d'achat/téléchargement SÉPARÉ du texte de référence ci-dessus (pas le
+/* Lien d'achat/téléchargement séparé du texte de référence ci-dessus (pas le
    titre entier cliquable) : reste explicite sur ce qu'il fait ("Acheter ce
    topo" finance l'entretien des falaises, pas une simple commodité perso).
-   font-family/font-size EXPLICITES (oubliés au 1er jet) : sans ça le lien
+   font-family/font-size explicites (oubliés au 1er jet) : sans ça le lien
    hérite du corps de page (16px, --font-body) au lieu de l'échelle du
    popup — d'où le "beaucoup trop gros" repéré en vrai. Mono + --fs-sm,
    comme "Voir sur Oblyk" juste en dessous (.actions-secondaires a) : un
-   libellé COURT SANS ponctuation interne n'a pas le problème d'espacement
+   libellé court sans ponctuation interne n'a pas le problème d'espacement
    de .topo-reference ci-dessus, et une action reste volontairement plus
    discrète qu'une info à lire. white-space: nowrap : ne coupe jamais au
    milieu de "Acheter ce topo" quand il repasse à côté/sous les badges. */
@@ -1880,12 +1864,12 @@
     max-height: min(25vh, 220px);
   }
   .maplibregl-popup-content.detail-voies-ouvert {
-    /* PAS 100vh : sur mobile, "vh" se base sur la hauteur du viewport barre
-       d'adresse MASQUÉE (le maximum théorique) — tant que le navigateur
+    /* pas 100vh : sur mobile, "vh" se base sur la hauteur du viewport barre
+       d'adresse masquée (le maximum théorique) — tant que le navigateur
        affiche encore sa barre (cas courant à l'ouverture), 100vh dépasse la
        zone réellement visible et le haut de la fiche déborde hors écran
        (constaté). "dvh" (dynamic viewport height) se recalcule sur la zone
-       RÉELLEMENT visible à tout instant — 1ère ligne gardée en repli pour
+       réellement visible à tout instant — 1ère ligne gardée en repli pour
        les rares navigateurs sans dvh (valeur ignorée par les autres).
        calc(...- 44px) plutôt que 100% pile : laisse le bandeau d'en-tête
        (← Sorties / nom de la sortie, voir .map-header) visible même en
@@ -1959,7 +1943,7 @@
      appliquée à .histo-label (--fs-xs en permanence, desktop et mobile, pas
      seulement bumpé ici : seul élément du groupe à porter une cotation à
      lire, pas juste le nom d'une section). .legende-titre/.fiche-groupe-
-     titre/.col-label sont explicitement déclarés à LA MÊME taille l'un que
+     titre/.col-label sont explicitement déclarés à la même taille l'un que
      l'autre ailleurs dans ce fichier ("même voix typographique") — bumpés
      ensemble ici pour ne pas rouvrir cet écart. */
   .popup .info-label,
@@ -1999,7 +1983,7 @@
    Pendant CSS de dureeAnimation() (carte-utils.js), qui traite les vols de
    caméra MapLibre. Ici : les transitions de l'interface (ouverture du panneau
    falaise, repli de la légende, feuille du bas mobile).
-   On neutralise la DURÉE, pas l'effet : les éléments arrivent au même état
+   On neutralise la durée, pas l'effet : les éléments arrivent au même état
    final, immédiatement. Mettre `transition: none` produirait le même résultat,
    mais une durée quasi nulle reste compatible avec les écouteurs
    `transitionend` s'il en apparaît un jour. */
@@ -2044,10 +2028,10 @@
 }
 
 /* ===== Champs de saisie sur mobile : 16 px minimum =====
-   iOS Safari ZOOME automatiquement la page quand on met le focus sur un
+   iOS Safari zoome automatiquement la page quand on met le focus sur un
    champ dont la police fait moins de 16 px — la carte saute, et l'utilisateur
    doit pincer pour revenir. Ce n'est pas un réglage qu'on peut désactiver
-   proprement (`user-scalable=no` le ferait, mais en supprimant AUSSI le zoom
+   proprement (`user-scalable=no` le ferait, mais en supprimant aussi le zoom
    volontaire, ce qui est un vrai recul d'accessibilité en extérieur).
    La seule solution correcte est de passer ces contrôles à 16 px.
    Uniquement sous 640 px : sur desktop le problème n'existe pas, et la
@@ -2061,7 +2045,7 @@
   #cotation-max {
     font-size: 16px;
   }
-  /* Un <select> se dimensionne sur son option la PLUS LONGUE : passer la
+  /* Un <select> se dimensionne sur son option la plus longue : passer la
      police à 16px l'a fait gonfler à 297px dans une colonne de 280px, d'où
      une barre de défilement horizontale sur toute la légende. width:100% +
      min-width:0 (indispensable dans un conteneur flex, où la largeur

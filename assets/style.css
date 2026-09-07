@@ -14,22 +14,22 @@
      valeur ne faisait que 2.61:1 sur --paper, sous le seuil de 3:1 exigé
      pour un élément porteur d'information non textuelle (WCAG 1.4.11) —
      les cases de l'histogramme et la pastille de légende en dépendent.
-     #b8872b est le point d'équilibre calculé : 3.08:1 sur --paper ET
+     #b8872b est le point d'équilibre calculé : 3.08:1 sur --paper et
      3.14:1 face à --gv. Assombrir davantage améliorerait le fond mais
-     ferait passer la distinction couenne / grande voie SOUS 3:1 — on
+     ferait passer la distinction couenne / grande voie sous 3:1 — on
      échangerait un critère contre l'autre. La distinction reste portée par
      la couleur seule (variable visuelle correcte pour une différence de
      nature) ; sa redondance est textuelle, dans l'aria-label de
      l'histogramme (voir construireHistogramme, popups.js). */
   --couenne: #b8872b;
-  /* Couleur du mode « voies par cotation » sur la carte. Ne PAS réutiliser
+  /* Couleur du mode « voies par cotation » sur la carte. Ne pas réutiliser
      --forest : mesuré à 1.04:1 face à --gv, autrement dit une luminance
      identique au brun des grandes voies — changer de mode ne se voyait pas.
      Ce vert plus clair et plus saturé remonte l'écart à 1.83:1 et ajoute un
      franc décalage de teinte, tout en restant à 5.26:1 sur --paper (au-delà
      du seuil de 3:1 exigé pour un élément porteur d'information).
      Séparé de --forest, qui reste la couleur des liens et doit garder son
-     contraste élevé pour du TEXTE. */
+     contraste élevé pour du texte. */
   --cotation: #38754d;
   /* Texte secondaire (libellés, notes) : seule couleur de texte du site à
      rester en littéral hexadécimal ailleurs plutôt que passer par une
@@ -45,31 +45,21 @@
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
 
   /* Échelle de tailles de police — remplace 18 valeurs quasi arbitraires
-     (0.62rem à 1.6rem, dont 6 tassées entre 0.70 et 0.78rem, à un pixel
-     près les unes des autres sans raison fonctionnelle — voir l'audit dans
-     charte-graphique.html) par 8 paliers nommés, chacun avec un rôle propre :
-     --fs-2xs  micro-labels (badges, libellés de colonnes, titres d'histogramme)
-     --fs-xs   petits labels secondaires ; aussi le palier mobile de --fs-2xs
-               (même bump déjà en place avant cette échelle, juste retokenisé)
-     --fs-sm   texte technique standard (mono) : légende, libellés de popup
+     (0.62rem à 1.6rem, audit dans charte-graphique.html) par 8 paliers nommés :
+     --fs-2xs  micro-labels (badges, colonnes, titres d'histogramme)
+     --fs-xs   petits labels secondaires ; palier mobile de --fs-2xs
+     --fs-sm   texte technique standard (mono) : légende, popups
      --fs-base corps de texte lisible : valeurs, listes, champs, boutons
      --fs-md   en-tête de page
      --fs-lg   titre de fiche (popup h3)
-     --fs-xl   icônes de fermeture (×) — panneau falaise, popup MapLibre,
-               champ recherche : les trois unifiées (1.15/1.2/1.3rem avant)
+     --fs-xl   icônes de fermeture (×), unifiées (panneau, popup, recherche)
      --fs-2xl  titre de la page d'accueil
 
-     Échelle remontée d'environ 12% (le corps passant de 12,8 à 14 px) pour
-     l'usage réel : écran à bout de bras, en plein soleil, parfois avec des
-     mains froides. Les rapports entre paliers sont inchangés — c'est la même
-     échelle, décalée, pas une nouvelle hiérarchie.
-     Vérifié avant d'adopter : la fiche mobile passe de 819 à 820 px de
-     contenu, sans débordement. La hauteur est dominée par l'histogramme et
-     les espacements, pas par le texte — la lisibilité gagnée ne coûte donc
-     aucune densité, ce qui est précisément ce qui rendait l'arbitrage
-     évident une fois mesuré plutôt que débattu.
-     Valeurs choisies pour tomber sur des pixels entiers à la racine 16 px
-     (11,2 mis à part) : un rendu plus net qu'avec des fractions. */
+     Remontée d'environ 12% (corps 12,8 -> 14 px) pour l'usage réel : écran à
+     bout de bras, en plein soleil. Rapports entre paliers inchangés. Vérifié
+     avant d'adopter : la fiche mobile passe de 819 à 820 px, sans débordement
+     (hauteur dominée par l'histogramme, pas par le texte).
+     Valeurs calées sur des pixels entiers à la racine 16 px (11,2 mis à part). */
   --fs-2xs: 0.7rem;
   --fs-xs: 0.75rem;
   --fs-sm: 0.8125rem;
@@ -86,7 +76,7 @@
      donc fausse dès que le contenu de l'en-tête changeait : y ajouter un
      bouton de 44px l'a fait passer à 65px, et la carte s'est retrouvée
      masquée sur 21px sans que rien ne le signale. Une seule source de
-     vérité, et l'en-tête y est CONTRAINT (height, pas min-height). */
+     vérité, et l'en-tête y est contraint (height, pas min-height). */
   --hauteur-entete: 44px;
 
   /* 320px, pas 300 : mesuré au pire cas (option la plus longue du select +
@@ -110,7 +100,7 @@ html, body {
 a { color: var(--forest); }
 a:visited { color: var(--forest); }
 
-/* Repli de focus clavier pour TOUT le site. Il n'y en avait aucun ici : les
+/* Repli de focus clavier pour tout le site. Il n'y en avait aucun ici : les
    pages héritaient du contour par défaut du navigateur, 1px, qui se perd sur
    un fond de carte chargé. Reprend la convention déjà posée au cas par cas
    dans style-carte.css (marqueurs, libellés de site, champ de recherche) :
@@ -121,7 +111,7 @@ a:visited { color: var(--forest); }
   outline-offset: 2px;
 }
 
-/* Le lien de la 404 est le SEUL contrôle de sa page, et mesurait 118x17.
+/* Le lien de la 404 est le seul contrôle de sa page, et mesurait 118x17.
    Au doigt seulement : à la souris le pointeur est précis, et la règle
    n'existe que pour le tactile (même raisonnement que .legende-toggle). */
 @media (pointer: coarse) {
@@ -172,13 +162,13 @@ a:visited { color: var(--forest); }
 }
 
 /* sources.html : un topo par <li> — titre/auteur à gauche, achat à droite,
-   même motif que .topo-page-ligne (popups.js) et .gps-copie. DEUX COLONNES
-   FIXES, pas flex-wrap : un retour à la ligne qui dépend de la longueur du
+   même motif que .topo-page-ligne (popups.js) et .gps-copie. deux colonnes
+   fixes, pas flex-wrap : un retour à la ligne qui dépend de la longueur du
    titre ferait basculer chaque entrée indépendamment des autres à une même
    largeur d'écran — repéré à l'usage, ça se voit et ça semble incohérent.
    .source-info (flex:1, min-width:0) s'enroule sur lui-même si le titre est
    long ; .source-achat (flex-shrink:0) reste au même endroit dans tous les
-   cas. Bascule en colonne pour TOUTES les entrées à la fois sous 640px
+   cas. Bascule en colonne pour toutes les entrées à la fois sous 640px
    (seuil déjà utilisé ailleurs sur le site, voir estDesktop()), plutôt que
    ligne par ligne selon leur contenu. */
 .liste-sources {
@@ -227,7 +217,7 @@ a:visited { color: var(--forest); }
   white-space: nowrap;
 }
 
-/* Italique et NON monospace : la mono est la voix « donnée » du site
+/* Italique et non monospace : la mono est la voix « donnée » du site
    (légende, libellés de popup, compteurs). « toquer là-haut » est un mot, pas
    une donnée — et l'italique est la convention typographique d'une glose.
    La mettre en mono, c'était porter à quatre sur sept le nombre de blocs
@@ -284,12 +274,12 @@ a:visited { color: var(--forest); }
 
 /* Le seul élément actionnable de la page : même palier qu'un titre de fiche,
    les deux nommant la chose qu'on regarde.
-   Et il DOIT ressembler à un lien. Il était en --ink sans soulignement, donc
+   Et il doit ressembler à un lien. Il était en --ink sans soulignement, donc
    indistinguable du texte courant, avec pour seul indice un :hover — qui
    n'existe pas au doigt : sur téléphone, plus rien du tout. Pendant ce
    temps « Revenir à l'accueil » sur la 404, le lien le moins utile du site,
    était vert et souligné. Le vert (--forest, couleur de lien du site) lui est
-   rendu — mais NE PAS RETIRER LE SOULIGNEMENT pour autant : --forest et --ink
+   rendu — mais sans en retirer le soulignement pour autant : --forest et --ink
    ne sont qu'à 1.51:1 l'un de l'autre, très loin des 3:1 qu'exige WCAG 1.4.1
    pour distinguer un lien par la couleur seule. C'est le trait qui porte
    l'information ; le vert ne fait que suivre la convention du site. */
@@ -322,7 +312,7 @@ a:visited { color: var(--forest); }
 /* Réservé aux pointeurs qui survolent réellement — sur tactile, :hover ne se
    "désenclenche" jamais après un tap (même raison que style-carte.css). */
 @media (hover: hover) {
-  /* Fond de LIGNE (pas de couleur de texte) : aide à suivre le titre jusqu'au
+  /* Fond de ligne (pas de couleur de texte) : aide à suivre le titre jusqu'au
      lien d'achat qui s'en écarte en colonne large — ne doit pas se lire comme
      "tout le bloc est cliquable", ce qu'il n'est pas (deux liens distincts
      à l'intérieur). Les liens eux-mêmes gardent leur propre survol ci-dessous. */
@@ -333,7 +323,7 @@ a:visited { color: var(--forest); }
     color: var(--clay);
   }
 
-  /* Ici le bloc ENTIER est bien un seul lien (contrairement à .liste-sources) :
+  /* Ici le bloc entier est bien un seul lien (contrairement à .liste-sources) :
      le fond couvre donc toute la zone cliquable, pas seulement le texte —
      avant cette règle, survoler le padding autour du titre ne réagissait pas
      du tout, alors que cette zone est cliquable au même titre que le texte. */

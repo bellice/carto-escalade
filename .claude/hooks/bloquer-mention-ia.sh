@@ -36,11 +36,11 @@ for m in re.finditer(r'<<-?\'?\"?EOF\'?\"?\s*\n(.*?)\n\s*EOF', cmd, re.DOTALL):
 # quitte a un faux positif rare, plutot que de ne jamais verifier ce cas.
 texte = '\n'.join(messages) if messages else cmd
 
-# (?<!\.)claude : exclut '.claude' (le dossier de config de Claude Code,
-# desormais une partie legitime du depot -- qui l'a fait tomber en faux
-# positif la premiere fois qu'un message a du le nommer, ex. ce commit-ci).
+# (?<!\.)claude(?!\.md) : exclut '.claude' (dossier de config) et 'CLAUDE.md'
+# (fichier de regles du projet) -- deux noms de fichiers legitimes du depot,
+# chacun tombe en faux positif la premiere fois qu'un message a du le nommer.
 # N'exclut PAS 'Claude' precede d'un espace/deux-points/etc., la vraie cible.
-if re.search(r'(?<!\.)claude|anthropic', texte, re.IGNORECASE):
+if re.search(r'(?<!\.)claude(?!\.md)|anthropic', texte, re.IGNORECASE):
     print(json.dumps({'hookSpecificOutput': {
         'hookEventName': 'PreToolUse',
         'permissionDecision': 'deny',
