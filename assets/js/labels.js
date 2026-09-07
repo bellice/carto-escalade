@@ -2,7 +2,7 @@
 // (marqueurs DOM non-figurés, indépendants des marqueurs falaise/parking/gîte).
 
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
-import { secteurDistinct, cleFalaise } from './donnees.js';
+import { secteurDistinct, cleFalaise, libelleFalaise } from './donnees.js';
 
 // Un point par "site" distinct (centroïde de ses falaises, pas la 1ʳᵉ
 // feature — certains sites s'étalent sur ~2km, un centroïde est nettement
@@ -103,31 +103,53 @@ function construireGeojsonSecteurs(geojson) {
     const cle = cleFalaise(p);
     const label = secteurDistinct(p) || p.nom;
     const [lon, lat] = f.geometry.coordinates;
-    if (!groupes.has(cle)) groupes.set(cle, { sumLon: 0, sumLat: 0, n: 0, nbVoies: 0, label });
+    if (!groupes.has(cle)) groupes.set(cle, { sumLon: 0, sumLat: 0, n: 0, nbVoies: 0, label, libelle: libelleFalaise(p) });
     const g = groupes.get(cle);
     g.sumLon += lon; g.sumLat += lat; g.n += 1;
     g.nbVoies += p.nb_voie_total ?? 0;
   });
-  return Array.from(groupes.values(), (g) => ({
+  return Array.from(groupes, ([cle, g]) => ({
+    cle,
     nom: g.label,
+    libelle: g.libelle,
     nbVoies: g.nbVoies,
     coordinates: [g.sumLon / g.n, g.sumLat / g.n],
   })).sort((a, b) => b.nbVoies - a.nbVoies);
 }
 
 // Labels de secteur : même technique que ajouterLabelsSites (marqueurs DOM,
-// ajoutés après pour passer au-dessus dans l'empilement), mais NON
-// cliquables — contrairement aux labels de site, le marqueur falaise en
-// dessous est déjà cliquable à ce niveau de zoom, un second point
-// d'interaction si proche n'apporterait rien et risquerait d'intercepter des
-// clics destinés au marqueur. Renvoie {el, marker, nom} (pas juste l'élément)
-// : appliquerAntiCollisionSecteurs (carte.js) a besoin de la position de
-// chaque marqueur pour son anti-collision à l'écran.
-export function ajouterLabelsSecteurs(map, geojson) {
+// ajoutés après pour passer au-dessus dans l'empilement) — et, depuis peu,
+// cliquables selon exactement le même motif (role="button"/tabindex/click+
+// keydown). Le raisonnement inverse tenu ici auparavant était erroné :
+// contrairement à un nom de SITE (qui coiffe plusieurs falaises différentes,
+// d'où un vrai risque de détourner le clic de l'une d'elles au profit du
+// site — mesuré, voir le commentaire de .label-site dans style-carte.css),
+// un nom de SECTEUR désigne la MÊME entité que le cercle juste au-dessus
+// (même cle, voir cleFalaise) : cliquer l'un ou l'autre ouvre toujours la
+// même fiche, sans rien voler à un voisin DIFFÉRENT.
+// Toujours PAS de zone tactile élargie (::after) au-delà du texte visible :
+// le risque n'est plus le cercle en dessous mais un secteur VOISIN (voir
+// appliquerAntiCollisionSecteurs) — même exception WCAG 2.5.8 que
+// .label-site, voir style-carte.css et le test "Cibles tactiles".
+// Renvoie {el, marker, nom} (pas juste l'élément) : appliquerAntiCollisionSecteurs
+// (carte.js) a besoin de la position de chaque marqueur pour son
+// anti-collision à l'écran.
+export function ajouterLabelsSecteurs(map, geojson, onClicSecteur) {
   return construireGeojsonSecteurs(geojson).map((secteur) => {
     const el = document.createElement('div');
     el.className = 'label-secteur';
     el.textContent = secteur.nom;
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', `Falaise : ${secteur.libelle}`);
+    const activer = () => onClicSecteur(secteur.cle);
+    el.addEventListener('click', activer);
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        activer();
+      }
+    });
     const marker = new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 14] })
       .setLngLat(secteur.coordinates)
       .addTo(map);

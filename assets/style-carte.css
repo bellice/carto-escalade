@@ -86,15 +86,17 @@
 }
 
 /* Nom de secteur, affiché seulement à fort zoom (voir ZOOM_LABELS_SECTEUR /
-   ajouterLabelsSecteurs dans app.js). Non cliquable, contrairement à
-   .label-site : le marqueur falaise en dessous est déjà interactif à ce
-   niveau de zoom. Volontairement plus discret que .label-site (pas de
-   majuscules/letter-spacing, plus petit, fond moins opaque) : un secteur est
-   un niveau en dessous du site dans la hiérarchie des noms de lieux — même
-   logique qu'une carte topo où un toponyme secondaire est rendu plus petit
-   et plus léger qu'un toponyme principal, pas juste dans une autre couleur. */
+   ajouterLabelsSecteurs dans labels.js) — cliquable, même motif que
+   .label-site (voir ajouterLabelsSecteurs/ajouterLabelsDeSecteur) : le
+   cercle juste au-dessus et cette étiquette désignent la MÊME falaise, donc
+   aucun risque de détourner le clic d'un voisin en la rendant réceptive.
+   Volontairement plus discret que .label-site (pas de majuscules/letter-
+   spacing, plus petit, fond moins opaque) : un secteur est un niveau en
+   dessous du site dans la hiérarchie des noms de lieux — même logique qu'une
+   carte topo où un toponyme secondaire est rendu plus petit et plus léger
+   qu'un toponyme principal, pas juste dans une autre couleur. */
 .label-secteur {
-  pointer-events: none;
+  cursor: pointer;
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   font-weight: 500;
@@ -118,6 +120,11 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.label-secteur:focus-visible {
+  outline: 2px solid var(--forest);
+  outline-offset: 1px;
 }
 
 /* ===== Map page ===== */
@@ -692,6 +699,13 @@
      site est secondaire — et la recherche le fait aussi. C'est exactement
      l'exception « contrôle équivalent » de WCAG 2.5.8, le champ de recherche
      (199x39) et son bouton « Voir » (55x39) étant tous deux conformes. */
+  /* Même raisonnement pour .label-secteur, rendue cliquable elle aussi :
+     pas de zone étendue ici non plus. Le risque n'est plus de voler le clic
+     du marqueur EN DESSOUS (même entité, voir labels.js) mais celui d'un
+     secteur VOISIN — plusieurs peuvent être affichés proches une fois
+     zoomé, et les élargir romprait le travail d'appliquerAntiCollisionSecteurs.
+     Même exception WCAG 2.5.8 : la recherche trouve aussi un secteur par
+     nom et son bouton « Voir » est conforme (199x39 / 55x39). */
 }
 
 .legende-toggle-icone {
@@ -2073,6 +2087,9 @@
    l'emporter sur l'état de base, jamais l'inverse. */
 @media (hover: hover) {
   .label-site:hover {
+    background: var(--stone-dark);
+  }
+  .label-secteur:hover {
     background: var(--stone-dark);
   }
   .recherche-champ .btn-effacer:hover { background: var(--stone-dark); }

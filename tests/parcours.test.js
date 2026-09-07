@@ -246,7 +246,11 @@ describe('Cibles tactiles', () => {
             // aussi bien qu'eux, et elle est conforme. Les agrandir captait
             // les clics destinés aux falaises en dessous — mesuré, 8 points
             // sur 20. Voir le commentaire de .label-site dans style-carte.css.
-            if (el.classList.contains('label-site')) continue;
+            // Idem pour les noms de secteur, cliquables comme .label-site
+            // depuis peu : même exception « contrôle équivalent » — la
+            // recherche trouve aussi un secteur par nom et son bouton
+            // « Voir » ouvre sa fiche.
+            if (el.classList.contains('label-site') || el.classList.contains('label-secteur')) continue;
             const b = el.getBoundingClientRect();
             if (!b.width) continue;
             const ap = getComputedStyle(el, '::after');
@@ -921,6 +925,40 @@ describe('Navigation directe', () => {
       const arrivee = await cadreContient(site);
       assert.equal(arrivee.toutes, true,
         `Les ${depart.nb} falaises de ${site} ne sont pas revenues dans le cadre après le clic`);
+      assert.deepEqual(erreurs, [], 'Erreurs JavaScript détectées');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  // Un secteur affiche un point + cercle (couche native, jamais de marqueur
+  // DOM) ET un nom en dessous dès ZOOM_LABELS_SECTEUR (15) : ce test vérifie
+  // que cliquer CE nom ouvre la fiche de la falaise qu'il désigne, comme un
+  // clic direct sur son cercle (voir ouvrirFalaise, appelé par les deux
+  // chemins avec la même cle).
+  test('cliquer le nom d’un secteur ouvre sa fiche', { timeout: 90000 }, async () => {
+    const { contexte, page, erreurs } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+
+      await page.evaluate((c) => window.__carteTest.jumpTo({ center: c, zoom: 16 }), REPERES.lesRoches.coord);
+      await page.waitForTimeout(800);
+
+      const trouve = await page.evaluate((nom) => {
+        const el = Array.from(document.querySelectorAll('.label-secteur'))
+          .find((e) => e.textContent === nom && e.style.visibility !== 'hidden' && e.offsetWidth > 0);
+        return el ? el.getAttribute('role') : null;
+      }, REPERES.lesRoches.nom);
+      assert.equal(trouve, 'button', `Étiquette « ${REPERES.lesRoches.nom} » introuvable, masquée, ou sans role=button`);
+
+      await page.evaluate((nom) => {
+        Array.from(document.querySelectorAll('.label-secteur')).find((e) => e.textContent === nom).click();
+      }, REPERES.lesRoches.nom);
+      await page.waitForSelector('.popup h3', { timeout: 10000 });
+      const titre = await page.textContent('.popup h3');
+      assert.equal(titre, REPERES.lesRoches.nom, 'Le clic sur le nom du secteur n’ouvre pas la bonne fiche');
       assert.deepEqual(erreurs, [], 'Erreurs JavaScript détectées');
     } finally {
       await contexte.close();

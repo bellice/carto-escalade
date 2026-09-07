@@ -866,8 +866,14 @@ export function initCarte(dataUrl) {
   // appliquerFiltresEtSecteurs) ; elles masquent en plus un libellé sans
   // figuré ponctuel visible en dessous, ou en collision à l'écran avec un
   // autre déjà affiché.
+  // Clic sur un label de secteur : ouvre sa fiche, exactement comme un clic
+  // direct sur son cercle (ouvrirFalaise, même fonction, même absence de
+  // mouvement de caméra — la falaise est déjà dans le cadre puisque son
+  // étiquette y est visible). Contrairement à ajouterLabelsDeSite : pas de
+  // fitBounds ni de reinitialiserRecherche ici, secteur et cercle désignent
+  // la MÊME entité (même cle), pas un site qui en coiffe plusieurs.
   function ajouterLabelsDeSecteur(geojson) {
-    labelsSecteurs = ajouterLabelsSecteurs(map, geojson);
+    labelsSecteurs = ajouterLabelsSecteurs(map, geojson, (cle) => ouvrirFalaise(cle));
     map.on('zoom', appliquerVisibiliteSecteurs);
     map.on('moveend', appliquerAntiCollisionSecteurs);
     map.on('zoomend', appliquerAntiCollisionSecteurs);
