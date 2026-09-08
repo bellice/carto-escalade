@@ -24,5 +24,22 @@ export function enregistrerServiceWorker(chemin, options) {
       .then((regs) => regs.forEach((r) => r.unregister()));
     return;
   }
-  navigator.serviceWorker.register(chemin, options);
+  navigator.serviceWorker.register(chemin, options).then((registration) => {
+    // Le navigateur ne revérifie sw.js que de temps en temps de lui-même
+    // (mécanisme interne, hors du contrôle de cette page) : sans cet appel,
+    // une mise à jour déployée pouvait mettre longtemps à être détectée,
+    // même en rechargeant normalement (pas un hard refresh). skipWaiting +
+    // clients.claim (déjà dans sw.js) prennent le relais dès que le
+    // navigateur DÉTECTE la nouvelle version ; il ne restait qu'à
+    // déclencher cette détection plus tôt, pas à changer ce qui se passe
+    // une fois détectée.
+    registration.update();
+    // Revérifie aussi au retour sur l'onglet : ce site se prépare parfois la
+    // veille et se rouvre plusieurs jours après, au pied d'une falaise —
+    // sans ça, un déploiement survenu entre-temps n'était détecté qu'à la
+    // prochaine fermeture/réouverture complète du navigateur.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') registration.update();
+    });
+  });
 }
