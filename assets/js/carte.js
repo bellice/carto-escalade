@@ -875,7 +875,14 @@ export function initCarte(dataUrl) {
     const bounds = new maplibregl.LngLatBounds();
     falaises.forEach((en) => bounds.extend([en.lon, en.lat]));
     reinitialiserPadding(map);
-    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
+    // duration explicite : sans elle, ce fitBounds prenait le défaut de
+    // MapLibre (~1000ms, mesuré) au lieu des 800ms de dureeAnimation déjà
+    // utilisés par le clic sur un cercle (flyTo, voir le handler de clic) —
+    // deux vitesses différentes pour deux façons de rejoindre un site,
+    // repéré à l'usage. Pire : sans duration, prefers-reduced-motion
+    // n'était pas respecté ici, contrairement à tout autre déplacement de
+    // caméra du site.
+    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16, duration: dureeAnimation(800) });
   }
 
   function ajouterLabelsDeSite(geojson) {
@@ -1104,7 +1111,10 @@ export function initCarte(dataUrl) {
     const bounds = new maplibregl.LngLatBounds();
     correspondances.forEach((e) => bounds.extend(e.marker ? e.marker.getLngLat() : [e.lon, e.lat]));
     reinitialiserPadding(map);
-    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16 });
+    // duration explicite : même défaut que zoomerSurSite avait (défaut
+    // MapLibre ~1000ms au lieu de 800ms, prefers-reduced-motion ignoré) —
+    // repéré en corrigeant celui-là, corrigé ici pour la même raison.
+    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16, duration: dureeAnimation(800) });
   }
 
   if (btnCentrer) {
