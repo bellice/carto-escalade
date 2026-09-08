@@ -448,26 +448,30 @@ export function initCarte(dataUrl) {
       if (cle) {
         // Sous ZOOM_LABELS_SECTEUR, les secteurs ne sont pas encore nommés
         // individuellement (trop serrés pour rester lisibles, voir
-        // labels.js) : cliquer un cercle cadre alors sur son SITE, comme un
-        // clic sur le nom de ce site (zoomerSurSite, même fonction) — SAUF
-        // si ce site est déjà entièrement dans le cadre, auquel cas ce même
-        // cadrage ne bougerait rien : le clic zoome alors sur CE point
-        // précis, jusqu'au seuil où les secteurs deviennent cliquables un
-        // par un. Sans cette exception, un site étalé (cadrant sous
-        // ZOOM_LABELS_SECTEUR) menait à une impasse : le clic suivant
-        // relançait indéfiniment le même cadrage, sans jamais rien ouvrir
-        // (constaté en test réel, obligeant un zoom manuel). Au-delà du
-        // seuil, le secteur visé est déjà lisible : le clic ouvre
-        // directement sa fiche, comme un clic sur son étiquette (voir
-        // ajouterLabelsDeSecteur).
-        const entree = index.get(cle);
-        const falaisesSite = entree ? falaisesDuSite(entree.p.site) : [];
+        // labels.js) : cliquer un cercle zoome alors sur CE point précis —
+        // flyTo vers une cible seule, comme allerVers (recherche), PAS un
+        // fitBounds sur tout le site (zoomerSurSite, réservée au clic sur le
+        // NOM du site). Cadrer le site entier ici faisait sauter la caméra
+        // vers son centre géographique, potentiellement loin du cercle
+        // cliqué et dans une direction sans rapport avec lui — repéré en
+        // usage réel sur un site étalé, animation désorientante sur un
+        // secteur excentré. Au-delà du seuil, le secteur visé est déjà
+        // lisible : le clic ouvre directement sa fiche, comme un clic sur
+        // son étiquette (voir ajouterLabelsDeSecteur).
         if (map.getZoom() >= ZOOM_LABELS_SECTEUR) {
           ouvrirFalaise(cle);
-        } else if (falaisesSite.length && falaisesSite.every((en) => map.getBounds().contains([en.lon, en.lat]))) {
-          map.easeTo({ center: [entree.lon, entree.lat], zoom: ZOOM_LABELS_SECTEUR });
         } else {
-          zoomerSurSite(entree?.p.site);
+          const entree = index.get(cle);
+          if (entree) {
+            map.stop();
+            reinitialiserPadding(map);
+            map.flyTo({
+              center: [entree.lon, entree.lat],
+              zoom: Math.max(map.getZoom(), ZOOM_LABELS_SECTEUR),
+              padding: margeToutVoir(),
+              duration: dureeAnimation(800),
+            });
+          }
         }
       } else if (popupOuverte && !(estDesktop() && popupOuverte.estPanneauFalaise)) {
         // Une popup FLOTTANTE (parking/gîte, ou fiche falaise mobile) est
@@ -851,9 +855,10 @@ export function initCarte(dataUrl) {
   }
 
   // Cadre sur l'étendue d'un site — pas de popup (ce n'est pas une entité
-  // unique), juste la caméra. Partagée entre le clic sur son nom (vue
-  // d'ensemble) et le clic sur un cercle de secteur avant que les secteurs ne
-  // soient nommés individuellement (voir le handler de clic de la carte).
+  // unique), juste la caméra. Réservée au clic sur son NOM (vue d'ensemble),
+  // PAS au clic sur un cercle de secteur : voir le handler de clic de la
+  // carte pour pourquoi un cercle zoome sur son propre point plutôt que de
+  // cadrer ici tout le site.
   // La recherche se réinitialise (même logique qu'allerVers : une recherche
   // active pourrait sinon masquer des falaises du site qu'on vient justement
   // de rejoindre) ; la sélection courante n'a pas besoin d'être touchée, elle

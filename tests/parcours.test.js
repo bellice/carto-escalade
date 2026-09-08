@@ -966,46 +966,24 @@ describe('Navigation directe', () => {
   });
 
   // Sous ZOOM_LABELS_SECTEUR (15), les secteurs ne sont pas encore nommés
-  // individuellement : cliquer un cercle cadre d'abord sur son SITE (comme un
-  // clic sur le nom de ce site), plutôt que d'ouvrir directement une fiche
-  // qu'on n'a pas vraiment choisie parmi des cercles encore serrés. Une fois
-  // le site entièrement dans le cadre, le même clic ne peut plus recadrer
-  // (rien ne bougerait) : il zoome alors sur ce point précis jusqu'au seuil,
-  // puis un clic suivant y ouvre enfin la fiche — trois clics au pire, jamais
-  // d'impasse. La Tour appartient à Saoû II (24 falaises) : à zoom 14 centré
-  // dessus, les 23 autres ne sont pas toutes dans le cadre (vérifié) —
-  // condition de départ nécessaire pour que le test mesure quelque chose.
-  test('cliquer un cercle sous ZOOM_LABELS_SECTEUR cadre sur son site, puis zoome jusqu’à la fiche', { timeout: 90000 }, async () => {
+  // individuellement : cliquer un cercle zoome sur CE point précis (flyTo),
+  // plutôt que d'ouvrir directement une fiche qu'on n'a pas vraiment choisie
+  // parmi des cercles encore serrés, ou de cadrer sur tout le site (l'un des
+  // deux menait à une animation désorientante sur un site étalé, la caméra
+  // sautant loin du cercle cliqué — constaté en usage réel). Le seuil
+  // franchi, un clic suivant au même endroit ouvre la fiche. La Tour
+  // appartient à Saoû II (24 falaises, donc pas un cas trivial à une seule
+  // falaise).
+  test('cliquer un cercle sous ZOOM_LABELS_SECTEUR zoome sur ce point, puis ouvre sa fiche', { timeout: 90000 }, async () => {
     const { contexte, page, erreurs } = await nouveauContexte(navigateur);
-
-    const cadreContient = (nomSite) => page.evaluate(async (s) => {
-      const geo = await (await fetch('data.geojson')).json();
-      const bornes = window.__carteTest.getBounds();
-      const points = geo.features
-        .filter((f) => f.properties.categorie === 'falaise' && f.properties.site === s)
-        .map((f) => f.geometry.coordinates);
-      return { nb: points.length, toutes: points.every((c) => bornes.contains(c)) };
-    }, nomSite);
 
     try {
       await exposerCarte(page);
       await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
       await attendreCarte(page);
 
-      const site = await page.evaluate(async (c) => {
-        const geo = await (await fetch('data.geojson')).json();
-        const f = geo.features.find((ft) => ft.properties.categorie === 'falaise'
-          && Math.abs(ft.geometry.coordinates[0] - c[0]) < 1e-5 && Math.abs(ft.geometry.coordinates[1] - c[1]) < 1e-5);
-        return f?.properties.site;
-      }, REPERES.laTour.coord);
-      assert.ok(site, 'Site introuvable pour La Tour');
-
       await page.evaluate((c) => window.__carteTest.jumpTo({ center: c, zoom: 14 }), REPERES.laTour.coord);
       await page.waitForTimeout(600);
-
-      const depart = await cadreContient(site);
-      assert.ok(depart.nb > 1, `${site} n'a qu'une falaise : ce test ne mesurerait rien`);
-      assert.equal(depart.toutes, false, `${site} tient déjà tout entier dans le cadre à zoom 14 : ce test ne mesurerait rien`);
 
       const cliquerLaTour = () => page.evaluate((c) => {
         const point = window.__carteTest.project(c);
@@ -1021,31 +999,23 @@ describe('Navigation directe', () => {
       }, REPERES.laTour.coord);
 
       assert.ok(await cliquerLaTour(), 'La Tour introuvable au clic à zoom 14');
-      await page.waitForTimeout(1800); // fitBounds animé
+      await page.waitForTimeout(1800); // flyTo animé
 
       let popupOuverte = await page.evaluate(() => Boolean(document.querySelector('.popup')));
       assert.equal(popupOuverte, false, 'Une fiche s’est ouverte alors que le zoom était sous ZOOM_LABELS_SECTEUR');
+      const zoomApres1erClic = await page.evaluate(() => window.__carteTest.getZoom());
+      assert.ok(zoomApres1erClic >= 15, `Le clic n'a pas zoomé jusqu'à ZOOM_LABELS_SECTEUR (zoom=${zoomApres1erClic})`);
+      const distance = await page.evaluate((c) => {
+        const centre = window.__carteTest.getCenter();
+        return Math.hypot(centre.lng - c[0], centre.lat - c[1]);
+      }, REPERES.laTour.coord);
+      assert.ok(distance < 0.01, `La caméra ne s'est pas centrée sur le point cliqué (écart=${distance})`);
 
-      const arrivee = await cadreContient(site);
-      assert.equal(arrivee.toutes, true, `Les ${depart.nb} falaises de ${site} ne sont pas dans le cadre après le clic`);
-
-      // Le site tient maintenant tout entier dans le cadre : le même clic ne
-      // doit plus refaire ce cadrage (rien ne bougerait) mais zoomer sur ce
-      // point précis, jusqu'au seuil où les secteurs s'ouvrent au clic — sans
-      // ça, un site étalé cadrant sous ZOOM_LABELS_SECTEUR était une impasse
-      // (constaté en test réel : aucun second clic ne progressait).
+      // Le seuil franchi, un clic suivant au même endroit ouvre la fiche.
       assert.ok(await cliquerLaTour(), 'La Tour introuvable au 2e clic');
-      await page.waitForTimeout(1800);
-      const zoomApres2eClic = await page.evaluate(() => window.__carteTest.getZoom());
-      assert.ok(zoomApres2eClic >= 15, `Le 2e clic n'a pas zoomé jusqu'à ZOOM_LABELS_SECTEUR (zoom=${zoomApres2eClic})`);
-      popupOuverte = await page.evaluate(() => Boolean(document.querySelector('.popup')));
-      assert.equal(popupOuverte, false, 'Le 2e clic a ouvert une fiche au lieu de zoomer sur le point');
-
-      // Ce seuil franchi, un 3e clic au même endroit ouvre enfin la fiche.
-      assert.ok(await cliquerLaTour(), 'La Tour introuvable au 3e clic');
       await page.waitForSelector('.popup h3', { timeout: 10000 });
       const titre = await page.textContent('.popup h3');
-      assert.equal(titre, REPERES.laTour.nom, 'Le 3e clic n’ouvre pas la fiche de La Tour');
+      assert.equal(titre, REPERES.laTour.nom, 'Le 2e clic n’ouvre pas la fiche de La Tour');
       assert.deepEqual(erreurs, [], 'Erreurs JavaScript détectées');
     } finally {
       await contexte.close();
