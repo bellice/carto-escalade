@@ -104,7 +104,17 @@ export function initCarte(dataUrl) {
   // ne soient connues, voir configurerFiltreTemps) — tempsGitePlafond sert
   // de référence "aucun filtre actif" (voir appliquerFiltres/reinitialiserFiltreTemps),
   // pas de sentinelle séparée à garder synchronisée ailleurs.
-  const filtres = { recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity };
+  // ensoleillement: tableau des catégories cochées (matin/apres-midi/
+  // journee/nord — jamais 'aucune') — vide = aucun filtre actif. Plusieurs
+  // cochables à la fois EN OU, chacune une correspondance EXACTE : pas de
+  // règle implicite qui devinerait qu'on veut aussi "journee" en cochant
+  // Matin + Après-midi (essayé, retiré). Les deux besoins sont réels et
+  // opposés — "au moins ce moment-là, peu importe le reste" et "CE moment
+  // précis, pas plus" — la coche explicite est la seule façon de les
+  // distinguer sans deviner : qui veut le premier coche Journée EN PLUS,
+  // qui veut le second ne coche que son bouton. Voir
+  // configurerFiltreEnsoleillement.
+  const filtres = { recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity, ensoleillement: [] };
   const blocCotation = document.getElementById('legende-cotation');
   let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
   // Bouton "Épurer" : indépendant de modeFigureActuel (voir construireSourceFalaises)
@@ -120,6 +130,15 @@ export function initCarte(dataUrl) {
   const filtreTemps = document.getElementById('filtre-temps');
   const filtreTempsValeur = document.getElementById('filtre-temps-valeur');
   const legendeTemps = document.getElementById('legende-temps');
+  const legendeEnsoleillement = document.getElementById('legende-ensoleillement');
+  const legendeFiltresAvances = document.getElementById('legende-filtres-avances');
+  // Posé par configurerFiltreEnsoleillement une fois les données connues —
+  // sert à rafraichirNoteEnsoleillement (avertir qu'un filtre actif masque
+  // aussi les falaises sans orientation connue, pas seulement celles qui ne
+  // correspondent pas : à Crozon, 16 falaises sur 60 n'ont pas cette donnée
+  // et disparaîtraient sinon en silence, comme si la carte était incomplète).
+  let falaisesSansOrientationConnue = false;
+  let noteEnsoleillementAucune = null;
 
   // Remet la recherche à zéro (texte, filtre, boutons dépendants) — utilisé
   // par allerVers() et par "Tout voir", qui doivent tous les deux repartir
@@ -140,6 +159,17 @@ export function initCarte(dataUrl) {
     if (filtreTempsValeur && Number.isFinite(filtres.tempsGitePlafond)) {
       filtreTempsValeur.textContent = `≤ ${filtres.tempsGitePlafond} min`;
     }
+  }
+
+  // Remet le filtre "Ensoleillement" à "Peu importe" — même usage que
+  // reinitialiserFiltreTemps ("Tout voir" et allerVers quand la cible serait
+  // masquée par le filtre courant).
+  function reinitialiserFiltreEnsoleillement() {
+    filtres.ensoleillement = [];
+    if (!legendeEnsoleillement) return;
+    legendeEnsoleillement.querySelectorAll('input[data-ensoleillement]').forEach((case_) => {
+      case_.checked = false;
+    });
   }
   let borneGlobale = null; // étendue de tous les marqueurs, pour le bouton "Tout voir"
   let maxima = { total: 0, couenne: 0, gv: 0 }; // pour la taille des cercles proportionnels
@@ -586,11 +616,13 @@ export function initCarte(dataUrl) {
     // seuil actuel ne doit pas non plus rester masquée quand on navigue
     // explicitement vers elle.
     const tempsGiteEmpecheVisibilite = (entree) => entree.tempsGite != null && entree.tempsGite > filtres.tempsMaxGite;
-    const cibleSeraitMasquee = cible.cat === 'falaise' && (estFalaiseVideDansMode(cible, modeFigureActuel) || tempsGiteEmpecheVisibilite(cible));
-    const origineSeraitMasquee = origine && origine.cat === 'falaise' && (estFalaiseVideDansMode(origine, modeFigureActuel) || tempsGiteEmpecheVisibilite(origine));
+    const ensoleillementEmpecheVisibilite = (entree) => filtres.ensoleillement.length && !filtres.ensoleillement.includes(entree.ensoleillement);
+    const cibleSeraitMasquee = cible.cat === 'falaise' && (estFalaiseVideDansMode(cible, modeFigureActuel) || tempsGiteEmpecheVisibilite(cible) || ensoleillementEmpecheVisibilite(cible));
+    const origineSeraitMasquee = origine && origine.cat === 'falaise' && (estFalaiseVideDansMode(origine, modeFigureActuel) || tempsGiteEmpecheVisibilite(origine) || ensoleillementEmpecheVisibilite(origine));
     if (cibleSeraitMasquee || origineSeraitMasquee) {
       definirModeFigure('aucun');
       reinitialiserFiltreTemps();
+      reinitialiserFiltreEnsoleillement();
     }
 
     // Cible falaise -> elle devient la sélection (ses parkings deviennent
@@ -693,6 +725,13 @@ export function initCarte(dataUrl) {
         remplirAutocompletion(geojson);
         ajusterLegendeAuxDonnees(geojson);
         configurerFiltreTemps(tempsDepuisGite);
+        configurerFiltreEnsoleillement();
+        // Le repli lui-même reste hidden (voir HTML) tant qu'aucun des deux
+        // filtres qu'il contient n'a de données exploitables — sinon "Filtres
+        // avancés" s'ouvrirait sur un tiroir vide.
+        if (legendeFiltresAvances && ((legendeTemps && !legendeTemps.hidden) || (legendeEnsoleillement && !legendeEnsoleillement.hidden))) {
+          legendeFiltresAvances.hidden = false;
+        }
         appliquerFiltresEtSecteurs();
         if (etatChargement) etatChargement.remove();
         preparerFourchette();
@@ -760,6 +799,7 @@ export function initCarte(dataUrl) {
       falaiseSelectionneeCle = null;
       reinitialiserRecherche();
       reinitialiserFiltreTemps();
+      reinitialiserFiltreEnsoleillement();
       appliquerFiltresEtSecteurs();
     }), 'top-right');
 
@@ -1000,6 +1040,40 @@ export function initCarte(dataUrl) {
       filtres.tempsMaxGite = Number(filtreTemps.value);
       filtreTempsValeur.textContent = `≤ ${filtreTemps.value} min`;
       appliquerFiltresEtSecteurs();
+    });
+  }
+
+  // Filtre "Ensoleillement" : masqué par défaut (voir HTML, attribut hidden)
+  // tant qu'aucune falaise de la sortie n'a d'orientation exploitable — un
+  // filtre qui ne pourrait jamais retenir personne vaut moins que pas de
+  // filtre, même règle que configurerFiltreTemps.
+  function configurerFiltreEnsoleillement() {
+    if (!legendeEnsoleillement) return;
+    const cases = legendeEnsoleillement.querySelectorAll('input[data-ensoleillement]');
+    if (!cases.length) return;
+    const exploitable = entries.some((e) => e.cat === 'falaise' && e.ensoleillement !== 'aucune');
+    if (!exploitable) return;
+    legendeEnsoleillement.hidden = false;
+    falaisesSansOrientationConnue = entries.some((e) => e.cat === 'falaise' && e.ensoleillement === 'aucune');
+    // Cochables ensemble EN OU (voir le commentaire de filtres.ensoleillement),
+    // mais deux groupes, pas un seul : "Matin/Journée/Après-midi" cherchent
+    // tous du soleil (se combinent librement entre elles), "Non" cherche son
+    // ABSENCE — une intention opposée, pas une nuance de la même recherche.
+    // Cocher l'une décoche donc l'autre groupe en entier (Matin + Non
+    // cochées ensemble ne voudrait rien dire).
+    cases.forEach((case_) => {
+      case_.addEventListener('change', () => {
+        if (case_.checked) {
+          const memeGroupe = (c) => (c.dataset.ensoleillement === 'nord') === (case_.dataset.ensoleillement === 'nord');
+          cases.forEach((c) => {
+            if (c !== case_ && !memeGroupe(c)) c.checked = false;
+          });
+        }
+        filtres.ensoleillement = Array.from(cases)
+          .filter((c) => c.checked)
+          .map((c) => c.dataset.ensoleillement);
+        appliquerFiltresEtSecteurs();
+      });
     });
   }
 
@@ -1293,6 +1367,33 @@ export function initCarte(dataUrl) {
   // NOTE portée : cette fonction est déplacée ICI, dans initCarte — depuis
   // la couche native elle utilise map et falaisesVisibles via la closure
   // (elle ne peut plus rester au niveau module, comme avant).
+  //
+  // Ensoleillement : correspondance EXACTE avec la catégorie choisie, un
+  // seul bouton actif à la fois (voir configurerFiltreEnsoleillement) — pas
+  // de logique de combinaison, chaque bouton fait exactement ce que son nom
+  // dit.
+  //
+  // Un filtre actif masque aussi les falaises SANS orientation connue
+  // (elles ne peuvent satisfaire aucune catégorie) — sans le dire, une
+  // carte à Crozon (16 falaises sur 60 concernées) semblerait avoir perdu
+  // des données plutôt que simplement filtrer. Note construite en JS, pas
+  // statique dans le HTML : comme .legende-note ailleurs dans ce fichier,
+  // n'existe que si elle a effectivement quelque chose à dire (filtre actif
+  // ET lieu concerné).
+  function rafraichirNoteEnsoleillement(filtreActif) {
+    if (!legendeEnsoleillement) return;
+    const utile = Boolean(filtreActif) && falaisesSansOrientationConnue;
+    if (utile && !noteEnsoleillementAucune) {
+      noteEnsoleillementAucune = document.createElement('p');
+      noteEnsoleillementAucune.className = 'legende-note';
+      noteEnsoleillementAucune.textContent = 'Falaises sans orientation connue non affichées.';
+      legendeEnsoleillement.after(noteEnsoleillementAucune);
+    } else if (!utile && noteEnsoleillementAucune) {
+      noteEnsoleillementAucune.remove();
+      noteEnsoleillementAucune = null;
+    }
+  }
+
   function appliquerFiltres(entries, filtres, mode, falaiseSelectionneeCle) {
   // Le mode "Cercles" et le filtre de trajet masquent des falaises mais
   // n'autorisent PAS leurs parkings : bouger le slider réafficherait des
@@ -1310,7 +1411,16 @@ export function initCarte(dataUrl) {
   const conditions = [];
   if (filtres.recherche) conditions.push(['>=', ['index-of', filtres.recherche, ['get', 'recherche']], 0]);
   if (Number.isFinite(filtres.tempsMaxGite)) conditions.push(['<=', ['coalesce', ['get', 'tempsGite'], 0], filtres.tempsMaxGite]);
+  // Union des catégories cochées, chacune une correspondance EXACTE (voir
+  // le commentaire de filtres.ensoleillement) — pas de repli "on suppose
+  // que ça passe" ici, contrairement au temps depuis le gîte où l'absence
+  // de mesure ne doit jamais exclure : une falaise sans orientation
+  // exploitable ne peut satisfaire aucune catégorie cochée.
+  if (filtres.ensoleillement.length) {
+    conditions.push(['in', ['get', 'ensoleillement'], ['literal', filtres.ensoleillement]]);
+  }
   if (map.getLayer('falaises')) map.setFilter('falaises', conditions.length ? ['all', ...conditions] : null);
+  rafraichirNoteEnsoleillement(filtres.ensoleillement.length > 0);
 
   falaisesVisibles = new Set();
   entries.forEach((entree) => {
@@ -1318,7 +1428,8 @@ export function initCarte(dataUrl) {
     const visible =
       (!filtres.recherche || entree.recherche.includes(filtres.recherche)) &&
       !estFalaiseVideDansMode(entree, mode) &&
-      (entree.tempsGite == null || entree.tempsGite <= filtres.tempsMaxGite);
+      (entree.tempsGite == null || entree.tempsGite <= filtres.tempsMaxGite) &&
+      (!filtres.ensoleillement.length || filtres.ensoleillement.includes(entree.ensoleillement));
     if (visible) {
       falaisesVisibles.add(entree.cle);
       if (filtres.recherche) entree.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));

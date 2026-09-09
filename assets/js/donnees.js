@@ -245,6 +245,48 @@ export function estFalaiseVideDansMode(entree, mode) {
   return false;
 }
 
+// Directions du matin (soleil levant) / de l'après-midi (soleil couchant),
+// vues depuis l'hémisphère nord (France).
+const DIRECTIONS_MATIN = new Set(['E', 'NE', 'SE']);
+const DIRECTIONS_APRES_MIDI = new Set(['O', 'SO', 'NO']);
+
+// Catégorise l'ensoleillement d'une falaise depuis son tableau `orientation`
+// (points cardinaux/intercardinaux français, ex. ['S','SO']) — variable
+// CATÉGORIELLE (nominale), affichée par la couleur du mode "Ensoleillement"
+// (voir symboles.js), jamais par la taille (cf. l'en-tête de symboles.js sur
+// Bertin/Cleveland & McGill).
+//
+// Règle de priorité pour les orientations MULTIPLES (26 % des falaises en
+// Drôme, ex. ['S','SO'], ['N','S','E']) — vérifiée sur les 222 falaises
+// réelles des 3 lieux avant d'être figée ici :
+//  1. Tableau vide/absent -> 'aucune' (donnée manquante — DISTINCT du point
+//     cardinal N, une exposition connue, pas une absence de mesure : les
+//     confondre masquerait que 26 falaises drômoises sont "Nord" plutôt
+//     qu'"inconnues", un cas plus fréquent que "aucune donnée" elle-même,
+//     16 falaises).
+//  2. 'N' ignoré puis, s'il ne reste plus rien -> 'nord' (orientation
+//     connue, jamais/peu ensoleillée).
+//  3. 'S' présent, seul ou combiné (ex. ['S','SO'], ['N','S','E']) ->
+//     'journee' : le repère le plus fiable d'un ensoleillement prolongé,
+//     prioritaire sur tout le reste.
+//  4. Sinon, matin ET après-midi tous deux présents (ex. ['N','E','O']) ->
+//     'journee' aussi : visible aux deux moments, donc ensoleillée une
+//     bonne part de la journée, même sans passer par le plein sud.
+//  5. Sinon, matin seul ou après-midi seul -> la catégorie correspondante.
+export function categoriserEnsoleillement(orientation) {
+  const dirs = (orientation || []).map(d => String(d).trim()).filter(Boolean);
+  if (!dirs.length) return 'aucune';
+  const sansNord = dirs.filter(d => d !== 'N');
+  if (!sansNord.length) return 'nord';
+  if (sansNord.includes('S')) return 'journee';
+  const matin = sansNord.some(d => DIRECTIONS_MATIN.has(d));
+  const apresMidi = sansNord.some(d => DIRECTIONS_APRES_MIDI.has(d));
+  if (matin && apresMidi) return 'journee';
+  if (matin) return 'matin';
+  if (apresMidi) return 'apres-midi';
+  return 'aucune'; // défensif : direction cardinale inconnue, ne devrait pas arriver
+}
+
 // NOTE : l'ancienne fonction falaiseVisible (lecture du DOM d'un marqueur)
 // a été retirée à la Phase 3 — les falaises sont rendues en couche native
 // (source "falaises"), sans marqueur DOM. La logique équivalente vit

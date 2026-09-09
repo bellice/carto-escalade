@@ -2,7 +2,7 @@
 // DOM, accessibilité, popup attachée, gestion d'ouverture/fermeture.
 
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
-import { cleFalaise, libelleFalaise, secteurDistinct } from './donnees.js';
+import { cleFalaise, libelleFalaise, secteurDistinct, categoriserEnsoleillement } from './donnees.js';
 import { poserTailleMarqueur } from './symboles.js';
 import { popupFalaise, popupParking, popupGite, construireHistogramme, construireDetailVoies } from './popups.js';
 import { reinitialiserPadding, margeAvantPopup, estPointVisible, dureeAnimation } from './carte-utils.js';
@@ -160,6 +160,9 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
       nbDansFourchette: 0, // recalculé par majFourchette (carte.js)
       nbGrandeVoie: p.nb_gv ?? 0,
       nbCouenne: p.nb_couenne ?? 0,
+      // Précalculée comme nbCouenne/nbGrandeVoie, pas relue à chaque frame
+      // depuis p.orientation : voir categoriserEnsoleillement (donnees.js).
+      ensoleillement: categoriserEnsoleillement(p.orientation),
     };
   }
 

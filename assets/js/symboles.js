@@ -147,6 +147,9 @@ export function construireSourceFalaises(entries, mode, maxima, epuree) {
         r: epuree ? RAYON_MIN : calculerRayon(valeur, maxima.total),
         recherche: entree.recherche,
         tempsGite: entree.tempsGite ?? null,
+        // Lu par le filtre "Ensoleillement" (map.setFilter dans carte.js),
+        // pas par ce fichier : ce mode ne touche ni taille ni couleur.
+        ensoleillement: entree.ensoleillement,
       },
       geometry: { type: 'Point', coordinates: [entree.lon, entree.lat] },
     });

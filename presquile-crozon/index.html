@@ -135,12 +135,49 @@
           </div>
         </div>
         <div class="legende-falaises" id="legende-falaises"></div>
-        <div class="legende-temps" id="legende-temps" hidden>
-          <div class="legende-temps-ligne1">
-            <label for="filtre-temps">Trajet depuis le gîte</label>
-            <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
+        <!-- Filtre indépendant du mode "Cercles", pas une option de
+             #mode-figure : il n'agit ni sur la taille ni sur la couleur des
+             cercles, seulement sur qui reste affiché.
+             Cases à cocher, pas des boutons-bascule façon .btn-tri-voies/
+             .btn-epuree : ceux-ci signifient déjà "un seul choix à la fois"
+             ailleurs sur ce site (tri Cotation/Position, vue Épurée) — les
+             réutiliser ici aurait suggéré la même règle à tort, alors que
+             PLUSIEURS catégories sont cochables à la fois (voir
+             configurerFiltreEnsoleillement, carte.js). Une case à cocher le
+             dit sans un mot d'explication.
+             Deux groupes : Matin/Journée/Après-midi se cochent ensemble EN
+             OU, chacune une correspondance EXACTE — pas de règle qui
+             devinerait qu'on veut aussi "Journée" en cochant Matin+Après-
+             midi (essayé, retiré, voir le commentaire de
+             filtres.ensoleillement dans carte.js) : "au moins ce moment-là,
+             peu importe le reste" et "CE moment précis, pas plus" sont deux
+             besoins réels et opposés, cocher Journée EN PLUS explicitement
+             est la seule façon de dire lequel des deux on veut. "Non" reste
+             mutuellement exclusif avec les trois autres — chercher le
+             soleil et chercher son absence sont deux intentions opposées,
+             pas des nuances à combiner. Placé avant "Depuis le gîte" :
+             pertinent pour tout le monde, contrairement au trajet depuis un
+             hébergement qu'on n'a pas forcément. -->
+        <!-- Fermé par défaut : voir .legende-filtres-avances dans style-carte.css. -->
+        <details class="legende-filtres-avances" id="legende-filtres-avances" hidden>
+          <summary>Filtres avancés</summary>
+          <div class="legende-filtres-contenu">
+            <div class="legende-ensoleillement" id="legende-ensoleillement" hidden role="group" aria-label="Filtrer par ensoleillement">
+              <span class="legende-ensoleillement-label">Ensoleillement</span>
+              <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="matin" />Matin</label>
+              <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="journee" />Journée</label>
+              <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="apres-midi" />Après-midi</label>
+              <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="nord" />Non</label>
+            </div>
+            <div class="legende-temps" id="legende-temps" hidden>
+              <div class="legende-temps-ligne1">
+                <label for="filtre-temps">Trajet depuis le gîte</label>
+                <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
+              </div>
+              <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
+            </div>
           </div>
-          <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
+        </details>
         </div>
       </div>
     </div>

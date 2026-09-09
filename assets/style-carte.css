@@ -653,10 +653,41 @@
 }
 @media (pointer: coarse) {
   .legende-toggle { min-height: 44px; padding: 4px 12px; }
+  .case-ensoleillement { min-height: 44px; }
+  .legende-filtres-avances > summary { min-height: 44px; }
   /* Curseur de trajet : 254x16 mesuré. La piste reste fine (le navigateur la
      centre dans la boite), seule la zone attrapable grandit — c'est elle
      qu'on vise en glissant le pouce. */
   #filtre-temps { min-height: 44px; }
+  /* Case à cocher native mesurée à 13x13 par le navigateur (Chromium),
+     sous le minimum tactile de 44px — même principe que le curseur
+     ci-dessus : agrandir la zone attrapable (l'input, en 44x44) sans
+     grossir l'apparence, une case pleine page aurait détonné à côté du
+     texte du libellé. Coche redessinée en ::before (appearance:none sinon
+     ::before ne s'applique pas à un input) : remplissage plein à la coche,
+     pas de coche dessinée dessus — même grammaire que .btn-epuree
+     ci-dessus. */
+  .case-ensoleillement input {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .case-ensoleillement input::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    background: var(--paper);
+  }
+  .case-ensoleillement input:checked::before {
+    background: var(--forest);
+    border-color: var(--forest);
+  }
   /* Le bouton de l'en-tête ne peut pas grandir : l'en-tête a une hauteur
      fixe (--hauteur-entete) dont dépend le calage de la carte. On étend donc
      la zone tactile au-delà de la boîte visible, via un pseudo-élément
@@ -894,6 +925,42 @@
   color: white;
 }
 
+/* Repli commun à "Ensoleillement" et "Depuis le gîte" : <details> natif,
+   même principe que .liens-replies dans les popups (rien à ajouter au
+   répartiteur de clics, l'ouverture au clavier vient sans une ligne de JS).
+   Fermé par défaut — mesuré sur mobile (390x844) : ces deux filtres à eux
+   seuls faisaient passer la légende ouverte de ~240 à ~410px, plus de la
+   moitié de l'écran avant même d'avoir choisi quoi que ce soit. Le <details>
+   lui-même reste hidden en HTML tant qu'aucun des deux n'a de données
+   exploitables (posé par configurerFiltreTemps/configurerFiltreEnsoleillement,
+   carte.js) — pas de repli vide. */
+.legende-filtres-avances {
+  border-top: 1px solid var(--stone-dark);
+  padding-top: 8px;
+}
+.legende-filtres-avances > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.legende-filtres-avances > summary::-webkit-details-marker { display: none; }
+.legende-filtres-avances > summary::after {
+  content: '▾';
+  font-size: var(--fs-xs);
+}
+.legende-filtres-avances[open] > summary::after { content: '▴'; }
+.legende-filtres-contenu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 /* Filtre "Depuis le gîte" — slider à un seul seuil (voir carte.js) : montre
    tout par défaut (poignée au maximum), glisser vers la gauche resserre
    progressivement aux falaises les plus proches. Label+valeur sur une ligne
@@ -906,8 +973,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  border-top: 1px solid var(--stone-dark);
-  padding-top: 8px;
   font-size: var(--fs-base);
 }
 /* display:flex ci-dessus l'emporterait sur le style natif de [hidden]
@@ -935,6 +1000,39 @@
   font-size: var(--fs-sm);
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* Filtre "Ensoleillement" (configurerFiltreEnsoleillement, carte.js) : même
+   voix typographique que .legende-temps juste au-dessus (le séparateur est
+   maintenant porté par .legende-filtres-avances, qui contient les deux).
+   Cases à cocher, pas des boutons-bascule façon .btn-tri-voies/.btn-epuree :
+   ceux-ci signifient déjà "un seul choix à la fois" ailleurs sur ce site,
+   alors que PLUSIEURS catégories sont cochables ici — une case le dit
+   nativement, sans un mot d'explication (voir le commentaire du HTML). */
+.legende-ensoleillement {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: var(--fs-base);
+}
+.legende-ensoleillement[hidden] { display: none; }
+.legende-ensoleillement-label {
+  color: var(--muted);
+}
+.case-ensoleillement {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+.case-ensoleillement input {
+  margin: 0;
+  accent-color: var(--forest);
+  cursor: pointer;
 }
 
 .legende .dot {
