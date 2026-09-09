@@ -13,7 +13,7 @@ import {
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
 import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, masquerDetailVoies } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
-import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop, dureeAnimation } from './carte-utils.js';
+import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop, dureeAnimation, dureeReduite } from './carte-utils.js';
 import { monterPreparationHorsLigne } from './hors-ligne.js';
 import { cablerActionsFiche } from './actions-fiche.js';
 
@@ -469,7 +469,7 @@ export function initCarte(dataUrl) {
               center: [entree.lon, entree.lat],
               zoom: Math.max(map.getZoom(), ZOOM_LABELS_SECTEUR),
               padding: margeToutVoir(),
-              duration: dureeAnimation(800),
+              ...dureeReduite(),
             });
           }
         }
@@ -875,13 +875,12 @@ export function initCarte(dataUrl) {
     const bounds = new maplibregl.LngLatBounds();
     falaises.forEach((en) => bounds.extend([en.lon, en.lat]));
     reinitialiserPadding(map);
-    // 1000ms (pas les 800ms du clic sur un cercle, voir le handler de
-    // clic) : reprend le défaut de MapLibre, qui convenait déjà à ce
-    // cadrage plus large — passé à 800ms par cohérence avec le reste, puis
-    // rendu à 1000ms, le rythme plus lent lui allant mieux qu'une vitesse
-    // uniforme partout. duration reste explicite (pas juste omis) pour que
-    // prefers-reduced-motion soit respecté, ce qu'il n'était pas avant.
-    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16, duration: dureeAnimation(1000) });
+    // Pas de duration explicite : le défaut de MapLibre convient à ce
+    // cadrage plus large (essayé en 800 puis 1000ms fixes, aucun des deux ne
+    // retrouvait le rythme d'origine — reparti de zéro). dureeReduite()
+    // n'ajoute une duration que pour l'annuler (prefers-reduced-motion),
+    // jamais pour en imposer une.
+    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16, ...dureeReduite() });
   }
 
   function ajouterLabelsDeSite(geojson) {
@@ -1110,11 +1109,8 @@ export function initCarte(dataUrl) {
     const bounds = new maplibregl.LngLatBounds();
     correspondances.forEach((e) => bounds.extend(e.marker ? e.marker.getLngLat() : [e.lon, e.lat]));
     reinitialiserPadding(map);
-    // 1000ms, même raison que zoomerSurSite : ce cadrage sur plusieurs
-    // points va mieux à ce rythme qu'aux 800ms d'un déplacement vers un
-    // point unique (allerVers, clic sur un cercle). duration reste
-    // explicite pour que prefers-reduced-motion soit respecté.
-    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16, duration: dureeAnimation(1000) });
+    // Pas de duration explicite, même raison que zoomerSurSite.
+    map.fitBounds(bounds, { padding: margeToutVoir(), maxZoom: 16, ...dureeReduite() });
   }
 
   if (btnCentrer) {

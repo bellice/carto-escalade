@@ -209,3 +209,13 @@ export function creerControleToutVoir(onClick) {
 export function dureeAnimation(millisecondes) {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : millisecondes;
 }
+
+// Pour un fitBounds/flyTo qu'on laisse VOLONTAIREMENT sans duration (son
+// calcul par défaut — fixe pour fitBounds, proportionnel à la distance pour
+// flyTo — convient mieux qu'une constante arbitraire) : { ...options,
+// ...dureeReduite() } n'ajoute une duration que si elle doit valoir 0, sans
+// jamais imposer de valeur le reste du temps. dureeAnimation(x) ne convient
+// pas ici : elle renvoie toujours x ou 0, jamais "rien".
+export function dureeReduite() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? { duration: 0 } : {};
+}
