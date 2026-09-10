@@ -33,6 +33,29 @@ async function trouverLieux() {
 const LIEUX = await trouverLieux();
 const geojsonDe = async (lieu) => JSON.parse(await lire(`${lieu}/data.geojson`));
 
+// Même principe que trouverLieux ci-dessus, appliqué aux pages : toute page
+// RÉELLEMENT publiée est couverte, sans liste à tenir à jour. La liste écrite à
+// la main qu'elle remplace n'avait jamais été complétée — sources.html et
+// mentions-legales.html étaient publiées depuis le début sans qu'aucun test ne
+// vérifie leur CSP, leur h1 ni l'absence de script inline. Ce qui décide, c'est
+// la liste d'exclusion de _config.yml, la même que celle qui décide ce qui part
+// sur GitHub Pages : une page retirée de la publication sort du lot ici aussi,
+// une page ajoutée y entre sans qu'on ait à y penser.
+async function trouverPagesPubliees() {
+  const conf = await lire('_config.yml');
+  const bloc = conf.slice(conf.indexOf('exclude:'));
+  const exclues = new Set(
+    [...bloc.matchAll(/^\s*-\s*(\S+)\s*$/gm)].map((m) => m[1].replace(/\/$/, ''))
+  );
+  const entrees = await readdir(RACINE, { withFileTypes: true });
+  const racine = entrees
+    .filter((e) => e.isFile() && e.name.endsWith('.html') && !exclues.has(e.name))
+    .map((e) => e.name)
+    .sort();
+  return [...racine, ...LIEUX.map((l) => `${l}/index.html`)];
+}
+const PAGES_PUBLIEES = await trouverPagesPubliees();
+
 // --- Contraste WCAG : même formule que la recommandation ---
 function luminance(hex) {
   const h = hex.replace('#', '');
@@ -523,7 +546,7 @@ describe('Manifeste et installation', () => {
 });
 
 describe('Pages HTML', () => {
-  const pages = ['index.html', '404.html', ...LIEUX.map((l) => `${l}/index.html`)];
+  const pages = PAGES_PUBLIEES;
 
   test('chaque page a exactement un <h1>', async () => {
     for (const page of pages) {
@@ -549,6 +572,31 @@ describe('Pages HTML', () => {
         assert.equal(corps.trim(), '',
           `${page} : script inline détecté — externaliser, sinon la CSP doit ` +
           'être relâchée avec unsafe-inline.');
+      }
+    }
+  });
+
+  // Les pages internes (hors publication, donc sans CSP et libres d'un script
+  // inline) n'ont personne pour signaler qu'elles ont cessé de fonctionner :
+  // charte-graphique.html est restée muette un temps indéterminé sur une simple
+  // apostrophe non échappée, palette et échelle typographique comprises. Or
+  // c'est LA référence visuelle du site : quand elle n'affiche rien, plus rien
+  // ne rend visible une dérive de jeton. On ne peut pas exécuter ces pages ici
+  // (pas de DOM), mais on peut exiger qu'elles compilent : new Function analyse
+  // le corps sans l'exécuter, ce qui suffit à attraper la classe d'erreur en
+  // cause.
+  test('les pages internes ont un script inline syntaxiquement valide', async () => {
+    const entrees = await readdir(RACINE, { withFileTypes: true });
+    const internes = entrees
+      .filter((e) => e.isFile() && e.name.endsWith('.html') && !pages.includes(e.name))
+      .map((e) => e.name);
+    assert.ok(internes.length > 0, 'aucune page interne trouvée — la découverte est-elle cassée ?');
+    for (const page of internes) {
+      const html = await lire(page);
+      for (const [, corps] of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
+        if (!corps.trim()) continue;
+        assert.doesNotThrow(() => new Function(corps),
+          `${page} : le script inline ne compile pas — la page s'affichera vide.`);
       }
     }
   });

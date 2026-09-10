@@ -4,6 +4,12 @@
   --stone-dark: #ddd8c9;
   --ink: #232a23;
   --forest: #2f4a37;
+  /* Variante foncée de --forest, sur le modèle de --clay-dark / --teal-dark
+     qui existaient déjà : --forest était le seul accent sans la sienne. Sert
+     l'état pressé des boutons PLEINS (voir « Retour d'appui » dans
+     style-carte.css), qui doivent s'assombrir là où un bouton à filet
+     s'assombrit vers --stone-dark. Le texte posé dessus reste --paper. */
+  --forest-dark: #233829;
   --clay: #a8452f;
   --clay-dark: #7e3122;
   --teal: #2f6e6a;
@@ -22,14 +28,12 @@
      nature) ; sa redondance est textuelle, dans l'aria-label de
      l'histogramme (voir construireHistogramme, popups.js). */
   --couenne: #b8872b;
-  /* Couleur du mode « voies par cotation » sur la carte. Ne pas réutiliser
-     --forest : mesuré à 1.04:1 face à --gv, autrement dit une luminance
-     identique au brun des grandes voies — changer de mode ne se voyait pas.
-     Ce vert plus clair et plus saturé remonte l'écart à 1.83:1 et ajoute un
-     franc décalage de teinte, tout en restant à 5.26:1 sur --paper (au-delà
-     du seuil de 3:1 exigé pour un élément porteur d'information).
-     Séparé de --forest, qui reste la couleur des liens et doit garder son
-     contraste élevé pour du texte. */
+  /* Vert « c'est fait » : seul usage restant, le bouton Préparer une fois la
+     sortie enregistrée hors ligne (.btn-preparer.pret). Servait auparavant au
+     mode carte « voies par cotation », devenu un filtre qui ne teinte plus
+     rien (voir appliquerFiltreCotation, carte.js). Reste séparé de --forest,
+     qui est la couleur des liens : 5.26:1 sur --paper ici, largement au-delà
+     du seuil de 3:1 exigé pour un élément porteur d'information. */
   --cotation: #38754d;
   /* Texte secondaire (libellés, notes) : seule couleur de texte du site à
      rester en littéral hexadécimal ailleurs plutôt que passer par une
@@ -70,6 +74,13 @@
   --fs-2xl: 1.625rem;
 
   --radius: 3px;
+  /* Second palier, pour les petites MARQUES plutôt que les surfaces :
+     étiquettes de carte, pastille parking, tag de catégorie, cases de
+     l'histogramme, poignée de la feuille mobile. Le rayon du dessus les
+     arrondissait trop pour leur taille. Existait déjà de fait — sept
+     border-radius: 2px écrits en dur — sans être déclaré nulle part, donc
+     sans rien pour empêcher un huitième de partir à 1 ou à 4. */
+  --radius-sm: 2px;
 
   /* Hauteur de l'en-tête. Était une constante 44px répétée en dur à quatre
      endroits (#map, les deux panneaux, la hauteur max de la feuille mobile),

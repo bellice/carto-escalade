@@ -36,7 +36,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--paper);
   font-family: var(--font-mono);
   font-weight: 700;
   font-size: 12px;
@@ -76,7 +76,7 @@
   color: var(--muted);
   background: rgba(251, 250, 246, 0.85);
   padding: 1px 5px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
 }
 
@@ -103,7 +103,7 @@
   color: var(--muted);
   background: rgba(251, 250, 246, 0.65);
   padding: 2px 5px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   /* Pas de nowrap : certains noms de secteur sont longs ("Champagne pour
      tout le monde") — laissé à la coupure naturelle plutôt qu'un seul chip
      très large. max-width fixe la largeur où ça coupe (indépendante de la
@@ -550,7 +550,7 @@
   padding: 4px 10px;
   border-radius: var(--radius);
   background: var(--clay-dark);
-  color: white;
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   white-space: nowrap;
@@ -683,6 +683,9 @@
 .legende-cercles::-webkit-scrollbar-track { background: transparent; }
 .legende-cercles::-webkit-scrollbar-thumb {
   background: var(--stone-dark);
+  /* Volontairement PAS var(--radius), qui vaut pourtant 3px aussi : ici c'est
+     la moitié des 6px de large du curseur, donc la valeur qui l'arrondit en
+     bâtonnet. Elle doit suivre la largeur ci-dessus, pas le rayon du site. */
   border-radius: 3px;
 }
 
@@ -846,9 +849,9 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   background: var(--teal);
-  color: #fff;
+  color: var(--paper);
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
   font-weight: 700;
@@ -908,6 +911,9 @@
 .legende-contenu::-webkit-scrollbar-track { background: transparent; }
 .legende-contenu::-webkit-scrollbar-thumb {
   background: var(--stone-dark);
+  /* Volontairement PAS var(--radius), qui vaut pourtant 3px aussi : ici c'est
+     la moitié des 6px de large du curseur, donc la valeur qui l'arrondit en
+     bâtonnet. Elle doit suivre la largeur ci-dessus, pas le rayon du site. */
   border-radius: 3px;
 }
 .legende-contenu > * { scroll-snap-align: start; }
@@ -1062,7 +1068,7 @@
 .btn-epuree[aria-pressed="true"] {
   background: var(--forest);
   border-color: var(--forest);
-  color: white;
+  color: var(--paper);
 }
 
 /* Même apparence que .btn-epuree (boîte, bordure, police) — toujours
@@ -1199,7 +1205,7 @@
 /* border-radius plus petit que .dot (50%) : garde le carré lisible à cette
    taille réduite, cohérent avec le vrai marqueur parking sur la carte (voir
    addMarker, marqueurs.js) — la légende doit montrer la même forme. */
-.dot.parking { background: var(--teal); border-radius: 2px; }
+.dot.parking { background: var(--teal); border-radius: var(--radius-sm); }
 .dot.gite {
   border-radius: 0;
   background: var(--ink);
@@ -1286,7 +1292,7 @@
   .btn-vue[aria-pressed="true"] {
     background: var(--forest);
     border-color: var(--forest);
-    color: white;
+    color: var(--paper);
   }
 
   /* Mode Filtres : #panneau-lateral devient le panneau plein écran, laissant
@@ -1473,9 +1479,9 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 2px 6px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   margin-bottom: 8px;
-  color: white;
+  color: var(--paper);
 }
 .cat-tag.falaise { background: var(--clay); }
 .cat-tag.parking { background: var(--teal); }
@@ -1659,7 +1665,7 @@
      garde ses 13px via la media query ci-dessous. */
   width: 12px;
   height: 12px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
 /* Couenne/grande voie : même forme (carré), couleur seule pour les
@@ -1705,7 +1711,7 @@
 .histo-swatch {
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   display: inline-block;
 }
 .histo-swatch.couenne { background: var(--couenne); }
@@ -1790,7 +1796,7 @@
 .btn-tri-voies.actif {
   background: var(--forest);
   border-color: var(--forest);
-  color: white;
+  color: var(--paper);
   cursor: default;
 }
 
@@ -2019,7 +2025,7 @@
   margin: 0 -4px;
   text-align: left;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 /* Affordance cliquable : le libellé "Parking n" ressemble à un lien
    (souligné, vert), le temps reste en gris muet ; au survol la ligne se
@@ -2053,7 +2059,7 @@
   padding: 8px 10px;
   border-radius: var(--radius);
   background: var(--forest);
-  color: white;
+  color: var(--paper);
   text-decoration: none;
 }
 
@@ -2104,10 +2110,10 @@
 .popup .gps-copie.copied {
   background: var(--forest);
   border-color: var(--forest);
-  color: white;
+  color: var(--paper);
 }
 .popup .gps-copie.copied .gps-label {
-  color: white;
+  color: var(--paper);
 }
 
 .popup .actions-secondaires {
@@ -2295,7 +2301,7 @@
     content: "";
     width: 36px;
     height: 4px;
-    border-radius: 2px;
+    border-radius: var(--radius-sm);
     background: var(--stone-dark);
   }
   .popup .poignee-texte {
@@ -2488,34 +2494,50 @@
   .label-site.survole {
     background: var(--stone-dark);
   }
-  .recherche-champ .btn-effacer:hover { background: var(--stone-dark); }
-  .recherche button:hover { background: var(--stone-dark); }
-  .recherche button:disabled:hover { background: var(--paper); }
-  .btn-tout-voir:hover { background: var(--stone-dark); }
-  .btn-reinitialiser-filtres:hover { background: var(--stone-dark); }
-  .btn-reinitialiser-filtres:disabled:hover { background: var(--paper); }
-  .btn-reessayer:hover { background: var(--stone); }
-  .btn-reessayer-voies:hover { background: var(--stone); }
-  .btn-preparer:hover { background: var(--stone); }
-  .btn-preparer:disabled:hover { background: var(--paper); }
-  .legende-toggle:hover { background: var(--stone-dark); }
-  .btn-vue:hover { background: var(--stone-dark); }
-  .btn-vue[aria-pressed="true"]:hover { background: var(--forest); }
-  .btn-epuree:hover { background: var(--stone-dark); }
-  /* Plus spécifique que la règle ci-dessus : survoler le bouton enclenché ne
-     doit pas effacer le "rempli" qui signale l'état actif (même logique que
-     .btn-preparer:disabled:hover juste au-dessus). */
-  .btn-epuree[aria-pressed="true"]:hover { background: var(--forest); }
-  .btn-voir-detail-voies:hover { background: var(--stone); }
-  .btn-retour-fiche:hover { background: var(--stone); }
+  /* LA famille bouton, en un seul bloc plutôt qu'une règle par classe.
+     L'ancienne forme (une ligne chacune) avait laissé s'installer DEUX fonds
+     de survol pour une seule et même recette visuelle : --stone-dark pour la
+     moitié des boutons, --stone pour l'autre, sans qu'aucune raison ne les
+     sépare. Groupées ici, deux valeurs différentes deviennent impossibles à
+     écrire sans le voir. --stone-dark l'emporte : sur un bouton posé sur
+     --paper, --stone ne se distinguait presque pas. */
+  .recherche-champ .btn-effacer:hover,
+  .recherche button:hover,
+  .btn-tout-voir:hover,
+  .btn-reinitialiser-filtres:hover,
+  .btn-reessayer:hover,
+  .btn-reessayer-voies:hover,
+  .btn-preparer:hover,
+  .btn-tri-voies:hover,
+  .legende-toggle:hover,
+  .btn-vue:hover,
+  .btn-epuree:hover,
+  .btn-voir-detail-voies:hover,
+  .btn-retour-fiche:hover,
+  .panneau-falaise-fermer:hover,
+  .popup .gps-copie:hover {
+    background: var(--stone-dark);
+  }
+  /* Désactivé : aucun retour, le bouton ne fera rien. Plus spécifique que le
+     bloc ci-dessus, donc l'emporte. */
+  .recherche button:disabled:hover,
+  .btn-reinitialiser-filtres:disabled:hover,
+  .btn-preparer:disabled:hover {
+    background: var(--paper);
+  }
+  /* Boutons ENCLENCHÉS : survoler ne doit pas effacer le rempli qui porte
+     l'état actif. .btn-tri-voies.actif est en plus non cliquable
+     (cursor: default) — le survol n'y annonce donc rien du tout. */
+  .btn-vue[aria-pressed="true"]:hover,
+  .btn-epuree[aria-pressed="true"]:hover,
+  .btn-tri-voies.actif:hover {
+    background: var(--forest);
+  }
   .popup .lien-secteur:hover { color: var(--clay); }
   .popup .parking-ligne:hover { background: rgba(0, 0, 0, 0.045); }
   .popup .parking-ligne:hover .parking-libelle { color: var(--clay); }
   .popup a.btn-primary:hover {
     background: var(--teal-dark);
-  }
-  .popup .gps-copie:hover {
-    background: var(--stone-dark);
   }
   .popup .actions-secondaires a:hover {
     color: var(--clay);
@@ -2526,9 +2548,48 @@
   .popup .btn-partager:hover {
     color: var(--clay);
   }
-  /* Bouton de fermeture du panneau desktop : vivait dans
-     @media (min-width: 641px). Rapatrié ici pour que la règle « aucun
-     :hover hors du garde tactile » n'ait aucune exception — l'élément est
-     de toute façon masqué sous 641px, le changement de portée est inerte. */
-  .panneau-falaise-fermer:hover { background: var(--stone); }
+}
+
+/* ===== Retour d'appui =====
+   HORS de @media (hover: hover), et c'est tout l'intérêt : le garde tactile
+   ci-dessus prive à raison les écrans tactiles du survol, mais rien n'avait
+   été mis à la place. Sur mobile, appuyer sur « Couenne » ne produisait
+   AUCUN accusé de réception tant que la carte n'avait pas fini de se
+   redessiner — l'interface paraissait morte au doigt alors qu'elle
+   travaillait. :active est la seule confirmation qu'un doigt peut recevoir,
+   et il sert aussi la souris (le clic maintenu répond).
+   Un cran plus loin que le survol dans le même sens : --stone-dark survole,
+   --stone-dark + 1px d'enfoncement appuie. Pas de transition : l'accusé de
+   réception doit être instantané, une durée le retarderait — c'est aussi
+   pourquoi prefers-reduced-motion n'a rien à retirer ici, le décalage est un
+   état, pas une animation.
+   Placé après le bloc de survol : à spécificité égale, l'appui l'emporte. */
+.recherche-champ .btn-effacer:active,
+.recherche button:not(:disabled):active,
+.btn-tout-voir:active,
+.btn-reinitialiser-filtres:not(:disabled):active,
+.btn-reessayer:active,
+.btn-reessayer-voies:active,
+.btn-preparer:not(:disabled):active,
+.btn-tri-voies:not(.actif):active,
+.legende-toggle:active,
+.btn-vue:not([aria-pressed="true"]):active,
+.btn-epuree:not([aria-pressed="true"]):active,
+.btn-voir-detail-voies:active,
+.btn-retour-fiche:active,
+.panneau-falaise-fermer:active,
+.popup .gps-copie:active {
+  background: var(--stone-dark);
+  transform: translateY(1px);
+}
+
+/* Boutons PLEINS : ils sont déjà à --forest, un fond clair les ferait
+   clignoter à l'envers. Ils s'enfoncent donc vers --forest-dark (voir
+   style.css). .btn-tri-voies.actif et .btn-vue[aria-pressed] enclenchés en
+   sont exclus plus haut : les appuyer ne déclenche rien, leur donner un
+   retour mentirait. .btn-epuree enclenché, lui, se désenclenche — il répond. */
+.btn-epuree[aria-pressed="true"]:active,
+.popup a.btn-primary:active {
+  background: var(--forest-dark);
+  transform: translateY(1px);
 }
