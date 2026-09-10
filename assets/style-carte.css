@@ -469,19 +469,46 @@
   cursor: not-allowed;
 }
 
-/* Vue d'ensemble — contrôle MapLibre (voir creerControleToutVoir dans
-   app.js), empilé automatiquement sous NavigationControl (top-right) par la
-   carte elle-même : seul le style visuel du bouton est à définir ici, sa
-   position/son espacement sont gérés par MapLibre. */
-.btn-tout-voir {
+/* ===== La recette « bouton à filet » =====
+   Sept classes la recopiaient à l'identique, sans classe de base : mono,
+   --fs-sm, filet --stone-dark, --radius, fond --paper. Le coût n'était pas
+   la duplication mais l'invisibilité des écarts — impossible, en lisant le
+   CSS, de dire si un « 6px 8px » était une décision ou une faute de frappe.
+   Deux fonds de survol différents pour cette même recette avaient d'ailleurs
+   fini par s'installer (corrigés, voir « États de survol » en fin de feuille).
+   Groupées ici, les déclarations communes sont écrites une fois ; ce qui reste
+   dans chaque bloc individuel est, par construction, un écart VOULU :
+     .btn-preparer / .btn-reessayer-voies → color: --forest
+     .btn-reessayer                        → filet --clay, --fs-base
+   La mise en page (padding, min-height, width, position) reste propre à
+   chaque bouton : elle dépend de l'endroit où il vit, pas de sa famille.
+   Placé AVANT tous les blocs concernés : à spécificité égale, c'est l'ordre
+   de source qui tranche, et l'écart doit gagner sur la recette.
+   .btn-tri-voies n'en fait pas partie : fond transparent, texte --forest et
+   font: inherit — c'est la grammaire « segment/bascule », pas celle-ci. */
+.btn-tout-voir,
+.btn-reessayer,
+.btn-reessayer-voies,
+.btn-preparer,
+.btn-epuree,
+.btn-reinitialiser-filtres,
+.btn-voir-detail-voies,
+.btn-retour-fiche {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  padding: 6px 8px;
   border: 1px solid var(--stone-dark);
   border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink);
   cursor: pointer;
+}
+
+/* Vue d'ensemble — contrôle MapLibre (voir creerControleToutVoir dans
+   app.js), empilé automatiquement sous NavigationControl (top-right) par la
+   carte elle-même : seul le style visuel du bouton est à définir ici, sa
+   position/son espacement sont gérés par MapLibre. */
+.btn-tout-voir {
+  padding: 4px 10px;
 }
 
 /* État de chargement / erreur (le temps que data.geojson arrive) */
@@ -517,12 +544,8 @@
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--clay);
-  border-radius: var(--radius);
-  background: var(--paper);
   color: var(--clay-dark);
-  font-family: var(--font-mono);
   font-size: var(--fs-base);
-  cursor: pointer;
 }
 
 /* Indicateur hors-ligne — non bloquant : il informe, il n'interrompt pas (le
@@ -572,13 +595,7 @@
 .btn-reessayer-voies {
   min-height: 44px;
   padding: 0 10px;
-  border: 1px solid var(--stone-dark);
-  border-radius: var(--radius);
-  background: var(--paper);
   color: var(--forest);
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  cursor: pointer;
 }
 
 /* « Préparer le hors-ligne » (voir hors-ligne.js) — dans l'en-tête, plus
@@ -597,14 +614,8 @@
 }
 .btn-preparer {
   padding: 4px 10px;
-  border: 1px solid var(--stone-dark);
-  border-radius: var(--radius);
-  background: var(--paper);
   color: var(--forest);
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
   white-space: nowrap;
-  cursor: pointer;
 }
 /* Préparation à jour : encre verte pleine, sans icône (règle du site) — le
    seul signal dont on a besoin est « c'est fait », le détail est dans
@@ -709,33 +720,40 @@
 }
 .legende-toggle {
   /* Bouton à libellé (pas un simple chevron 24x24, illisible) : le texte
-     "Masquer"/"Afficher" (mis à jour en JS selon aria-expanded) dit ce que
-     fait le bouton, le chevron reste pour l'affordance de repli. */
-  /* Trois corrections après essai sur mobile :
-     - 44px de haut (il en faisait 21) : règle appliquée partout ailleurs sur
-       le site, oubliée ici alors que ce bouton est le seul moyen de rouvrir
-       la légende une fois repliée.
-     - bordure --muted au lieu de --stone-dark : cette dernière ne fait que
-       1.36:1 sur --paper, sous le seuil de 3:1 exigé pour la limite d'un
-       contrôle (WCAG 1.4.11) — replié, le bouton flotte sur le fond de carte
-       et sa bordure y disparaissait.
-     - ombre portée : le détache du fond, quelle qu'en soit la densité. */
-  /* 44px seulement sur pointeur grossier : c'est une contrainte tactile
+     "Filtres"/"Filtres · N" dit ce que le bouton commande et combien de
+     filtres sont actifs ; le chevron porte l'état replié/déplié (rotation
+     CSS via aria-expanded, voir .legende-toggle-icone).
+     bordure --muted et non --stone-dark : cette dernière ne fait que 1.36:1
+     sur --paper, sous le seuil de 3:1 exigé pour la limite d'un contrôle
+     (WCAG 1.4.11).
+     44px seulement sur pointeur grossier : c'est une contrainte tactile
      (doigt), pas une règle universelle. À la souris le pointeur est précis,
-     et imposer 44px ne fait qu'alourdir un bouton de réglage secondaire. */
+     et imposer 44px ne fait qu'alourdir un réglage secondaire.
+
+     Pleine largeur, libellé à gauche et chevron rejeté à droite : en pastille
+     de 89px calée à gauche, ce bouton avait l'affordance d'un menu déroulant
+     alors qu'il déplie une section — et il se trouvait au MILIEU du panneau,
+     avec du contenu au-dessus et en dessous, sans qu'on puisse deviner lequel
+     des deux il commandait. Occupant la ligne entière juste au-dessus de ce
+     qu'il replie, il se lit pour ce qu'il est : l'en-tête de cette section.
+     Plus d'ombre portée : elle existait pour le détacher du fond de carte, du
+     temps où il flottait par-dessus. Il repose aujourd'hui sur le panneau
+     lui-même, y compris replié (vérifié : #panneau-lateral s'étend en dessous
+     dans les deux états) — l'ombre ne détachait plus que du papier sur du
+     papier. */
+  width: 100%;
   padding: 3px 10px;
   border: 1px solid var(--muted);
   border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 1px 3px rgba(35, 42, 35, 0.18);
   cursor: pointer;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  flex-shrink: 0;
 }
 @media (pointer: coarse) {
   .legende-toggle { min-height: 44px; padding: 4px 12px; }
@@ -1056,14 +1074,7 @@
    .btn-tri-voies.actif — même langage visuel partout sur le site. */
 .btn-epuree {
   flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
   padding: 4px 10px;
-  border: 1px solid var(--stone-dark);
-  border-radius: var(--radius);
-  background: var(--paper);
-  color: var(--ink);
-  cursor: pointer;
 }
 .btn-epuree[aria-pressed="true"] {
   background: var(--forest);
@@ -1079,14 +1090,7 @@
    "Voir" dans le champ de recherche (.recherche button:disabled). */
 .btn-reinitialiser-filtres {
   align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
   padding: 4px 10px;
-  border: 1px solid var(--stone-dark);
-  border-radius: var(--radius);
-  background: var(--paper);
-  color: var(--ink);
-  cursor: pointer;
 }
 .btn-reinitialiser-filtres:disabled {
   opacity: 0.4;
@@ -1750,13 +1754,6 @@
    décorrélée de la taille visuelle du bouton. */
 .btn-voir-detail-voies {
   min-height: 44px;
-  border: 1px solid var(--stone-dark);
-  border-radius: var(--radius);
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  cursor: pointer;
   display: block;
   width: 100%;
   margin-top: 8px;
@@ -1875,13 +1872,6 @@
   min-height: 44px;
   width: 100%;
   margin-top: 10px;
-  border: 1px solid var(--stone-dark);
-  border-radius: var(--radius);
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  cursor: pointer;
   box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08);
 }
 

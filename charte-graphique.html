@@ -201,11 +201,37 @@
 <table class="tailles">
   <thead><tr><th>Token</th><th>Valeur</th><th>Usage</th></tr></thead>
   <tbody>
-    <tr><td class="rem">--radius</td><td class="rem" id="val-radius"></td><td>Rayon de bordure standard (boutons, cartes, badges).</td></tr>
+    <tr><td class="rem">--radius</td><td class="rem" id="val-radius"></td><td>Rayon standard : boutons, champs, panneaux, lignes cliquables.</td></tr>
+    <tr><td class="rem">--radius-sm</td><td class="rem" id="val-radius-sm"></td><td>Petites marques : étiquettes de carte, pastille parking, tag de catégorie, cases d'histogramme, poignée de la feuille mobile.</td></tr>
     <tr><td class="rem">--largeur-panneau-gauche</td><td class="rem" id="val-largeur-gauche"></td><td>Largeur du panneau recherche + légende (desktop).</td></tr>
     <tr><td class="rem">--largeur-panneau-droit</td><td class="rem" id="val-largeur-droit"></td><td>Largeur du panneau fiche falaise (desktop).</td></tr>
   </tbody>
 </table>
+
+<h3>Espacements</h3>
+<p class="note">
+  Cette section portait « espacements » dans son titre sans en documenter un seul, et c'est
+  précisément pourquoi la règle ci-dessous n'a jamais été énoncée : elle est suivie dans le
+  CSS depuis toujours, mais nulle part écrite.
+</p>
+<p class="note">
+  <strong>Les espacements avancent par pas de 2&nbsp;px</strong>, sans jeton nommé — contrairement
+  à la typographie, aucune échelle abstraite n'a été posée ici, et il n'y a pas lieu d'en inventer
+  une : les valeurs employées (<code>2 4 6 8 10 12 14 16 20 24 28 32 40</code>) suivent déjà ce
+  rythme, et les tasser sur six paliers déplacerait plus de soixante-dix déclarations pour ne
+  gagner qu'un vocabulaire. Une interface aussi dense a besoin de ce grain fin :
+  <code>6&nbsp;px</code> et <code>10&nbsp;px</code> sont, à eux deux, les valeurs les plus
+  fréquentes du fichier.
+</p>
+<p class="note">
+  Les valeurs impaires sont donc des <em>exceptions</em>, et chacune doit se justifier là où elle
+  est écrite. Les quatre qui subsistent le font :
+  <code>1px 5px</code> et <code>2px 5px</code> serrent les étiquettes posées sur la carte, où
+  chaque pixel dispute de la place au fond ; <code>gap: 3px</code> sépare deux lignes de texte qui
+  doivent se lire comme un bloc ; <code>padding-right: 38px</code> vaut les 32&nbsp;px du bouton de
+  fermeture mobile plus 6 d'air, et le dit en commentaire. Une cinquième valeur impaire sans
+  raison écrite au-dessus d'elle est une dérive, pas un réglage.
+</p>
 
 <h2>4. Composants</h2>
 
@@ -351,6 +377,7 @@
   });
 
   document.getElementById('val-radius').textContent = cs.getPropertyValue('--radius').trim();
+  document.getElementById('val-radius-sm').textContent = cs.getPropertyValue('--radius-sm').trim();
   document.getElementById('val-largeur-gauche').textContent = cs.getPropertyValue('--largeur-panneau-gauche').trim();
   document.getElementById('val-largeur-droit').textContent = cs.getPropertyValue('--largeur-panneau-droit').trim();
 </script>
