@@ -375,6 +375,12 @@
   top: 54px;
   left: 12px;
   z-index: 10;
+  /* 260px, plus étroit que .legende-contenu (340px) juste en dessous : cette
+     ligne partage sa hauteur avec les contrôles de zoom de la carte (haut
+     droit), contrairement à la légende. Mesuré au test sur le plus petit
+     viewport visé (320px) : au-delà de 260px, "Voir" chevauche déjà le
+     bouton "+" de 27px. La légende n'a pas cette contrainte, rien à sa
+     droite à cette hauteur-là. */
   width: min(260px, calc(100vw - 24px));
   display: flex;
   gap: 6px;
@@ -784,8 +790,12 @@
      voir..."). Repéré au test : le panneau entier changeait de largeur en
      zoomant. width fige la légende à sa largeur par défaut, quel que soit
      son contenu du moment. */
-  width: min(280px, calc(100vw - 24px));
-  max-width: min(280px, calc(100vw - 24px));
+  /* 340px (280 avant) : mesuré au test, les 4 cases d'Ensoleillement
+     passaient de 3 lignes à 2 à cette largeur (plus haut n'apporte plus
+     rien : la ligne de recherche juste au-dessus chevauche alors les
+     contrôles de zoom de la carte, voir .recherche). */
+  width: min(340px, calc(100vw - 24px));
+  max-width: min(340px, calc(100vw - 24px));
   /* 500px (pas 360 comme avant "Filtres avancés") : sur les deux hauteurs de
      mobile testées (844 et 568), 100vh-160 dépasse déjà 360px, donc c'est
      le 360 fixe qui tranchait, pas la hauteur de l'écran — repéré au test :
@@ -2210,8 +2220,10 @@
     font-size: 16px;
   }
   /* Un <select> se dimensionne sur son option la plus longue : passer la
-     police à 16px l'a fait gonfler à 297px dans une colonne de 280px, d'où
-     une barre de défilement horizontale sur toute la légende. width:100% +
+     police à 16px l'a fait gonfler à 297px (constaté dans une colonne de
+     280px, avant son élargissement à 340 -- le select grandit pareil quelle
+     que soit la largeur de la colonne, seul le risque de dépassement change),
+     d'où une barre de défilement horizontale sur toute la légende. width:100% +
      min-width:0 (indispensable dans un conteneur flex, où la largeur
      minimale vaut auto par défaut et empêche tout rétrécissement) le
      ramènent dans son cadre. */
