@@ -132,6 +132,7 @@ export function initCarte(dataUrl) {
   const legendeTemps = document.getElementById('legende-temps');
   const legendeEnsoleillement = document.getElementById('legende-ensoleillement');
   const legendeFiltresAvances = document.getElementById('legende-filtres-avances');
+  const btnReinitialiserFiltres = document.getElementById('reinitialiser-filtres');
   // Posé par configurerFiltreEnsoleillement une fois les données connues —
   // sert à rafraichirNoteEnsoleillement (avertir qu'un filtre actif masque
   // aussi les falaises sans orientation connue, pas seulement celles qui ne
@@ -159,6 +160,7 @@ export function initCarte(dataUrl) {
     if (filtreTempsValeur && Number.isFinite(filtres.tempsGitePlafond)) {
       filtreTempsValeur.textContent = `≤ ${filtres.tempsGitePlafond} min`;
     }
+    rafraichirBoutonReinitialiserFiltres();
   }
 
   // Remet le filtre "Ensoleillement" à "Peu importe" — même usage que
@@ -169,6 +171,33 @@ export function initCarte(dataUrl) {
     if (!legendeEnsoleillement) return;
     legendeEnsoleillement.querySelectorAll('input[data-ensoleillement]').forEach((case_) => {
       case_.checked = false;
+    });
+    rafraichirBoutonReinitialiserFiltres();
+  }
+
+  // Grise "Réinitialiser" (jamais hidden : voir style-carte.css) tant
+  // qu'Ensoleillement et Depuis le gîte sont tous deux à leur état neutre —
+  // rien à réinitialiser. Appelé après chaque changement des deux filtres,
+  // et par reinitialiserFiltreTemps/reinitialiserFiltreEnsoleillement
+  // elles-mêmes (appelées aussi par "Tout voir" et allerVers) pour que le
+  // bouton se regrise avec eux.
+  function rafraichirBoutonReinitialiserFiltres() {
+    if (!btnReinitialiserFiltres) return;
+    const actif = filtres.ensoleillement.length > 0 || filtres.tempsMaxGite < filtres.tempsGitePlafond;
+    btnReinitialiserFiltres.disabled = !actif;
+  }
+
+  // Un seul bouton pour les deux filtres du repli "Filtres avancés" : plus
+  // rapide que décocher chaque case puis rendre le curseur à son plafond à
+  // la main. Portée volontairement limitée à ces deux filtres (pas la
+  // recherche ni le mode "Cercles") — "Tout voir" couvre déjà la remise à
+  // zéro complète, caméra comprise.
+  function configurerReinitialisationFiltres() {
+    if (!btnReinitialiserFiltres) return;
+    btnReinitialiserFiltres.addEventListener('click', () => {
+      reinitialiserFiltreTemps();
+      reinitialiserFiltreEnsoleillement();
+      appliquerFiltresEtSecteurs();
     });
   }
   let borneGlobale = null; // étendue de tous les marqueurs, pour le bouton "Tout voir"
@@ -726,6 +755,7 @@ export function initCarte(dataUrl) {
         ajusterLegendeAuxDonnees(geojson);
         configurerFiltreTemps(tempsDepuisGite);
         configurerFiltreEnsoleillement();
+        configurerReinitialisationFiltres();
         // Le repli lui-même reste hidden (voir HTML) tant qu'aucun des deux
         // filtres qu'il contient n'a de données exploitables — sinon "Filtres
         // avancés" s'ouvrirait sur un tiroir vide.
@@ -1039,6 +1069,7 @@ export function initCarte(dataUrl) {
     filtreTemps.addEventListener('input', () => {
       filtres.tempsMaxGite = Number(filtreTemps.value);
       filtreTempsValeur.textContent = `≤ ${filtreTemps.value} min`;
+      rafraichirBoutonReinitialiserFiltres();
       appliquerFiltresEtSecteurs();
     });
   }
@@ -1072,6 +1103,7 @@ export function initCarte(dataUrl) {
         filtres.ensoleillement = Array.from(cases)
           .filter((c) => c.checked)
           .map((c) => c.dataset.ensoleillement);
+        rafraichirBoutonReinitialiserFiltres();
         appliquerFiltresEtSecteurs();
       });
     });

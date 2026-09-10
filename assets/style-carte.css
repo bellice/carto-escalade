@@ -786,9 +786,39 @@
      son contenu du moment. */
   width: min(280px, calc(100vw - 24px));
   max-width: min(280px, calc(100vw - 24px));
-  max-height: min(360px, calc(100vh - 160px));
+  /* 500px (pas 360 comme avant "Filtres avancés") : sur les deux hauteurs de
+     mobile testées (844 et 568), 100vh-160 dépasse déjà 360px, donc c'est
+     le 360 fixe qui tranchait, pas la hauteur de l'écran — repéré au test :
+     "Non" (dernière case) rendu à moitié, sous la coupure. Tout ouvert
+     (Ensoleillement + Depuis le gîte + leur note), le contenu mesure 463px ;
+     500 laisse de la marge sans jamais s'approcher de la barre de recherche
+     (54-93px en haut, donc large place au-dessus d'une légende ancrée en
+     bas). Le terme en 100vh reste : sur un écran vraiment petit, il reprend
+     la main et le scroll redevient nécessaire — inévitable si le contenu
+     dépasse l'écran, pas une régression. */
+  max-height: min(500px, calc(100vh - 160px));
   overflow-y: auto;
+  /* Ancrage sur chaque bloc direct (.legende-cats, .legende-figure,
+     .legende-falaises...) plutôt qu'un scroll libre : sur un écran où le
+     contenu dépasse malgré tout (cf. ci-dessus), le scroll s'arrête entre
+     deux blocs plutôt qu'en plein milieu de l'un d'eux. "proximity" et non
+     "mandatory" : un petit geste reste libre, seul un geste qui s'arrête
+     déjà près d'un ancrage s'y aligne. */
+  scroll-snap-type: y proximity;
+  /* Barre fine et sobre plutôt que la barre système, épaisse par défaut sur
+     certains navigateurs mobiles — cohérente avec le reste de la légende
+     (mêmes couleurs que le contour de ses boutons). Firefox (scrollbar-*) et
+     WebKit/Chromium (::-webkit-scrollbar*) n'ont pas d'API commune. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--stone-dark) transparent;
 }
+.legende-contenu::-webkit-scrollbar { width: 6px; }
+.legende-contenu::-webkit-scrollbar-track { background: transparent; }
+.legende-contenu::-webkit-scrollbar-thumb {
+  background: var(--stone-dark);
+  border-radius: 3px;
+}
+.legende-contenu > * { scroll-snap-align: start; }
 .legende-contenu[hidden] { display: none; }
 
 .legende-cats {
@@ -923,6 +953,28 @@
   background: var(--forest);
   border-color: var(--forest);
   color: white;
+}
+
+/* Même apparence que .btn-epuree (boîte, bordure, police) — toujours
+   présent, jamais hidden : un bouton qui apparaît/disparaît au fil des
+   coches aurait décalé tout ce qui suit (les cases, le curseur) à chaque
+   clic. Se grise à la place quand Ensoleillement et Depuis le gîte sont
+   tous deux à leur état neutre — rien à réinitialiser — même convention que
+   "Voir" dans le champ de recherche (.recherche button:disabled). */
+.btn-reinitialiser-filtres {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  padding: 4px 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn-reinitialiser-filtres:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Repli commun à "Ensoleillement" et "Depuis le gîte" : <details> natif,
@@ -2204,6 +2256,8 @@
   .recherche button:hover { background: var(--stone-dark); }
   .recherche button:disabled:hover { background: var(--paper); }
   .btn-tout-voir:hover { background: var(--stone-dark); }
+  .btn-reinitialiser-filtres:hover { background: var(--stone-dark); }
+  .btn-reinitialiser-filtres:disabled:hover { background: var(--paper); }
   .btn-reessayer:hover { background: var(--stone); }
   .btn-reessayer-voies:hover { background: var(--stone); }
   .btn-preparer:hover { background: var(--stone); }
