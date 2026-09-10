@@ -67,10 +67,6 @@ function calculerRayon(valeur, max) {
 function remplissagePourMode(mode) {
   if (mode === 'couenne') return 'var(--couenne)';
   if (mode === 'gv') return 'var(--gv)';
-  // Mode fourchette : même vert que l'ancien mode « voies faciles » qu'il
-  // remplace — la grandeur reste « des voies à ma portée », seule la borne
-  // change (réglable au lieu de figée à 6a+).
-  if (mode === 'cotation') return 'var(--cotation)';
   return 'var(--clay)';
 }
 
@@ -79,28 +75,26 @@ export function infosLegendePourMode(mode, maxima) {
   const remplissage = remplissagePourMode(mode);
   if (mode === 'couenne') return { max: maxima.couenne, median: maxima.couenneMedian, remplissage };
   if (mode === 'gv') return { max: maxima.gv, median: maxima.gvMedian, remplissage };
-  if (mode === 'cotation') return { max: maxima.fourchette, median: maxima.fourchetteMedian, remplissage };
   return { max: maxima.total, median: maxima.totalMedian, remplissage };
 }
 
-// Redessine une falaise selon le mode choisi dans le sélecteur "Cercles".
+// Redessine une falaise selon le mode "Type de voie" choisi.
 // La taille encode toujours UNE seule grandeur quantitative à la fois (cf.
 // sémiologie graphique) — laquelle dépend du mode : nombre de voies total,
-// ou nombre en couenne / grande voie / dans la fourchette de cotation seul,
-// quand on veut comparer spécifiquement une sous-catégorie entre falaises
-// (comptage brut, pas une proportion — plus lisible et plus actionnable pour
-// la logistique qu'une "part", qui masquait la taille réelle du secteur). Le
-// remplissage suit la même logique : uni / teinte dédiée par sous-catégorie
-// / teinte répartie (grande voie-couenne, catégorielle donc couleur, pas
+// ou nombre en couenne / grande voie seul, quand on veut comparer
+// spécifiquement une sous-catégorie entre falaises (comptage brut, pas une
+// proportion — plus lisible et plus actionnable pour la logistique qu'une
+// "part", qui masquait la taille réelle du secteur). La fourchette de
+// cotation est un filtre indépendant (carte.js), pas un mode de taille : elle
+// n'entre pas ici. Le remplissage suit la même logique : uni / teinte dédiée
+// par sous-catégorie (grande voie-couenne, catégorielle donc couleur, pas
 // taille).
-// Grandeur encodée par la taille selon le mode "Cercles" courant — factorisé
-// ici car carte.js en a aussi besoin (construireSourceFalaises, tri par
-// valeur décroissante dans la source), sans dupliquer ce mapping mode ->
-// propriété.
+// Grandeur encodée par la taille selon le mode courant — factorisé ici car
+// carte.js en a aussi besoin (construireSourceFalaises, tri par valeur
+// décroissante dans la source), sans dupliquer ce mapping mode -> propriété.
 function valeurPourMode(entree, mode) {
   return mode === 'couenne' ? entree.nbCouenne
     : mode === 'gv' ? entree.nbGrandeVoie
-    : mode === 'cotation' ? entree.nbDansFourchette
     : entree.nbVoies;
 }
 
@@ -126,6 +120,8 @@ export function couleurFalaisePourMode(mode) {
 //  - valeur : pour l'ordre de dessin et la légende
 //  - recherche : texte bas-de-casse pour le filtre de recherche
 //  - tempsGite : null si inconnu (filtre "Depuis le gîte")
+//  - ensoleillement / nbDansFourchette : lus par les filtres du même nom
+//    (map.setFilter dans carte.js), pas par ce fichier
 // Triées par valeur DÉCROISSANTE : le plus petit est peint en dernier (dessus),
 // même règle que l'ancien réordonnancement DOM des cercles.
 // "epuree" (bouton "Épurer") : force un rayon constant sans toucher au
@@ -147,9 +143,13 @@ export function construireSourceFalaises(entries, mode, maxima, epuree) {
         r: epuree ? RAYON_MIN : calculerRayon(valeur, maxima.total),
         recherche: entree.recherche,
         tempsGite: entree.tempsGite ?? null,
-        // Lu par le filtre "Ensoleillement" (map.setFilter dans carte.js),
-        // pas par ce fichier : ce mode ne touche ni taille ni couleur.
+        // Lus par les filtres "Ensoleillement" et "Cotation des voies"
+        // (map.setFilter dans carte.js), pas par ce fichier : ni l'un ni
+        // l'autre ne touche la taille ou la couleur des cercles.
+        // nbDansFourchette est recalculé par majFourchette (carte.js) à chaque
+        // changement de bornes ; la source est reconstruite dans la foulée.
         ensoleillement: entree.ensoleillement,
+        nbDansFourchette: entree.nbDansFourchette ?? 0,
       },
       geometry: { type: 'Point', coordinates: [entree.lon, entree.lat] },
     });

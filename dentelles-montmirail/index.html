@@ -157,21 +157,21 @@
              par appliquerFiltres, aucun nouveau calcul (carte.js). -->
         <p class="legende-resultat" id="legende-resultat" aria-live="polite"></p>
         <!-- Deux questions distinctes, pas un seul choix à 4 options comme
-             avant (voir l'historique git) : le TYPE de voie compté par la
+             avant (voir l'historique git) : le type de voie compté par la
              taille des cercles (.legende-figure dans .legende-cercles,
              toujours visible côté Carte, en montre le titre fixe et le
-             résultat), et la COTATION à laquelle on s'intéresse. Vivent ici
+             résultat), et la cotation à laquelle on s'intéresse. Vivent ici
              et non côté Carte : question de réglage, pas de lecture de la
              carte — comme Ensoleillement/Depuis le gîte juste en dessous.
              Boutons à choix unique (même grammaire que .btn-tri-voies
              ailleurs sur le site), pas un select : "Toutes les voies" reste
              un 3e choix à part entière plutôt qu'un état "aucune case
-             cochée" ambigu. Mutuellement exclusif avec "Cotation des voies"
-             juste en dessous (voir definirModeFigure, carte.js) : une
-             falaise n'a qu'une SEULE grandeur affichée par la taille de son
-             cercle à la fois (voir le commentaire d'en-tête de symboles.js
-             sur pourquoi type et cotation ne se combinent pas en un seul
-             figuré). -->
+             cochée" ambigu. Se combine avec "Cotation des voies" juste en
+             dessous, un filtre indépendant (voir appliquerFiltreCotation,
+             carte.js) : choisir "Couenne" et resserrer la fourchette agit
+             sur les deux critères à la fois. Seule la taille du cercle
+             n'encode qu'une grandeur à la fois, celle du type ; la cotation
+             n'y touche pas et s'y ajoute sans conflit (en-tête symboles.js). -->
         <div class="legende-figure">
           <span class="legende-figure-label">Type de voie</span>
           <button type="button" class="btn-tri-voies actif" data-mode="aucun" aria-pressed="true">Toutes les voies</button>
@@ -191,9 +191,9 @@
             <select id="cotation-max"></select>
           </div>
         </div>
-        <!-- Filtre indépendant du mode "Cercles", pas une option de
-             #mode-figure : il n'agit ni sur la taille ni sur la couleur des
-             cercles, seulement sur qui reste affiché.
+        <!-- Filtre indépendant du mode "Type de voie", au même titre que la
+             fourchette de cotation : il n'agit ni sur la taille ni sur la
+             couleur des cercles, seulement sur qui reste affiché.
              Cases à cocher, pas des boutons-bascule façon .btn-tri-voies/
              .btn-epuree : ceux-ci signifient déjà "un seul choix à la fois"
              ailleurs sur ce site (tri Cotation/Position, vue Épurée) — les
@@ -228,13 +228,13 @@
           </div>
           <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
         </div>
-        <!-- Efface Ensoleillement + Depuis le gîte d'un coup (voir
-             configurerReinitialisationFiltres, carte.js) — après les deux,
-             pas avant : sa portée se lit par adjacence, pas par un titre.
-             Ni "Type de voie" ni "Cotation des voies" : leur propre remise à
-             "Toutes les voies"/pleine échelle se fait par leurs contrôles
-             respectifs. hidden par défaut (voir carte.js) tant qu'aucun des
-             deux filtres qu'il efface n'a de données exploitables. -->
+        <!-- Efface d'un coup les quatre filtres qui masquent des falaises —
+             Type de voie, Cotation des voies, Ensoleillement, Depuis le gîte
+             (voir configurerReinitialisationFiltres, carte.js). Placé après
+             eux, pas avant : sa portée se lit par adjacence, pas par un
+             titre. Affiché en permanence (carte.js le montre au chargement),
+             seulement grisé tant que rien n'est actif : pas de saut du DOM à
+             la première sélection. -->
         <button type="button" class="btn-reinitialiser-filtres" id="reinitialiser-filtres" hidden disabled>Réinitialiser</button>
       </div>
     </div>

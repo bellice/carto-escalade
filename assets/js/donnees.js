@@ -123,22 +123,6 @@ export function calculerMaxima(geojson) {
   };
 }
 
-// Maxima du mode fourchette. À part de calculerMaxima : celui-ci ne dépend
-// que du GeoJSON et se calcule une fois au chargement, alors que ceux-ci
-// changent à chaque déplacement des bornes. Ne compte QUE les falaises ayant
-// au moins une voie dans la fourchette : inclure les zéros écraserait la
-// médiane et rendrait les cercles de référence inutilisables dès qu'une
-// fourchette étroite ne concerne qu'une poignée de falaises.
-export function maximaFourchette(entries) {
-  const valeurs = entries
-    .filter(e => e.cat === 'falaise' && e.nbDansFourchette > 0)
-    .map(e => e.nbDansFourchette);
-  return {
-    fourchette: Math.max(0, ...valeurs),
-    fourchetteMedian: mediane(valeurs),
-  };
-}
-
 function mediane(valeurs) {
   const tri = [...valeurs].sort((a, b) => a - b);
   const n = tri.length;
@@ -237,11 +221,6 @@ export function compterDansFourchette(cotations, min, max) {
 export function estFalaiseVideDansMode(entree, mode) {
   if (mode === 'couenne') return !entree.nbCouenne;
   if (mode === 'gv') return !entree.nbGrandeVoie;
-  // nbDansFourchette est recalculé à chaque changement de fourchette (voir
-  // majFourchette, carte.js) plutôt qu'ici : le calcul dépend de bornes que
-  // cette fonction ne connaît pas, et le refaire pour chaque falaise à chaque
-  // rendu serait du gaspillage.
-  if (mode === 'cotation') return !entree.nbDansFourchette;
   return false;
 }
 

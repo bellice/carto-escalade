@@ -7,7 +7,7 @@ import { escapeHtml } from './utils.js';
 import {
   indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite, indexerSources,
   estFalaiseVideDansMode, libelleFalaise,
-  compterDansFourchette, maximaFourchette, valeurCotationApprochee,
+  compterDansFourchette, valeurCotationApprochee,
   cotationVersValeur, approximerCotation,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
@@ -114,10 +114,23 @@ export function initCarte(dataUrl) {
   // distinguer sans deviner : qui veut le premier coche Journée EN PLUS,
   // qui veut le second ne coche que son bouton. Voir
   // configurerFiltreEnsoleillement.
-  const filtres = { recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity, ensoleillement: [] };
-  let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
+  const filtres = {
+    recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity, ensoleillement: [],
+    // Fourchette de cotation : filtre à part entière, au même titre
+    // qu'Ensoleillement ou "Depuis le gîte" — il n'agit ni sur la taille ni
+    // sur la couleur des cercles, seulement sur qui reste affiché, et se
+    // combine avec "Type de voie" (ce n'est pas un mode de definirModeFigure).
+    // min/max : bornes choisies ; plancher/plafond : amplitude réelle des
+    // cotations de cette sortie (posés par preparerFourchette). Inactif tant
+    // que les deux bornes sont à leurs extrêmes — même logique que le curseur
+    // du gîte au plafond. Voir filtreCotationActif / appliquerFiltreCotation.
+    cotationMin: -Infinity, cotationMax: Infinity,
+    cotationPlancher: -Infinity, cotationPlafond: Infinity,
+  };
+  let modeFigureActuel = 'aucun'; // mode courant de "Type de voie" (aucun/couenne/gv) — voir appliquerFiltres()
   // Bouton "Épurer" : indépendant de modeFigureActuel (voir construireSourceFalaises)
-  // — un filtre couenne/gv/cotation actif le reste une fois la vue épurée.
+  // — un filtre "Type de voie" ou "Cotation des voies" actif le reste une
+  // fois la vue épurée.
   let epureeActuelle = false;
   let falaiseSelectionneeCle = null; // falaise dont la popup est ouverte (ou origine/cible d'une navigation) — voir appliquerFiltres()
 
@@ -176,25 +189,53 @@ export function initCarte(dataUrl) {
     rafraichirBoutonReinitialiserFiltres();
   }
 
-  // Grise "Réinitialiser" (jamais hidden : voir style-carte.css) tant
-  // qu'aucun des trois filtres qu'il traite n'est actif — rien à
-  // réinitialiser. "Type de voie"/"Cotation des voies" comptent : eux aussi
-  // masquent des falaises derrière (estFalaiseVideDansMode, donnees.js), pas
-  // seulement une histoire de taille de cercle — même si couenne/gv/cotation
-  // sont mutuellement exclusifs entre eux (un seul actif à la fois, voir
-  // definirModeFigure), donc valent au plus 1 dans ce compte, jamais 2.
+  // Fourchette de cotation resserrée par rapport à l'amplitude réelle des
+  // données : au moins une borne a quitté son extrême, donc le filtre exclut
+  // des falaises. Sortie sans cotation exploitable (preparerFourchette a
+  // retiré la section) : plancher/plafond restent à ±Infinity, toujours faux.
+  function filtreCotationActif() {
+    return filtres.cotationMin > filtres.cotationPlancher
+      || filtres.cotationMax < filtres.cotationPlafond;
+  }
+
+  // Remet la fourchette de cotation à l'amplitude complète (= aucune falaise
+  // exclue) — même usage que reinitialiserFiltreTemps : "Tout voir",
+  // "Réinitialiser", et allerVers quand la cible serait masquée par la
+  // fourchette courante. No-op si cette sortie n'a pas de cotation.
+  function reinitialiserFiltreCotation() {
+    if (!Number.isFinite(filtres.cotationPlancher)) return;
+    const selMin = document.getElementById('cotation-min');
+    const selMax = document.getElementById('cotation-max');
+    if (selMin && selMin.options.length) selMin.selectedIndex = 0;
+    if (selMax && selMax.options.length) selMax.selectedIndex = selMax.options.length - 1;
+    // majFourchette resynchronise filtres.cotationMin/Max sur les <select>
+    // qu'on vient de remettre à leurs extrêmes et recalcule nbDansFourchette.
+    majFourchette();
+    const source = map.getSource('falaises');
+    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle));
+    rafraichirBoutonReinitialiserFiltres();
+  }
+
+  // Grise "Réinitialiser" (jamais re-caché après le chargement : voir
+  // chargerDonnees) tant qu'aucun des filtres qu'il traite n'est actif — rien
+  // à réinitialiser. "Type de voie" et "Cotation des voies" comptent : eux
+  // aussi masquent des falaises derrière (estFalaiseVideDansMode et
+  // compterDansFourchette, donnees.js), pas seulement une histoire de taille
+  // de cercle. Ils sont désormais indépendants l'un de l'autre (combinables),
+  // donc valent chacun 1 : un "Couenne" + une fourchette resserrée comptent 2.
   // Recherche exclue : "Tout voir" la traite déjà séparément, et elle ne
   // "reste" jamais active de la même façon (elle se vide au moindre clic
-  // ailleurs). Appelé après chaque changement d'un des trois filtres —
+  // ailleurs). Appelé après chaque changement d'un de ces filtres —
   // reinitialiserFiltreTemps/reinitialiserFiltreEnsoleillement/
-  // definirModeFigure (elles-mêmes appelées aussi par "Tout voir" et
-  // allerVers) — pour que le bouton se regrise avec eux. Même décompte
-  // affiché sur le bouton "Filtres" — bascule mobile ET repli desktop (voir
-  // son texte, .legende-toggle-texte).
+  // reinitialiserFiltreCotation/definirModeFigure/appliquerFiltreCotation
+  // (elles-mêmes appelées aussi par "Tout voir" et allerVers) — pour que le
+  // bouton se regrise avec eux. Même décompte affiché sur le bouton "Filtres"
+  // — bascule mobile ET repli desktop (voir son texte, .legende-toggle-texte).
   function rafraichirBoutonReinitialiserFiltres() {
     const nActifs = (filtres.ensoleillement.length > 0 ? 1 : 0)
       + (filtres.tempsMaxGite < filtres.tempsGitePlafond ? 1 : 0)
-      + (modeFigureActuel !== 'aucun' ? 1 : 0);
+      + (modeFigureActuel !== 'aucun' ? 1 : 0)
+      + (filtreCotationActif() ? 1 : 0);
     if (btnReinitialiserFiltres) btnReinitialiserFiltres.disabled = nActifs === 0;
     const libelle = nActifs > 0 ? `Filtres · ${nActifs}` : 'Filtres';
     if (btnVueFiltres) btnVueFiltres.textContent = libelle;
@@ -203,16 +244,17 @@ export function initCarte(dataUrl) {
   }
 
   // Un seul bouton pour tout ce qui masque une falaise (Ensoleillement,
-  // Depuis le gîte, ET Type de voie/Cotation depuis que ceux-ci comptent
-  // aussi dans rafraichirBoutonReinitialiserFiltres — choisir "Couenne" ou
+  // Depuis le gîte, Type de voie ET Cotation des voies — choisir "Couenne" ou
   // resserrer une fourchette filtre tout autant que cocher "Matin", voir
-  // estFalaiseVideDansMode dans donnees.js) : plus rapide que défaire chaque
-  // réglage un par un. Recherche exclue : "Tout voir" la traite séparément.
+  // estFalaiseVideDansMode et compterDansFourchette dans donnees.js) : plus
+  // rapide que défaire chaque réglage un par un. Recherche exclue : "Tout
+  // voir" la traite séparément.
   function configurerReinitialisationFiltres() {
     if (!btnReinitialiserFiltres) return;
     btnReinitialiserFiltres.addEventListener('click', () => {
       reinitialiserFiltreTemps();
       reinitialiserFiltreEnsoleillement();
+      reinitialiserFiltreCotation();
       definirModeFigure('aucun');
       appliquerFiltresEtSecteurs();
     });
@@ -614,10 +656,13 @@ export function initCarte(dataUrl) {
     return ['step', ['zoom'], COULEUR_ELOIGNE, ZOOM_SIMPLIFICATION, couleur];
   }
 
-  // Change le mode "Cercles" et redessine tout ce qui en dépend — utilisé
-  // par le sélecteur lui-même ET par allerVers (voir plus bas) : naviguer
-  // vers une falaise doit garantir qu'elle reste visible, quitte à sortir
-  // d'un thème qui l'aurait masquée (voir estFalaiseVideDansMode).
+  // Change le mode "Type de voie" (aucun/couenne/gv — la grandeur encodée par
+  // la taille des cercles) et redessine tout ce qui en dépend — utilisé par
+  // les boutons eux-mêmes et par allerVers (voir plus bas) : naviguer vers
+  // une falaise doit garantir qu'elle reste visible, quitte à sortir d'un
+  // thème qui l'aurait masquée (voir estFalaiseVideDansMode). "Cotation des
+  // voies" ne passe pas par ici : c'est un filtre indépendant qui se combine
+  // avec ce mode (voir appliquerFiltreCotation).
   function definirModeFigure(nouveauMode) {
     modeFigureActuel = nouveauMode;
     boutonsTypeVoie.forEach((b) => {
@@ -625,18 +670,6 @@ export function initCarte(dataUrl) {
       b.classList.toggle('actif', actif);
       b.setAttribute('aria-pressed', String(actif));
     });
-    // Cotation redevient neutre (bornes remises au complet) dès qu'un autre
-    // mode est choisi : sinon une fourchette resserrée resterait affichée
-    // sans plus rien piloter, comme si elle filtrait encore — même principe
-    // que "Depuis le gîte" au repos (curseur au plafond = aucune falaise
-    // exclue). "Cotation des voies" reste toujours visible (voir le HTML) :
-    // contrairement à l'ancien select, plus rien ne la masque, c'est cette
-    // remise à plat qui dit "inactive" plutôt qu'un hidden.
-    if (nouveauMode !== 'cotation' && selectCotationMin && selectCotationMax && selectCotationMin.options.length) {
-      selectCotationMin.selectedIndex = 0;
-      selectCotationMax.selectedIndex = selectCotationMax.options.length - 1;
-    }
-    if (nouveauMode === 'cotation') majFourchette();
     // Couche native : remplace les features (un mode en exclut certaines,
     // voir construireSourceFalaises) et la couleur du thème. setData
     // remplace l'ancien dessinerFalaise + trierCerclesParTaille : le tri par
@@ -675,21 +708,30 @@ export function initCarte(dataUrl) {
     const origine = origineCle ? index.get(origineCle) : null;
 
     // Naviguer vers une falaise garantit qu'elle reste visible : si le mode
-    // "Cercles" actif la masquerait (aucune donnée pour ce thème — voir
-    // estFalaiseVideDansMode), on repasse sur "Voies" plutôt que de laisser
-    // une popup s'ouvrir sans aucun figuré en dessous. Même vérification
-    // pour l'origine d'un lien croisé (cas plus rare, mais même risque).
-    // Même logique pour le filtre "Depuis le gîte" : une falaise au-delà du
-    // seuil actuel ne doit pas non plus rester masquée quand on navigue
-    // explicitement vers elle.
+    // "Type de voie" actif la masquerait (aucune donnée pour ce thème — voir
+    // estFalaiseVideDansMode), on repasse sur "Toutes les voies" plutôt que
+    // de laisser une popup s'ouvrir sans aucun figuré en dessous. Même
+    // vérification pour l'origine d'un lien croisé (cas plus rare, mais même
+    // risque). Même logique pour "Depuis le gîte" (falaise au-delà du seuil),
+    // l'ensoleillement, et la fourchette de cotation (aucune voie dans les
+    // bornes choisies) : chacun peut masquer la cible d'une navigation
+    // explicite, chacun est levé si c'est le cas.
     const tempsGiteEmpecheVisibilite = (entree) => entree.tempsGite != null && entree.tempsGite > filtres.tempsMaxGite;
     const ensoleillementEmpecheVisibilite = (entree) => filtres.ensoleillement.length && !filtres.ensoleillement.includes(entree.ensoleillement);
-    const cibleSeraitMasquee = cible.cat === 'falaise' && (estFalaiseVideDansMode(cible, modeFigureActuel) || tempsGiteEmpecheVisibilite(cible) || ensoleillementEmpecheVisibilite(cible));
-    const origineSeraitMasquee = origine && origine.cat === 'falaise' && (estFalaiseVideDansMode(origine, modeFigureActuel) || tempsGiteEmpecheVisibilite(origine) || ensoleillementEmpecheVisibilite(origine));
+    const cotationEmpecheVisibilite = (entree) => filtreCotationActif()
+      && !compterDansFourchette(entree.cotations, filtres.cotationMin, filtres.cotationMax);
+    const seraitMasquee = (entree) => entree && entree.cat === 'falaise' && (
+      estFalaiseVideDansMode(entree, modeFigureActuel)
+      || tempsGiteEmpecheVisibilite(entree)
+      || ensoleillementEmpecheVisibilite(entree)
+      || cotationEmpecheVisibilite(entree));
+    const cibleSeraitMasquee = seraitMasquee(cible);
+    const origineSeraitMasquee = seraitMasquee(origine);
     if (cibleSeraitMasquee || origineSeraitMasquee) {
       definirModeFigure('aucun');
       reinitialiserFiltreTemps();
       reinitialiserFiltreEnsoleillement();
+      reinitialiserFiltreCotation();
     }
 
     // Cible falaise -> elle devient la sélection (ses parkings deviennent
@@ -794,12 +836,13 @@ export function initCarte(dataUrl) {
         configurerFiltreTemps(tempsDepuisGite);
         configurerFiltreEnsoleillement();
         configurerReinitialisationFiltres();
-        // "Réinitialiser" reste hidden (voir HTML) tant qu'aucun des deux
-        // filtres qu'il efface n'a de données exploitables dans cette sortie
-        // — sinon un bouton en permanence grisé, sans jamais rien à faire.
-        if (btnReinitialiserFiltres) {
-          btnReinitialiserFiltres.hidden = !((legendeTemps && !legendeTemps.hidden) || (legendeEnsoleillement && !legendeEnsoleillement.hidden));
-        }
+        // "Réinitialiser" devient visible une fois pour toutes ici, puis ne
+        // fait plus que se griser/dégriser (rafraichirBoutonReinitialiserFiltres)
+        // : "Type de voie" est proposé pour toute sortie (toutes ont des
+        // voies), il y a donc toujours quelque chose que ce bouton peut
+        // remettre à zéro. Le garder affiché en permanence évite le saut du
+        // DOM quand un premier filtre s'active.
+        if (btnReinitialiserFiltres) btnReinitialiserFiltres.hidden = false;
         appliquerFiltresEtSecteurs();
         if (etatChargement) etatChargement.remove();
         preparerFourchette();
@@ -861,13 +904,17 @@ export function initCarte(dataUrl) {
       // voir" doit revenir à la même vue qu'à l'arrivée, pas à une vue plus
       // zoomée qui réintroduirait le chevauchement des cercles.
       if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: ZOOM_VUE_ENSEMBLE_MAX });
-      // "Vue d'ensemble" signifie repartir à zéro : aucune sélection ni
-      // recherche active — sinon la caméra revient mais les marqueurs
-      // restent restreints, contradiction avec "tout voir".
+      // "Vue d'ensemble" signifie repartir à zéro : ni sélection, ni
+      // recherche, ni aucun filtre qui masque des falaises — sinon la caméra
+      // revient mais les marqueurs restent restreints, contradiction avec
+      // "tout voir". Type de voie compris (couenne/gv masquent des falaises
+      // comme les autres).
       falaiseSelectionneeCle = null;
       reinitialiserRecherche();
       reinitialiserFiltreTemps();
       reinitialiserFiltreEnsoleillement();
+      reinitialiserFiltreCotation();
+      definirModeFigure('aucun');
       appliquerFiltresEtSecteurs();
     }), 'top-right');
 
@@ -1314,15 +1361,16 @@ export function initCarte(dataUrl) {
   if (btnVueCarte) btnVueCarte.addEventListener('click', () => definirVueMobile('carte'));
   if (btnVueFiltres) btnVueFiltres.addEventListener('click', () => definirVueMobile('filtres'));
 
-  // --- "Type de voie" (cercles proportionnels) : boutons à choix unique,
-  // même grammaire que .btn-tri-voies ailleurs sur le site (un seul actif à
-  // la fois, aria-pressed). Remplace l'ancien select unique "Cercles", qui
-  // mélangeait deux questions différentes (quel TYPE de voie, quelle
-  // COTATION) dans un seul contrôle à 4 choix exclusifs — "Cotation des
-  // voies" juste en dessous est désormais une section à part entière. Les
-  // deux restent mutuellement exclusifs (une falaise n'a qu'une SEULE
-  // grandeur affichée par la taille de son cercle à la fois — voir
-  // symboles.js), mais chacun a maintenant son propre contrôle visible. ---
+  // --- "Type de voie" (grandeur encodée par la taille des cercles) : boutons
+  // à choix unique, même grammaire que .btn-tri-voies ailleurs sur le site
+  // (un seul actif à la fois, aria-pressed). Remplace l'ancien select unique
+  // "Cercles", qui mélangeait deux questions différentes (quel type de voie,
+  // quelle cotation) dans un seul contrôle à 4 choix exclusifs. "Cotation des
+  // voies" juste en dessous est désormais un filtre indépendant qui se
+  // combine avec ce mode (fourchette 5a-6b + "Grande voie" = falaises avec
+  // des grandes voies, dont au moins une voie cotée 5a-6b) : il ne touche pas
+  // la taille des cercles, une falaise garde une seule grandeur affichée par
+  // sa taille à la fois (voir symboles.js). ---
   const boutonsTypeVoie = document.querySelectorAll('.legende-figure .btn-tri-voies');
   boutonsTypeVoie.forEach((bouton) => {
     bouton.addEventListener('click', () => {
@@ -1367,24 +1415,35 @@ export function initCarte(dataUrl) {
   const selectCotationMin = document.getElementById('cotation-min');
   const selectCotationMax = document.getElementById('cotation-max');
 
-  // Recalcule nbDansFourchette pour chaque falaise, puis les maxima du mode.
-  // Fait ICI, une seule fois par changement de bornes, plutôt qu'à la volée
-  // dans estFalaiseVideDansMode/valeurPourMode : ces deux fonctions sont
-  // appelées pour chaque falaise à chaque rendu de la couche.
+  // Synchronise filtres.cotationMin/Max sur les <select> et recalcule
+  // nbDansFourchette (nombre de voies de la falaise dans la fourchette
+  // choisie) pour chaque falaise. Fait une seule fois par changement de
+  // bornes, plutôt qu'à la volée dans appliquerFiltres/construireSourceFalaises
+  // qui s'exécutent pour chaque falaise à chaque rendu de la couche.
   function majFourchette() {
-    if (!selectCotationMin || !selectCotationMax) return;
+    if (!selectCotationMin || !selectCotationMax || !selectCotationMin.options.length) return;
     const min = Number(selectCotationMin.value);
     const max = Number(selectCotationMax.value);
+    filtres.cotationMin = min;
+    filtres.cotationMax = max;
     entries.forEach((entree) => {
       if (entree.cat !== 'falaise') return;
       entree.nbDansFourchette = compterDansFourchette(entree.cotations, min, max);
     });
-    // Pas de compte affiché ici : les modes « couennes » et « grandes voies »
-    // masquent eux aussi les falaises à zéro sans jamais annoncer de total.
-    // N'en afficher un que pour la fourchette serait une incohérence née de
-    // la nouveauté de ce mode. Si ce retour chiffré s'avère utile, il devra
-    // être ajouté à TOUS les modes d'un coup.
-    Object.assign(maxima, maximaFourchette(entries));
+  }
+
+  // Applique la fourchette de cotation courante : filtre indépendant (ne
+  // touche ni taille ni couleur des cercles, donc pas un mode via
+  // definirModeFigure) qui se combine avec "Type de voie". Reconstruit la
+  // source pour que nbDansFourchette, à jour, atteigne le filtre natif de la
+  // couche (voir construireSourceFalaises / appliquerFiltres), puis relance
+  // la cascade de visibilité et le décompte du bouton "Réinitialiser".
+  function appliquerFiltreCotation() {
+    majFourchette();
+    const source = map.getSource('falaises');
+    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle));
+    appliquerFiltresEtSecteurs();
+    rafraichirBoutonReinitialiserFiltres();
   }
 
   // Peuple les deux listes avec les cotations RÉELLEMENT présentes dans la
@@ -1425,6 +1484,14 @@ export function initCarte(dataUrl) {
     selectCotationMin.value = String(crans[0][0]);
     selectCotationMax.value = String(crans[crans.length - 1][0]);
 
+    // Amplitude réelle des cotations de cette sortie : sert de repère
+    // « inactif » à filtreCotationActif (au repos les deux bornes sont ici)
+    // et de cible à reinitialiserFiltreCotation.
+    filtres.cotationPlancher = crans[0][0];
+    filtres.cotationPlafond = crans[crans.length - 1][0];
+    filtres.cotationMin = filtres.cotationPlancher;
+    filtres.cotationMax = filtres.cotationPlafond;
+
     // Bornes croisées : plutôt que de refuser la saisie, on pousse l'autre
     // borne — l'utilisateur obtient toujours une fourchette valide sans avoir
     // à comprendre pourquoi son choix a été rejeté.
@@ -1435,9 +1502,9 @@ export function initCarte(dataUrl) {
         if (deplace === 'min') selectCotationMax.value = String(min);
         else selectCotationMin.value = String(max);
       }
-      majFourchette();
-      definirModeFigure('cotation');
-      appliquerFiltresEtSecteurs();
+      // Filtre indépendant : on n'appelle pas definirModeFigure — resserrer
+      // la fourchette ne doit pas désélectionner "Type de voie".
+      appliquerFiltreCotation();
     };
     selectCotationMin.addEventListener('change', () => corriger('min'));
     selectCotationMax.addEventListener('change', () => corriger('max'));
@@ -1532,6 +1599,14 @@ export function initCarte(dataUrl) {
   if (filtres.ensoleillement.length) {
     conditions.push(['in', ['get', 'ensoleillement'], ['literal', filtres.ensoleillement]]);
   }
+  // Fourchette de cotation resserrée : ne garde que les falaises avec au
+  // moins une voie dans les bornes (nbDansFourchette, propriété posée par
+  // construireSourceFalaises et rafraîchie à chaque changement de bornes via
+  // appliquerFiltreCotation qui reconstruit la source). Indépendant du mode
+  // "Type de voie" ci-dessus : les deux conditions se cumulent dans le 'all'.
+  if (filtreCotationActif()) {
+    conditions.push(['>', ['coalesce', ['get', 'nbDansFourchette'], 0], 0]);
+  }
   if (map.getLayer('falaises')) map.setFilter('falaises', conditions.length ? ['all', ...conditions] : null);
   rafraichirNoteEnsoleillement(filtres.ensoleillement.length > 0);
 
@@ -1542,7 +1617,8 @@ export function initCarte(dataUrl) {
       (!filtres.recherche || entree.recherche.includes(filtres.recherche)) &&
       !estFalaiseVideDansMode(entree, mode) &&
       (entree.tempsGite == null || entree.tempsGite <= filtres.tempsMaxGite) &&
-      (!filtres.ensoleillement.length || filtres.ensoleillement.includes(entree.ensoleillement));
+      (!filtres.ensoleillement.length || filtres.ensoleillement.includes(entree.ensoleillement)) &&
+      (!filtreCotationActif() || entree.nbDansFourchette > 0);
     if (visible) {
       falaisesVisibles.add(entree.cle);
       if (filtres.recherche) entree.parkingAssocie.forEach((nom) => parkingsAutorises.add(nom));

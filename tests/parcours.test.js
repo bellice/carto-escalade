@@ -349,10 +349,11 @@ describe('Vocabulaire de la légende', () => {
             const texte = cleTexte();
             if (!/secteur/i.test(texte)) mauvais.push(`${bouton.dataset.mode} → « ${texte} »`);
           }
-          // "Cotation des voies" : plus de 5e option dans un select, ce mode
-          // s'active en touchant l'une des deux bornes (voir definirModeFigure,
-          // carte.js) — absent si cette sortie n'a aucune cotation exploitable
-          // (voir preparerFourchette, qui retire #legende-cotation entier).
+          // "Cotation des voies" : filtre indépendant réglé par ses deux
+          // bornes (voir appliquerFiltreCotation, carte.js) — absent si cette
+          // sortie n'a aucune cotation exploitable (voir preparerFourchette,
+          // qui retire #legende-cotation entier). Y toucher ne doit pas casser
+          // la clé de légende (toujours « Secteurs »).
           const min = document.getElementById('cotation-min');
           if (min && min.options.length) {
             min.dispatchEvent(new Event('change', { bubbles: true }));
@@ -478,7 +479,16 @@ describe('Filtre par fourchette de cotation', () => {
       assert.ok(complet.crans > 5,
         'Les listes doivent être peuplées avec les cotations réellement présentes');
 
-      // Fourchette débutant : doit réduire nettement. Sur ce jeu de données,
+      // "Type de voie" et "Cotation des voies" sont deux filtres indépendants
+      // qui se cumulent (ils étaient mutuellement exclusifs avant). On active
+      // "Grande voie" d'abord : resserrer la fourchette ensuite ne doit ni le
+      // désélectionner ni cesser de filtrer.
+      await page.click('[data-mode="gv"]');
+      await page.waitForTimeout(400);
+      const avecType = await page.evaluate(() =>
+        window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length);
+
+      // Fourchette resserrée : doit réduire encore. Sur ce jeu de données,
       // filtrer par PRÉSENCE laisserait ~100 falaises sur 107 ; c'est le
       // comptage par fourchette qui donne du signal.
       await page.selectOption('#cotation-min', { label: '4a' });
@@ -487,15 +497,16 @@ describe('Filtre par fourchette de cotation', () => {
 
       const apresFourchette = await page.evaluate(() => ({
         falaises: window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length,
-        // Toucher la fourchette bascule "Type de voie" sur aucun bouton actif
-        // (mutuellement exclusifs, voir definirModeFigure) — pas un select à
-        // 5e option "cotation" comme avant.
-        typeVoieActif: document.querySelector('.legende-figure .btn-tri-voies[aria-pressed="true"]'),
+        // Le bouton "Type de voie" actif : resserrer la cotation ne doit pas
+        // le lâcher (filtres combinables, voir appliquerFiltreCotation).
+        typeVoieActif: document.querySelector('.legende-figure .btn-tri-voies[aria-pressed="true"]')?.dataset.mode || null,
       }));
       assert.ok(apresFourchette.falaises < complet.falaises,
         `La fourchette doit masquer des falaises (${apresFourchette.falaises} vs ${complet.falaises})`);
-      assert.equal(apresFourchette.typeVoieActif, null,
-        'Resserrer la cotation doit désactiver "Type de voie" (mutuellement exclusifs)');
+      assert.ok(apresFourchette.falaises <= avecType,
+        `La fourchette doit se cumuler avec "Grande voie", pas l'annuler (${apresFourchette.falaises} vs ${avecType})`);
+      assert.equal(apresFourchette.typeVoieActif, 'gv',
+        'Resserrer la cotation ne doit pas désactiver "Type de voie" (filtres combinables)');
       // Pas de compte affiché : les modes couenne/grande voie masquent eux
       // aussi sans annoncer de total — n'en afficher un que pour la fourchette
       // serait incohérent. Voir majFourchette (carte.js).
