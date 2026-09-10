@@ -242,6 +242,7 @@
      positionnent par rapport au viewport (aucun ancêtre positionné avant
      641px), exactement comme avant leur déplacement dans #panneau-lateral. */
   #panneau-lateral > .recherche,
+  #panneau-lateral > .legende-cercles,
   #panneau-lateral > .legende {
     position: static;
     top: auto; left: auto; bottom: auto;
@@ -250,6 +251,26 @@
     padding: 14px 16px;
   }
   #panneau-lateral > .recherche { border-bottom: 1px solid var(--stone-dark); }
+  /* .legende-cercles (pictos + cercles proportionnels) est un flottant
+     autonome sur mobile (voir plus bas, hors media query) : sur desktop il
+     s'aplatit ici au même titre que .legende ci-dessus, sans cadre propre —
+     pas de padding:0 comme .legende-contenu plus bas, il n'a pas de wrapper
+     externe qui lui donnerait déjà les 14/16 ci-dessus par un autre biais. */
+  #panneau-lateral > .legende-cercles {
+    border: none;
+    background: none;
+    border-radius: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    width: 100%;
+  }
+  /* display:flex (règle par défaut, hors media query) l'emporterait sur le
+     style natif de [hidden] sans ceci — même piège déjà couvert pour
+     .legende-contenu[hidden] plus bas. Desktop seulement : sur mobile,
+     .legende-cercles reste affiché quel que soit cet attribut (voir sa
+     règle par défaut, plus haut dans ce fichier). */
+  #panneau-lateral > .legende-cercles[hidden] { display: none; }
 
   /* Sur desktop l'indicateur hors-ligne revient dans le flux, en dernière
      ligne du panneau : la légende se replie et se déplie, donc sa hauteur
@@ -515,7 +536,14 @@
    (obligation de crédit) et mangeait 7px de la légende dépliée. Ici elle ne
    réserve aucune place : la carte ne perd pas un pixel. */
 .bandeau-hors-ligne {
-  position: absolute;
+  /* fixed et non absolute : enfant DOM de #panneau-lateral (voir carte.js),
+     qui devient lui-même position:absolute en mode Filtres (voir plus bas,
+     body.mode-filtres) — un enfant resté absolute se positionnerait alors
+     par rapport à CE panneau plutôt qu'au viewport. fixed échappe à tout
+     ancêtre positionné. Aucun changement de rendu ailleurs : sans ancêtre
+     positionné avant lui en mode Carte, absolute et fixed y donnent déjà le
+     même résultat. */
+  position: fixed;
   top: 101px; /* sous .recherche : top 54 + ~39 de hauteur + 8 d'air */
   left: 12px;
   z-index: 30;
@@ -610,13 +638,62 @@
   gap: 8px;
 }
 
-/* En-tête de la légende (titre + bouton de repli en icône compacte) : le
-   panneau gauche ne recouvre rien d'important — masquer/afficher la légende
-   en entier reste le bon comportement, seule la forme du bouton change
-   (chevron compact en haut, au lieu du gros bouton "Masquer" pleine largeur
-   en bas). L'état replié/déplié est porté par aria-expanded (rotation du
-   chevron, voir .legende-toggle-icone), explicité au lecteur d'écran par le
-   aria-label mis à jour en JS. */
+/* Pictos + cercles proportionnels (voir le HTML) : explique les symboles, ne
+   filtre rien -- distinct de .legende, qui elle est neutralisée par le
+   panneau Filtres plein écran sur mobile (voir plus bas, body.mode-filtres).
+   Flottant autonome par défaut (comme .legende ci-dessus), aplati dans la
+   carte #panneau-lateral sur desktop (@media min-width:641px ci-dessus).
+   fixed et non absolute : reste un enfant DOM de #panneau-lateral (requis
+   pour cet aplatissement desktop), qui devient lui-même position:absolute +
+   overflow:auto en mode Filtres mobile -- un enfant resté absolute
+   défilerait alors AVEC ce panneau et se positionnerait par rapport à lui
+   plutôt qu'au viewport. Même correctif déjà appliqué à .bandeau-hors-ligne
+   pour la même raison.
+   Masqué en mode Filtres (voir plus bas, body.mode-filtres) : elle explique
+   les symboles de la carte, qui n'est justement plus visible dans cet écran
+   — pas seulement inutile, un essai réel l'a affichée par-dessus le panneau
+   de filtres et elle interceptait alors les clics sur les cases à cocher en
+   dessous (mode cotation + Ensoleillement, petit écran). */
+.legende-cercles {
+  position: fixed;
+  bottom: 72px; /* 20 (décalage pilule) + 44 (sa hauteur) + 8 (air) */
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--paper);
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: var(--fs-base);
+  /* 260px (340 avant) : sans le select ni les bornes de cotation (déplacés
+     dans Filtres), il ne reste plus que les pictos et les repères de
+     taille -- un contenu bien moins large, revenu proche de la largeur
+     d'avant l'ajout d'Ensoleillement (qui suffisait déjà à ce seul
+     contenu). Laisse plus de carte visible en mode Carte. */
+  width: min(260px, calc(100vw - 24px));
+  max-width: min(260px, calc(100vw - 24px));
+  max-height: min(280px, calc(100vh - 260px));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stone-dark) transparent;
+}
+.legende-cercles::-webkit-scrollbar { width: 6px; }
+.legende-cercles::-webkit-scrollbar-track { background: transparent; }
+.legende-cercles::-webkit-scrollbar-thumb {
+  background: var(--stone-dark);
+  border-radius: 3px;
+}
+
+/* En-tête des FILTRES desktop uniquement (voir le HTML : masqué sur mobile,
+   où la bascule Carte/Filtres joue ce rôle) — .legende-cercles juste
+   au-dessus, elle, n'a pas d'en-tête : elle reste affichée en permanence, ce
+   bouton ne la concerne pas. L'état replié/déplié est porté par
+   aria-expanded (rotation du chevron, voir .legende-toggle-icone),
+   explicité au lecteur d'écran par le aria-label mis à jour en JS — le texte
+   visible ("Filtres"/"Filtres · N") dit le compte de filtres actifs, pas
+   l'état replié/déplié. */
 .legende-entete {
   display: flex;
   justify-content: space-between;
@@ -660,7 +737,12 @@
 @media (pointer: coarse) {
   .legende-toggle { min-height: 44px; padding: 4px 12px; }
   .case-ensoleillement { min-height: 44px; }
-  .legende-filtres-avances > summary { min-height: 44px; }
+  /* "Type de voie" : même contrôle que .btn-tri-voies dans les popups
+     (jamais 44px là-bas), mais devenu ici un des contrôles principaux d'un
+     écran dédié plutôt qu'un détail dans une fiche — vaut la contrainte
+     tactile du reste du site. */
+  .legende-figure .btn-tri-voies { min-height: 44px; }
+  .legende-cotation-bornes select { min-height: 44px; }
   /* Curseur de trajet : 254x16 mesuré. La piste reste fine (le navigateur la
      centre dans la boite), seule la zone attrapable grandit — c'est elle
      qu'on vise en glissant le pouce. */
@@ -910,12 +992,17 @@
   flex-shrink: 0;
 }
 
-/* Sélecteur de figuré : sert de titre aux cercles proportionnels rendus
-   juste en dessous (#legende-falaises) — placé au-dessus d'eux dans le HTML.
-   La bordure du haut le sépare des catégories (Falaises/Parkings/Gîte), le
-   margin-bottom laisse un peu d'air avant les cercles de référence. */
+/* Titre "Nombre de voies" côté Carte (.legende-cercles) : sert de titre aux
+   cercles proportionnels rendus juste en dessous (#legende-falaises) — placé
+   au-dessus d'eux dans le HTML. La bordure du haut le sépare des catégories
+   (Falaises/Parkings/Gîte), le margin-bottom laisse un peu d'air avant les
+   cercles de référence.
+   Même classe réutilisée côté Filtres pour "Type de voie" (label + 3
+   boutons) : même rythme de séparateur, flex-wrap nécessaire cette fois --
+   label et boutons ne tiennent pas sur une ligne à la largeur du panneau. */
 .legende-figure {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   border-top: 1px solid var(--stone-dark);
@@ -923,25 +1010,38 @@
   margin-bottom: 8px;
   font-size: var(--fs-base);
 }
-.legende-figure select {
-  /* Police du corps, pas mono — contrairement aux sélecteurs de cotation
-     juste en dessous. Le site distingue deux voix : mono pour les boutons et
-     les valeurs techniques (« ≤ 120 min », « 6a+ »), corps pour les libellés
-     et les champs de formulaire (« Falaises », le champ de recherche). Ce
-     sélecteur porte des phrases (« Voies par cotation »), pas des codes : la
-     voix mono lui allait mal, et lui coûtait 25 % de largeur en plus à
-     taille égale (169px contre 127px pour « Voies par cotation » à 16px).
-     Sur mobile la taille est forcée à 16px pour le zoom iOS (voir plus bas) :
-     la police était donc le seul levier restant sur le poids visuel.
-     Les sélecteurs de cotation, eux, gardent le mono — ils portent des
-     codes de difficulté, où la chasse fixe aligne les colonnes. */
+/* Titre fixe qui remplace l'ancien select côté Carte (voir le HTML) : voix
+   du corps, pas mono. Le site distingue deux voix : mono pour les boutons et
+   les valeurs techniques (« ≤ 120 min », « 6a+ »), corps pour les libellés
+   et les champs de formulaire. Ce texte porte une phrase ("Nombre de
+   voies"), pas un code — contrairement aux select de cotation juste en
+   dessous (mono, où la chasse fixe aligne les colonnes de difficulté).
+   Gras comme .legende-figure-label/.legende-ensoleillement-label côté
+   Filtres : même titre de section, doit se voir au premier coup d'œil face
+   à Épurer juste à côté. */
+.legende-figure-titre {
   font-family: var(--font-body);
   font-size: var(--fs-sm);
-  padding: 4px 6px;
-  border: 1px solid var(--stone-dark);
-  border-radius: var(--radius);
-  background: var(--paper);
+  font-weight: 600;
   color: var(--ink);
+}
+/* Précède le select côté Filtres (voir le HTML) : même grammaire que
+   .legende-ensoleillement-label — un mot avant son contrôle. Sert aussi de
+   titre à "Cotation des voies" (même classe, voir le HTML), qui elle n'est
+   pas dans un conteneur flex : flex-basis n'y a aucun effet, seul le
+   margin-bottom compte pour l'espacer de ses bornes De/à juste en dessous.
+   Plus gras que ses valeurs (boutons/cases en dessous) : un titre de
+   sous-section doit se voir au premier coup d'œil, pas se confondre avec
+   ce qu'il introduit. flex-basis:100% (dans .legende-figure/.legende-
+   ensoleillement, tous deux flex-wrap) : force son propre retour à la
+   ligne, les boutons/cases suivent sur leur propre rangée plutôt que de
+   se coller au texte du titre. */
+.legende-figure-label {
+  display: block;
+  flex-basis: 100%;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--muted);
 }
 /* Même ligne que le select, pas une barre à part. flex-shrink:0 : sur mobile
    c'est le select (déjà min-width:0) qui doit céder la place, pas ce texte.
@@ -987,42 +1087,6 @@
   cursor: not-allowed;
 }
 
-/* Repli commun à "Ensoleillement" et "Depuis le gîte" : <details> natif,
-   même principe que .liens-replies dans les popups (rien à ajouter au
-   répartiteur de clics, l'ouverture au clavier vient sans une ligne de JS).
-   Fermé par défaut — mesuré sur mobile (390x844) : ces deux filtres à eux
-   seuls faisaient passer la légende ouverte de ~240 à ~410px, plus de la
-   moitié de l'écran avant même d'avoir choisi quoi que ce soit. Le <details>
-   lui-même reste hidden en HTML tant qu'aucun des deux n'a de données
-   exploitables (posé par configurerFiltreTemps/configurerFiltreEnsoleillement,
-   carte.js) — pas de repli vide. */
-.legende-filtres-avances {
-  border-top: 1px solid var(--stone-dark);
-  padding-top: 8px;
-}
-.legende-filtres-avances > summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  list-style: none;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-.legende-filtres-avances > summary::-webkit-details-marker { display: none; }
-.legende-filtres-avances > summary::after {
-  content: '▾';
-  font-size: var(--fs-xs);
-}
-.legende-filtres-avances[open] > summary::after { content: '▴'; }
-.legende-filtres-contenu {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-}
-
 /* Filtre "Depuis le gîte" — slider à un seul seuil (voir carte.js) : montre
    tout par défaut (poignée au maximum), glisser vers la gauche resserre
    progressivement aux falaises les plus proches. Label+valeur sur une ligne
@@ -1035,6 +1099,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  border-top: 1px solid var(--stone-dark);
+  padding-top: 8px;
   font-size: var(--fs-base);
 }
 /* display:flex ci-dessus l'emporterait sur le style natif de [hidden]
@@ -1046,6 +1112,14 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
+}
+/* Même emphase que .legende-figure-label/.legende-ensoleillement-label
+   (titre plus gras que sa valeur) — mais reste sur sa ligne avec
+   .filtre-temps-valeur juste à côté (pas de flex-basis:100% ici) : ce
+   libellé porte sa valeur en direct ("≤ 120 min"), contrairement aux
+   trois autres, qui introduisent des contrôles séparés en dessous. */
+.legende-temps-ligne1 label {
+  font-weight: 600;
 }
 .legende-temps input[type="range"] {
   width: 100%;
@@ -1065,8 +1139,8 @@
 }
 
 /* Filtre "Ensoleillement" (configurerFiltreEnsoleillement, carte.js) : même
-   voix typographique que .legende-temps juste au-dessus (le séparateur est
-   maintenant porté par .legende-filtres-avances, qui contient les deux).
+   voix typographique et même séparateur que .legende-temps, chacun sa
+   propre section depuis le retrait du repli commun qui les enveloppait.
    Cases à cocher, pas des boutons-bascule façon .btn-tri-voies/.btn-epuree :
    ceux-ci signifient déjà "un seul choix à la fois" ailleurs sur ce site,
    alors que PLUSIEURS catégories sont cochables ici — une case le dit
@@ -1076,10 +1150,19 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 12px;
+  border-top: 1px solid var(--stone-dark);
+  padding-top: 8px;
   font-size: var(--fs-base);
 }
 .legende-ensoleillement[hidden] { display: none; }
+/* Voir le commentaire de .legende-figure-label (même grammaire : titre plus
+   gras que ses valeurs, flex-basis:100% pour renvoyer les cases à cocher
+   sur leur propre rangée en dessous). */
 .legende-ensoleillement-label {
+  display: block;
+  flex-basis: 100%;
+  margin-bottom: 4px;
+  font-weight: 600;
   color: var(--muted);
 }
 .case-ensoleillement {
@@ -1097,7 +1180,13 @@
   cursor: pointer;
 }
 
-.legende .dot {
+/* .legende-cats et non .legende : les pictos vivent dans .legende-cats,
+   monté tantôt dans .legende-cercles (mobile), tantôt aplati directement
+   dans #panneau-lateral (desktop) -- jamais garanti descendant de .legende
+   elle-même. Régression réelle constatée avec l'ancien sélecteur .legende
+   .dot après ce déplacement : pastilles invisibles faute de forme/couleur,
+   sur tous les viewports. */
+.legende-cats .dot {
   width: 11px; height: 11px;
   border-radius: 50%;
   display: inline-block;
@@ -1115,6 +1204,140 @@
   border-radius: 0;
   background: var(--ink);
   transform: rotate(45deg);
+}
+
+/* ===== Bascule mobile Carte/Filtres =====
+   Sous 641px, remplace le couple recherche flottante + légende
+   flottante-repliable par un aller-retour plein écran explicite (voir
+   carte.js, definirVueMobile) — même mécanisme que body.fiche-ouverte plus
+   bas dans ce fichier, juste un second état plutôt qu'un widget de plus.
+   Réutilise #panneau-lateral (déjà le parent commun de .recherche et
+   .legende) comme conteneur plein écran, exactement comme
+   @media (min-width:641px) le fait déjà pour la carte flottante desktop —
+   même recette, juste conditionnée sur body.mode-filtres au lieu d'une
+   largeur d'écran. Invisible par défaut : n'existe que sous 640px. */
+.legende-resultat { display: none; }
+.bascule-vue { display: none; }
+
+@media (max-width: 640px) {
+  /* La légende flottante disparaît du mobile : son rôle est repris en
+     entier par le panneau "Filtres" plein écran ci-dessous. */
+  .legende { display: none; }
+  /* .legende-entete (le bouton "Filtres" desktop) resterait sinon visible EN
+     PLUS de la pilule Carte/Filtres — redondant, les deux replient/déplient
+     les mêmes filtres par des chemins différents. */
+  .legende-entete { display: none; }
+
+  .legende-resultat {
+    display: block;
+    margin: 0 0 8px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-base);
+    color: var(--ink);
+  }
+  /* Panneau "Filtres" plein écran : ces libellés sont le contenu principal
+     d'un écran dédié, pas l'annotation discrète d'une légende annexe
+     compacte (le --muted/--fs-sm d'origine, gardés tels quels sur desktop
+     où ce contexte compact reste vrai). "Type de voie"/"Cotation des
+     voies"/"Ensoleillement" en --ink, les cases à cocher et les "De"/"à" de
+     la fourchette remontés à --fs-base. */
+  .legende-figure-label,
+  .legende-ensoleillement-label,
+  .legende-cotation-bornes {
+    color: var(--ink);
+  }
+  .case-ensoleillement,
+  .legende-cotation-bornes,
+  .legende-cotation-bornes select {
+    font-size: var(--fs-base);
+  }
+
+  /* Pilule à deux boutons, même grammaire que .btn-tri-voies/.btn-epuree
+     (contour = inactif, fond plein --forest = actif). Bordure --muted et non
+     --stone-dark : ce bouton flotte directement sur le fond de carte, même
+     correctif de contraste WCAG 1.4.11 que .legende-toggle (--stone-dark ne
+     fait que 1.36:1 sur --paper). Ancrée là où vivait .legende (bas gauche) :
+     aucune collision avec l'attribution OpenStreetMap (bas droite — voir le
+     commentaire de .bandeau-hors-ligne sur ce même risque avec une barre
+     pleine largeur) ni avec l'indicateur hors-ligne (haut gauche). */
+  .bascule-vue {
+    display: flex;
+    position: absolute;
+    bottom: 20px;
+    left: 12px;
+    z-index: 10;
+    gap: 6px;
+  }
+  .btn-vue {
+    min-height: 44px;
+    padding: 0 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--muted);
+    border-radius: var(--radius);
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(35, 42, 35, 0.18);
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    cursor: pointer;
+  }
+  .btn-vue[aria-pressed="true"] {
+    background: var(--forest);
+    border-color: var(--forest);
+    color: white;
+  }
+
+  /* Mode Filtres : #panneau-lateral devient le panneau plein écran, laissant
+     l'en-tête visible (top:var(--hauteur-entete)) — même idiome que #map/
+     #panneau-falaise (top+bottom ancrés). Pas de hauteur variable en dvh
+     comme la feuille de fiche : ce panneau occupe toujours EXACTEMENT le
+     même espace, jamais une hauteur partielle. bottom:80px réserve la place
+     de .bascule-vue qui flotte par-dessus (20 de décalage + 44 de haut + 16
+     d'air). */
+  body.mode-filtres #panneau-lateral {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: var(--hauteur-entete);
+    left: 0; right: 0;
+    bottom: 80px;
+    z-index: 12;
+    overflow-y: auto;
+    background: var(--paper);
+  }
+  /* Voir le commentaire de .legende-cercles : sans ça, elle flotte par-dessus
+     ce panneau et intercepte les clics sur son contenu (constaté). */
+  body.mode-filtres .legende-cercles { display: none; }
+  body.mode-filtres #panneau-lateral > .recherche,
+  body.mode-filtres #panneau-lateral > .legende {
+    position: static;
+    top: auto; left: auto; bottom: auto;
+    width: auto;
+    z-index: auto;
+  }
+  body.mode-filtres #panneau-lateral > .recherche {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--stone-dark);
+  }
+  body.mode-filtres #panneau-lateral > .legende {
+    display: flex; /* annule .legende{display:none} ci-dessus */
+    padding: 14px 16px;
+  }
+  /* Plus de plafond 340×500/scroll-snap/barre custom : ces contraintes
+     n'existaient que pour tenir dans la petite carte flottante — le panneau
+     plein écran gère son propre scroll (overflow-y ci-dessus). */
+  body.mode-filtres #panneau-lateral > .legende .legende-contenu {
+    border: none;
+    background: none;
+    padding: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    scroll-snap-type: none;
+    width: 100%;
+  }
 }
 
 /* Popup MapLibre */
@@ -2135,7 +2358,9 @@
      tant qu'une fiche est ouverte (voir addMarker dans app.js). */
   body.fiche-ouverte .recherche,
   body.fiche-ouverte .legende,
-  body.fiche-ouverte .btn-tout-voir {
+  body.fiche-ouverte .legende-cercles,
+  body.fiche-ouverte .btn-tout-voir,
+  body.fiche-ouverte .bascule-vue {
     display: none;
   }
 }
@@ -2172,14 +2397,16 @@
   }
 }
 
-/* Fourchette de cotation (mode « Nombre de voies par cotation »).
+/* "Cotation des voies" : section à part entière (voir le HTML), plus un
+   sous-réglage du mode "Cercles" — même séparateur que .legende-figure
+   juste au-dessus plutôt qu'un simple margin-top.
    Deux <select> natifs plutôt qu'un curseur à deux poignées : accessibles au
    clavier, cible tactile correcte, et rien à maintenir — voir le commentaire
    dans carte.js. */
 .legende-cotation {
-  margin-top: 8px;
+  border-top: 1px solid var(--stone-dark);
+  padding-top: 8px;
 }
-.legende-cotation[hidden] { display: none; }
 .legende-cotation-bornes {
   display: flex;
   align-items: center;
@@ -2214,24 +2441,21 @@
   .recherche-champ input {
     font-size: 16px;
   }
-  #mode-figure,
   #cotation-min,
   #cotation-max {
     font-size: 16px;
   }
   /* Un <select> se dimensionne sur son option la plus longue : passer la
-     police à 16px l'a fait gonfler à 297px (constaté dans une colonne de
-     280px, avant son élargissement à 340 -- le select grandit pareil quelle
-     que soit la largeur de la colonne, seul le risque de dépassement change),
-     d'où une barre de défilement horizontale sur toute la légende. width:100% +
-     min-width:0 (indispensable dans un conteneur flex, où la largeur
-     minimale vaut auto par défaut et empêche tout rétrécissement) le
-     ramènent dans son cadre. */
-  .legende-figure,
+     police à 16px l'a fait gonfler à 297px, d'où une barre de défilement
+     horizontale sur toute la légende (constaté du temps où #mode-figure
+     portait des phrases comme « Voies par cotation » -- devenu 3 boutons
+     depuis, seuls les select de cotation ci-dessous en ont encore besoin).
+     width:100% + min-width:0 (indispensable dans un conteneur flex, où la
+     largeur minimale vaut auto par défaut et empêche tout rétrécissement)
+     le ramènent dans son cadre. */
   .legende-cotation-bornes {
     min-width: 0;
   }
-  .legende-figure select,
   .legende-cotation-bornes select {
     width: 100%;
     min-width: 0;
@@ -2275,6 +2499,8 @@
   .btn-preparer:hover { background: var(--stone); }
   .btn-preparer:disabled:hover { background: var(--paper); }
   .legende-toggle:hover { background: var(--stone-dark); }
+  .btn-vue:hover { background: var(--stone-dark); }
+  .btn-vue[aria-pressed="true"]:hover { background: var(--forest); }
   .btn-epuree:hover { background: var(--stone-dark); }
   /* Plus spécifique que la règle ci-dessus : survoler le bouton enclenché ne
      doit pas effacer le "rempli" qui signale l'état actif (même logique que

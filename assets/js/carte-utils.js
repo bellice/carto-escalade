@@ -95,28 +95,33 @@ export function estPointVisible(map, lon, lat, padding, marge = 24) {
 // - Desktop : margeDesktop() — seul le panneau gauche (permanent) est
 //   réservé ; une "vue d'ensemble" n'ouvre jamais le panneau droit
 //   (contextuel, réservé uniquement par margeAvantPopup(true)).
-// - Mobile : mesure la VRAIE hauteur occupée à l'écran par le panneau
-//   légende (flottant en bas, inchangé sur mobile) plutôt que de deviner un
-//   chiffre fixe — MARGE_MOBILE.bottom (170) avait été réglé pour une légende
-//   plus courte qu'aujourd'hui, et redeviendrait obsolète à chaque futur
-//   ajout dans ce panneau sans cette mesure. Recalculée à chaque appel : la
-//   légende peut être repliée/dépliée entre deux appels, la hauteur d'écran
-//   peut changer (rotation).
-//   Repli sur MARGE_MOBILE.bottom si la légende est présente dans le DOM
-//   mais MASQUÉE (offsetParent === null) : body.fiche-ouverte lui applique
-//   display:none tant qu'une fiche reste ouverte (voir le CSS) — un élément
-//   display:none renvoie un getBoundingClientRect() à zéro, donc top=0, ce
-//   qui aurait donné bas≈innerHeight (quasi tout l'écran). Bug réel constaté :
-//   cliquer un libellé de site (qui recadre via margeToutVoir) pendant que la
-//   fiche falaise est ouverte sur mobile ne faisait plus rien — le padding
-//   obtenu dépassait la hauteur du conteneur, MapLibre abandonnait
-//   silencieusement le fitBounds (même défaillance déjà documentée plus bas,
-//   voir reinitialiserPadding).
+// - Mobile : mesure la VRAIE hauteur occupée à l'écran par .legende-cercles
+//   (pictos + cercles proportionnels, flottant en permanence en bas, voir
+//   style-carte.css) plutôt que de deviner un chiffre fixe — c'est le plus
+//   HAUT des deux éléments empilés dans ce coin (lui, puis la pilule
+//   Carte/Filtres en dessous), le mesurer couvre donc les deux d'un coup.
+//   MARGE_MOBILE.bottom (170) avait été réglé pour l'ancienne légende
+//   flottante, remplacée depuis par ce couple. Recalculée à chaque appel :
+//   la hauteur d'écran peut changer (rotation).
+//   Repli sur MARGE_MOBILE.bottom si .legende-cercles est présent dans le
+//   DOM mais MASQUÉ : body.fiche-ouverte lui applique display:none tant
+//   qu'une fiche reste ouverte (voir le CSS) — un élément display:none
+//   renvoie un getBoundingClientRect() à zéro, donc top=0, ce qui aurait
+//   donné bas≈innerHeight (quasi tout l'écran). Bug réel constaté à
+//   l'origine sur l'ancienne légende : cliquer un libellé de site (qui
+//   recadre via margeToutVoir) pendant que la fiche falaise est ouverte sur
+//   mobile ne faisait plus rien — le padding obtenu dépassait la hauteur du
+//   conteneur, MapLibre abandonnait silencieusement le fitBounds (même
+//   défaillance déjà documentée plus bas, voir reinitialiserPadding).
+//   getComputedStyle(...).display et non offsetParent : .legende-cercles est
+//   position:fixed (voir son commentaire dans le CSS) — offsetParent d'un
+//   élément fixed vaut TOUJOURS null par spec, qu'il soit visible ou non,
+//   ce test aurait donc toujours pris le repli.
 export function margeToutVoir() {
   if (estDesktop()) return margeDesktop();
-  const legende = document.querySelector('.legende');
-  const legendeVisible = legende && legende.offsetParent !== null;
-  const bas = legendeVisible ? Math.round(window.innerHeight - legende.getBoundingClientRect().top) + 10 : MARGE_MOBILE.bottom;
+  const legendeCercles = document.querySelector('.legende-cercles');
+  const visible = legendeCercles && getComputedStyle(legendeCercles).display !== 'none';
+  const bas = visible ? Math.round(window.innerHeight - legendeCercles.getBoundingClientRect().top) + 10 : MARGE_MOBILE.bottom;
   return { ...MARGE_MOBILE, bottom: Math.max(bas, 40) };
 }
 

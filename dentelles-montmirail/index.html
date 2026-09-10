@@ -98,38 +98,92 @@
       <button type="button" class="btn-centrer" aria-label="Voir le résultat de la recherche">Voir</button>
     </div>
 
+    <!-- Pictos + cercles proportionnels : explique les symboles de la carte,
+         ne filtre rien. Séparé de .legende (qui, elle, filtre) pour rester
+         visible en permanence des deux côtés, desktop ET mobile, quel que
+         soit l'état du bouton "Filtres" (desktop) ou le mode Carte/Filtres
+         (mobile, voir style-carte.css et carte.js). -->
+    <div class="legende-cercles" id="legende-cercles">
+      <div class="legende-cats">
+        <!-- SECTEURS et non « Falaises » : un point de la carte est un couple
+     site+secteur. 111 points pour 37 noms de falaise en Drôme, 60 pour
+     10 en Bretagne — le libellé était faux d’un facteur 3 à 6. Même
+     erreur que le « 111 falaises » corrigé sur l’accueil. -->
+        <span id="cle-falaises-zone"><span class="cle"><span class="dot"></span> Secteurs</span></span>
+        <span class="cle"><span class="dot parking"></span> Parkings</span>
+        <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
+      </div>
+      <!-- Titre fixe et non le sélecteur lui-même (déplacé dans le panneau
+           "Filtres", voir #legende-contenu plus bas) : les quatre modes
+           comptent chacun un sous-ensemble de voies (total, par cotation,
+           couennes, grandes voies), "Nombre de voies" reste juste dans les
+           quatre cas — inutile de le faire varier avec le mode actif. Sa
+           place au-dessus de #legende-falaises reste voulue : il titre les
+           cercles proportionnels rendus juste en dessous. -->
+      <div class="legende-figure">
+        <span class="legende-figure-titre">Nombre de voies</span>
+        <!-- Indépendant du mode "Cercles" (voir Filtres) : un filtre
+             couenne/gv/cotation actif le reste, épurer ne fait qu'uniformiser
+             la taille affichée. -->
+        <button type="button" class="btn-epuree" aria-pressed="false" aria-label="Simplifier l'affichage des cercles">Épurer</button>
+      </div>
+      <div class="legende-falaises" id="legende-falaises"></div>
+    </div>
+
     <div class="legende">
+      <!-- Replie seulement CE bloc (#legende-contenu), jamais .legende-cercles
+           juste au-dessus (pictos + cercles proportionnels, qui explique la
+           carte plutôt qu'il ne filtre — reste affiché en permanence, voir
+           son propre commentaire). Placé ici, juste avant ce qu'il replie,
+           plutôt qu'en tête de tout le panneau : le libellé "Filtres" dit
+           déjà sa portée, nul besoin de le mettre à distance des pictos qu'il
+           ne touche pas. Masqué sur mobile (voir style-carte.css) : la
+           bascule Carte/Filtres y joue déjà ce rôle. -->
       <div class="legende-entete">
-        <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu" aria-label="Réduire la légende">
-          <span class="legende-toggle-texte">Masquer</span>
+        <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu" aria-label="Réduire les filtres">
+          <!-- Compte les filtres actifs ("Filtres · 2"), tenu à jour par
+               rafraichirBoutonReinitialiserFiltres (carte.js) — même
+               convention que le bouton "Filtres" de la bascule mobile. Le
+               chevron seul dit replié/déplié (rotation CSS sur
+               aria-expanded, voir .legende-toggle-icone) : le texte ne
+               porte plus "Masquer"/"Afficher". -->
+          <span class="legende-toggle-texte">Filtres</span>
           <span class="legende-toggle-icone" aria-hidden="true">▾</span>
         </button>
       </div>
       <div class="legende-contenu" id="legende-contenu">
-        <div class="legende-cats">
-          <!-- SECTEURS et non « Falaises » : un point de la carte est un couple
-     site+secteur. 111 points pour 37 noms de falaise en Drôme, 60 pour
-     10 en Bretagne — le libellé était faux d’un facteur 3 à 6. Même
-     erreur que le « 111 falaises » corrigé sur l’accueil. -->
-          <span id="cle-falaises-zone"><span class="cle"><span class="dot"></span> Secteurs</span></span>
-          <span class="cle"><span class="dot parking"></span> Parkings</span>
-          <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
-        </div>
-        <!-- Le sélecteur est le TITRE des cercles proportionnels rendus juste
-             en dessous : sa place au-dessus de #legende-falaises est voulue. -->
+        <!-- Visible seulement dans le panneau "Filtres" plein écran mobile
+             (voir style-carte.css) : falaisesVisibles est déjà tenue à jour
+             par appliquerFiltres, aucun nouveau calcul (carte.js). -->
+        <p class="legende-resultat" id="legende-resultat" aria-live="polite"></p>
+        <!-- Deux questions distinctes, pas un seul choix à 4 options comme
+             avant (voir l'historique git) : le TYPE de voie compté par la
+             taille des cercles (.legende-figure dans .legende-cercles,
+             toujours visible côté Carte, en montre le titre fixe et le
+             résultat), et la COTATION à laquelle on s'intéresse. Vivent ici
+             et non côté Carte : question de réglage, pas de lecture de la
+             carte — comme Ensoleillement/Depuis le gîte juste en dessous.
+             Boutons à choix unique (même grammaire que .btn-tri-voies
+             ailleurs sur le site), pas un select : "Toutes les voies" reste
+             un 3e choix à part entière plutôt qu'un état "aucune case
+             cochée" ambigu. Mutuellement exclusif avec "Cotation des voies"
+             juste en dessous (voir definirModeFigure, carte.js) : une
+             falaise n'a qu'une SEULE grandeur affichée par la taille de son
+             cercle à la fois (voir le commentaire d'en-tête de symboles.js
+             sur pourquoi type et cotation ne se combinent pas en un seul
+             figuré). -->
         <div class="legende-figure">
-          <select id="mode-figure" aria-label="Nombre représenté par la taille des cercles">
-            <option value="aucun">Toutes les voies</option>
-            <option value="cotation">Voies par cotation</option>
-            <option value="couenne" id="option-couenne">Couennes</option>
-            <option value="gv" id="option-gv">Grandes voies</option>
-          </select>
-          <!-- Bouton, pas une 6e option du select : question différente
-               (« taille du tout ? » vs « quelle grandeur ? »), indépendant
-               du mode courant — un filtre couenne/gv/cotation actif le reste. -->
-          <button type="button" class="btn-epuree" aria-pressed="false" aria-label="Simplifier l'affichage des cercles">Épurer</button>
+          <span class="legende-figure-label">Type de voie</span>
+          <button type="button" class="btn-tri-voies actif" data-mode="aucun" aria-pressed="true">Toutes les voies</button>
+          <button type="button" class="btn-tri-voies" data-mode="couenne" id="option-couenne" aria-pressed="false">Couenne</button>
+          <button type="button" class="btn-tri-voies" data-mode="gv" id="option-gv" aria-pressed="false">Grande voie</button>
         </div>
-        <div class="legende-cotation" id="legende-cotation" hidden>
+        <!-- Toujours visible (pas de hidden) : au repos, les bornes couvrent
+             toute l'échelle présente dans cette sortie, ce qui dit "inactif"
+             aussi clairement qu'un repli — même principe que le curseur
+             "Depuis le gîte" au plafond. -->
+        <div class="legende-cotation" id="legende-cotation">
+          <span class="legende-figure-label">Cotation des voies</span>
           <div class="legende-cotation-bornes">
             <label for="cotation-min">De</label>
             <select id="cotation-min"></select>
@@ -137,7 +191,6 @@
             <select id="cotation-max"></select>
           </div>
         </div>
-        <div class="legende-falaises" id="legende-falaises"></div>
         <!-- Filtre indépendant du mode "Cercles", pas une option de
              #mode-figure : il n'agit ni sur la taille ni sur la couleur des
              cercles, seulement sur qui reste affiché.
@@ -161,30 +214,44 @@
              pas des nuances à combiner. Placé avant "Depuis le gîte" :
              pertinent pour tout le monde, contrairement au trajet depuis un
              hébergement qu'on n'a pas forcément. -->
-        <!-- Fermé par défaut : voir .legende-filtres-avances dans style-carte.css. -->
-        <details class="legende-filtres-avances" id="legende-filtres-avances" hidden>
-          <summary>Filtres avancés</summary>
-          <div class="legende-filtres-contenu">
-            <button type="button" class="btn-reinitialiser-filtres" id="reinitialiser-filtres" disabled>Réinitialiser</button>
-            <div class="legende-ensoleillement" id="legende-ensoleillement" hidden role="group" aria-label="Filtrer par ensoleillement">
-              <span class="legende-ensoleillement-label">Ensoleillement</span>
-              <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="matin" />Matin</label>
-              <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="journee" />Journée</label>
-              <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="apres-midi" />Après-midi</label>
-              <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="nord" />Non</label>
-            </div>
-            <div class="legende-temps" id="legende-temps" hidden>
-              <div class="legende-temps-ligne1">
-                <label for="filtre-temps">Trajet depuis le gîte</label>
-                <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
-              </div>
-              <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
-            </div>
-          </div>
-        </details>
+        <div class="legende-ensoleillement" id="legende-ensoleillement" hidden role="group" aria-label="Filtrer par ensoleillement">
+          <span class="legende-ensoleillement-label">Ensoleillement</span>
+          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="matin" />Matin</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="journee" />Journée</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="apres-midi" />Après-midi</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="nord" />Non</label>
         </div>
+        <div class="legende-temps" id="legende-temps" hidden>
+          <div class="legende-temps-ligne1">
+            <label for="filtre-temps">Trajet depuis le gîte</label>
+            <span id="filtre-temps-valeur" class="filtre-temps-valeur" aria-live="polite"></span>
+          </div>
+          <input type="range" id="filtre-temps" aria-describedby="filtre-temps-valeur" />
+        </div>
+        <!-- Efface Ensoleillement + Depuis le gîte d'un coup (voir
+             configurerReinitialisationFiltres, carte.js) — après les deux,
+             pas avant : sa portée se lit par adjacence, pas par un titre.
+             Ni "Type de voie" ni "Cotation des voies" : leur propre remise à
+             "Toutes les voies"/pleine échelle se fait par leurs contrôles
+             respectifs. hidden par défaut (voir carte.js) tant qu'aucun des
+             deux filtres qu'il efface n'a de données exploitables. -->
+        <button type="button" class="btn-reinitialiser-filtres" id="reinitialiser-filtres" hidden disabled>Réinitialiser</button>
       </div>
     </div>
+  </div>
+
+  <!-- Bascule mobile plein écran Carte/Filtres : sous 641px, remplace la
+       légende flottante par un aller-retour explicite entre la carte et un
+       panneau plein écran (voir style-carte.css @media max-width:640px et
+       carte.js, definirVueMobile). Ancrée là où vivait .legende-toggle (bas
+       gauche) : jamais de chevauchement avec l'attribution OpenStreetMap
+       (bas droite, voir le commentaire de .bandeau-hors-ligne sur ce même
+       risque) ni avec l'indicateur hors-ligne (haut gauche). Invisible
+       ≥641px (desktop inchangé), sibling de #panneau-lateral et non imbriqué
+       dedans : elle ne doit pas défiler avec son contenu en mode Filtres. -->
+  <div class="bascule-vue" role="group" aria-label="Vue de la carte">
+    <button type="button" class="btn-vue" id="btn-vue-carte" aria-pressed="true">Carte</button>
+    <button type="button" class="btn-vue" id="btn-vue-filtres" aria-pressed="false">Filtres</button>
   </div>
 
   <!-- Sibling de #panneau-lateral, PAS imbriqué dedans : il s'ancre à droite,

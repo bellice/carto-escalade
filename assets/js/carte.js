@@ -115,7 +115,6 @@ export function initCarte(dataUrl) {
   // qui veut le second ne coche que son bouton. Voir
   // configurerFiltreEnsoleillement.
   const filtres = { recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity, ensoleillement: [] };
-  const blocCotation = document.getElementById('legende-cotation');
   let modeFigureActuel = 'aucun'; // mode courant du sélecteur "Cercles" — voir appliquerFiltres()
   // Bouton "Épurer" : indépendant de modeFigureActuel (voir construireSourceFalaises)
   // — un filtre couenne/gv/cotation actif le reste une fois la vue épurée.
@@ -131,8 +130,10 @@ export function initCarte(dataUrl) {
   const filtreTempsValeur = document.getElementById('filtre-temps-valeur');
   const legendeTemps = document.getElementById('legende-temps');
   const legendeEnsoleillement = document.getElementById('legende-ensoleillement');
-  const legendeFiltresAvances = document.getElementById('legende-filtres-avances');
   const btnReinitialiserFiltres = document.getElementById('reinitialiser-filtres');
+  const resumeResultats = document.getElementById('legende-resultat');
+  const btnVueCarte = document.getElementById('btn-vue-carte');
+  const btnVueFiltres = document.getElementById('btn-vue-filtres');
   // Posé par configurerFiltreEnsoleillement une fois les données connues —
   // sert à rafraichirNoteEnsoleillement (avertir qu'un filtre actif masque
   // aussi les falaises sans orientation connue, pas seulement celles qui ne
@@ -176,27 +177,43 @@ export function initCarte(dataUrl) {
   }
 
   // Grise "Réinitialiser" (jamais hidden : voir style-carte.css) tant
-  // qu'Ensoleillement et Depuis le gîte sont tous deux à leur état neutre —
-  // rien à réinitialiser. Appelé après chaque changement des deux filtres,
-  // et par reinitialiserFiltreTemps/reinitialiserFiltreEnsoleillement
-  // elles-mêmes (appelées aussi par "Tout voir" et allerVers) pour que le
-  // bouton se regrise avec eux.
+  // qu'aucun des trois filtres qu'il traite n'est actif — rien à
+  // réinitialiser. "Type de voie"/"Cotation des voies" comptent : eux aussi
+  // masquent des falaises derrière (estFalaiseVideDansMode, donnees.js), pas
+  // seulement une histoire de taille de cercle — même si couenne/gv/cotation
+  // sont mutuellement exclusifs entre eux (un seul actif à la fois, voir
+  // definirModeFigure), donc valent au plus 1 dans ce compte, jamais 2.
+  // Recherche exclue : "Tout voir" la traite déjà séparément, et elle ne
+  // "reste" jamais active de la même façon (elle se vide au moindre clic
+  // ailleurs). Appelé après chaque changement d'un des trois filtres —
+  // reinitialiserFiltreTemps/reinitialiserFiltreEnsoleillement/
+  // definirModeFigure (elles-mêmes appelées aussi par "Tout voir" et
+  // allerVers) — pour que le bouton se regrise avec eux. Même décompte
+  // affiché sur le bouton "Filtres" — bascule mobile ET repli desktop (voir
+  // son texte, .legende-toggle-texte).
   function rafraichirBoutonReinitialiserFiltres() {
-    if (!btnReinitialiserFiltres) return;
-    const actif = filtres.ensoleillement.length > 0 || filtres.tempsMaxGite < filtres.tempsGitePlafond;
-    btnReinitialiserFiltres.disabled = !actif;
+    const nActifs = (filtres.ensoleillement.length > 0 ? 1 : 0)
+      + (filtres.tempsMaxGite < filtres.tempsGitePlafond ? 1 : 0)
+      + (modeFigureActuel !== 'aucun' ? 1 : 0);
+    if (btnReinitialiserFiltres) btnReinitialiserFiltres.disabled = nActifs === 0;
+    const libelle = nActifs > 0 ? `Filtres · ${nActifs}` : 'Filtres';
+    if (btnVueFiltres) btnVueFiltres.textContent = libelle;
+    const texteToggleDesktop = document.querySelector('.legende-toggle-texte');
+    if (texteToggleDesktop) texteToggleDesktop.textContent = libelle;
   }
 
-  // Un seul bouton pour les deux filtres du repli "Filtres avancés" : plus
-  // rapide que décocher chaque case puis rendre le curseur à son plafond à
-  // la main. Portée volontairement limitée à ces deux filtres (pas la
-  // recherche ni le mode "Cercles") — "Tout voir" couvre déjà la remise à
-  // zéro complète, caméra comprise.
+  // Un seul bouton pour tout ce qui masque une falaise (Ensoleillement,
+  // Depuis le gîte, ET Type de voie/Cotation depuis que ceux-ci comptent
+  // aussi dans rafraichirBoutonReinitialiserFiltres — choisir "Couenne" ou
+  // resserrer une fourchette filtre tout autant que cocher "Matin", voir
+  // estFalaiseVideDansMode dans donnees.js) : plus rapide que défaire chaque
+  // réglage un par un. Recherche exclue : "Tout voir" la traite séparément.
   function configurerReinitialisationFiltres() {
     if (!btnReinitialiserFiltres) return;
     btnReinitialiserFiltres.addEventListener('click', () => {
       reinitialiserFiltreTemps();
       reinitialiserFiltreEnsoleillement();
+      definirModeFigure('aucun');
       appliquerFiltresEtSecteurs();
     });
   }
@@ -246,6 +263,16 @@ export function initCarte(dataUrl) {
     appliquerFiltres(entries, filtres, modeFigureActuel, falaiseSelectionneeCle);
     appliquerAntiCollisionSecteurs();
     appliquerAntiCollisionSites();
+    rafraichirResumeResultats();
+  }
+
+  // Résumé vivant en tête du panneau "Filtres" mobile (voir style-carte.css,
+  // #legende-resultat) : falaisesVisibles est déjà tenue à jour par
+  // appliquerFiltres juste au-dessus, aucun nouveau calcul nécessaire.
+  function rafraichirResumeResultats() {
+    if (!resumeResultats) return;
+    const n = falaisesVisibles.size;
+    resumeResultats.textContent = `${n} secteur${n === 1 ? '' : 's'} affiché${n === 1 ? '' : 's'}`;
   }
 
   // Change la falaise "active" (popup ouverte) : ses parkings associés
@@ -593,12 +620,22 @@ export function initCarte(dataUrl) {
   // d'un thème qui l'aurait masquée (voir estFalaiseVideDansMode).
   function definirModeFigure(nouveauMode) {
     modeFigureActuel = nouveauMode;
-    if (selectFigure) selectFigure.value = nouveauMode;
-    // Les bornes de cotation n'ont de sens que dans leur mode : les afficher
-    // en permanence laisserait croire qu'elles filtrent alors qu'elles ne
-    // pilotent rien (même principe que le filtre de trajet, masqué tant
-    // qu'aucun temps n'est calculable).
-    if (blocCotation) blocCotation.hidden = nouveauMode !== 'cotation';
+    boutonsTypeVoie.forEach((b) => {
+      const actif = b.dataset.mode === nouveauMode;
+      b.classList.toggle('actif', actif);
+      b.setAttribute('aria-pressed', String(actif));
+    });
+    // Cotation redevient neutre (bornes remises au complet) dès qu'un autre
+    // mode est choisi : sinon une fourchette resserrée resterait affichée
+    // sans plus rien piloter, comme si elle filtrait encore — même principe
+    // que "Depuis le gîte" au repos (curseur au plafond = aucune falaise
+    // exclue). "Cotation des voies" reste toujours visible (voir le HTML) :
+    // contrairement à l'ancien select, plus rien ne la masque, c'est cette
+    // remise à plat qui dit "inactive" plutôt qu'un hidden.
+    if (nouveauMode !== 'cotation' && selectCotationMin && selectCotationMax && selectCotationMin.options.length) {
+      selectCotationMin.selectedIndex = 0;
+      selectCotationMax.selectedIndex = selectCotationMax.options.length - 1;
+    }
     if (nouveauMode === 'cotation') majFourchette();
     // Couche native : remplace les features (un mode en exclut certaines,
     // voir construireSourceFalaises) et la couleur du thème. setData
@@ -618,6 +655,7 @@ export function initCarte(dataUrl) {
     // eux-mêmes sont retraités par appliquerFiltresEtSecteurs() (appelé par
     // le sélecteur après definirModeFigure).
     appliquerAntiCollisionSecteurs();
+    rafraichirBoutonReinitialiserFiltres();
   }
 
   // Navigue vers le marqueur "cle" (falaise ou parking lié depuis une popup),
@@ -756,11 +794,11 @@ export function initCarte(dataUrl) {
         configurerFiltreTemps(tempsDepuisGite);
         configurerFiltreEnsoleillement();
         configurerReinitialisationFiltres();
-        // Le repli lui-même reste hidden (voir HTML) tant qu'aucun des deux
-        // filtres qu'il contient n'a de données exploitables — sinon "Filtres
-        // avancés" s'ouvrirait sur un tiroir vide.
-        if (legendeFiltresAvances && ((legendeTemps && !legendeTemps.hidden) || (legendeEnsoleillement && !legendeEnsoleillement.hidden))) {
-          legendeFiltresAvances.hidden = false;
+        // "Réinitialiser" reste hidden (voir HTML) tant qu'aucun des deux
+        // filtres qu'il efface n'a de données exploitables dans cette sortie
+        // — sinon un bouton en permanence grisé, sans jamais rien à faire.
+        if (btnReinitialiserFiltres) {
+          btnReinitialiserFiltres.hidden = !((legendeTemps && !legendeTemps.hidden) || (legendeEnsoleillement && !legendeEnsoleillement.hidden));
         }
         appliquerFiltresEtSecteurs();
         if (etatChargement) etatChargement.remove();
@@ -1201,6 +1239,10 @@ export function initCarte(dataUrl) {
   function centrerSurRecherche() {
     const q = filtres.recherche;
     if (!q) return;
+    // Choisir un résultat depuis le panneau "Filtres" mobile doit ramener
+    // sur la carte pour le voir — sinon la caméra bouge derrière un panneau
+    // qui reste affiché, et le résultat semble n'avoir rien fait.
+    definirVueMobile('carte');
     // Le clavier mobile est encore ouvert : le prochain tap servirait à le
     // fermer plutôt qu'à atteindre sa cible. Bug constaté — après une
     // recherche, le lien « voir sur la carte » du parking restait sans effet.
@@ -1224,7 +1266,11 @@ export function initCarte(dataUrl) {
     btnCentrer.addEventListener('click', centrerSurRecherche);
   }
 
-  // --- Repli/déploiement du panneau légende (fermé par défaut, cf. HTML) ---
+  // --- Repli/déploiement des FILTRES desktop uniquement (fermé par défaut,
+  // cf. HTML) : .legende-cercles (pictos + cercles proportionnels) n'est
+  // plus concernée depuis que c'est un sibling séparé de .legende, affiché
+  // en permanence des deux côtés desktop et mobile — seuls les réglages
+  // (#legende-contenu) se replient. ---
   const legendeToggle = document.querySelector('.legende-toggle');
   const legendeContenu = document.getElementById('legende-contenu');
   if (legendeToggle && legendeContenu) {
@@ -1235,25 +1281,58 @@ export function initCarte(dataUrl) {
       // L'état visuel est porté par l'icône (rotation CSS via aria-expanded,
       // voir .legende-toggle-icone) — le aria-label reste explicite pour le
       // lecteur d'écran (une icône seule ne l'est pas).
-      legendeToggle.setAttribute('aria-label', vaOuvrir ? 'Réduire la légende' : 'Déplier la légende');
-      // Le libellé VISIBLE suit l'état (un chevron seul était illisible) :
-      // "Masquer" quand la légende est affichée, "Afficher" quand repliée.
-      const texteToggle = legendeToggle.querySelector('.legende-toggle-texte');
-      if (texteToggle) texteToggle.textContent = vaOuvrir ? 'Masquer' : 'Afficher';
+      legendeToggle.setAttribute('aria-label', vaOuvrir ? 'Réduire les filtres' : 'Déplier les filtres');
+      // Le libellé VISIBLE ("Filtres" / "Filtres · N") ne dit plus l'état —
+      // c'est le rôle du chevron (rotation CSS via aria-expanded, voir
+      // .legende-toggle-icone) — mais LE nombre de filtres actifs, tenu à
+      // jour par rafraichirBoutonReinitialiserFiltres. Le aria-label reste
+      // le seul endroit qui dit l'état, explicitement, pour qui n'a pas
+      // l'icône.
     });
   }
 
-  // --- Sélecteur de figuré (cercles proportionnels) ---
-  const selectFigure = document.getElementById('mode-figure');
-  if (selectFigure) {
-    selectFigure.addEventListener('change', () => {
-      definirModeFigure(selectFigure.value);
+  // --- Bascule mobile "Carte" / "Filtres" (voir style-carte.css, @media
+  // max-width:640px) : sous 641px, remplace la légende flottante par un
+  // aller-retour plein écran entre la carte et le panneau de filtres —
+  // #panneau-lateral, invisible hors media query. Sans effet ≥641px (garde
+  // en plus de celle du CSS, au cas où un futur appel oublierait le
+  // contexte) : #map reste alors la seule vue, comme aujourd'hui.
+  // inert sur la carte pendant "Filtres" : contrairement à la fiche mobile
+  // (qui ne recouvre qu'une partie de l'écran, zoom/"Tout voir" restent
+  // volontairement joignables), ce panneau remplace la carte en entier —
+  // sans inert, ces contrôles resteraient dans l'ordre de tabulation tout en
+  // étant invisibles. Même mécanisme déjà en place pour #panneau-falaise
+  // (voir ouvrirPanneauFalaise/fermerPanneauFalaise, marqueurs.js).
+  function definirVueMobile(vue) {
+    if (estDesktop()) return;
+    const enFiltres = vue === 'filtres';
+    document.body.classList.toggle('mode-filtres', enFiltres);
+    if (btnVueCarte) btnVueCarte.setAttribute('aria-pressed', String(!enFiltres));
+    if (btnVueFiltres) btnVueFiltres.setAttribute('aria-pressed', String(enFiltres));
+    if (map) map.getContainer().toggleAttribute('inert', enFiltres);
+  }
+  if (btnVueCarte) btnVueCarte.addEventListener('click', () => definirVueMobile('carte'));
+  if (btnVueFiltres) btnVueFiltres.addEventListener('click', () => definirVueMobile('filtres'));
+
+  // --- "Type de voie" (cercles proportionnels) : boutons à choix unique,
+  // même grammaire que .btn-tri-voies ailleurs sur le site (un seul actif à
+  // la fois, aria-pressed). Remplace l'ancien select unique "Cercles", qui
+  // mélangeait deux questions différentes (quel TYPE de voie, quelle
+  // COTATION) dans un seul contrôle à 4 choix exclusifs — "Cotation des
+  // voies" juste en dessous est désormais une section à part entière. Les
+  // deux restent mutuellement exclusifs (une falaise n'a qu'une SEULE
+  // grandeur affichée par la taille de son cercle à la fois — voir
+  // symboles.js), mais chacun a maintenant son propre contrôle visible. ---
+  const boutonsTypeVoie = document.querySelectorAll('.legende-figure .btn-tri-voies');
+  boutonsTypeVoie.forEach((bouton) => {
+    bouton.addEventListener('click', () => {
+      definirModeFigure(bouton.dataset.mode);
       // Une falaise sans donnée pour ce thème disparaît (source reconstruite
       // par construireSourceFalaises) — son parking ne doit pas rester
       // affiché seul, sans rien à proposer.
       appliquerFiltresEtSecteurs();
     });
-  }
+  });
 
   // --- Bouton "Épurer" (taille uniforme, indépendant du mode ci-dessus) ---
   const btnEpuree = document.querySelector('.btn-epuree');
@@ -1331,10 +1410,12 @@ export function initCarte(dataUrl) {
     });
     const crans = [...parValeur.entries()].sort((a, b) => a[0] - b[0]);
     if (!crans.length) {
+      // Plus d'option "cotation" à retirer d'un select (voir "Type de voie"
+      // plus haut, qui n'en propose plus) : "Cotation des voies" n'existe
+      // désormais que comme section à part entière, retirée en bloc ici si
+      // aucune cotation exploitable n'existe dans cette sortie.
       const bloc = document.getElementById('legende-cotation');
       if (bloc) bloc.remove();
-      const option = selectFigure?.querySelector('option[value="cotation"]');
-      if (option) option.remove();
       return;
     }
     const options = crans.map(([valeur, libelle]) =>

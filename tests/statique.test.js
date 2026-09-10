@@ -317,7 +317,7 @@ describe('Lisibilité : échelle typographique', () => {
 
   // Sur un écran tactile, :hover ne se « dé-survole » jamais après un tap :
   // l'élément touché reste affiché comme sélectionné jusqu'à ce qu'on tape
-  // ailleurs. Constaté sur le bouton Masquer/Afficher de la légende.
+  // ailleurs. Constaté sur le bouton "Filtres" de la légende (.legende-toggle).
   test('aucun état de survol hors de @media (hover: hover)', async () => {
     const css = (await lire('assets/style-carte.css')).replace(/\/\*[\s\S]*?\*\//g, '');
     const garde = css.indexOf('@media (hover: hover)');
@@ -373,8 +373,9 @@ describe('Lisibilité : échelle typographique', () => {
   // iOS zoome au focus de TOUT contrôle de formulaire sous 16px, <select>
   // compris — vérifié en documentation après avoir failli les en exclure.
   // Le zoom ne se défait pas tout seul : l'utilisateur reste coincé zoomé sur
-  // la carte. Le poids visuel du sélecteur se règle par la POLICE (voir
-  // .legende-figure select), pas par la taille.
+  // la carte. #mode-figure n'y figure plus : remplacé par des boutons
+  // ("Type de voie"), que ce bug Safari ne concerne pas — seuls restent les
+  // deux <select> de cotation.
   test('les contrôles de formulaire font 16 px sur mobile', async () => {
     const css = await lire('assets/style-carte.css');
     // Ancrer sur la SECTION mobile : `.recherche-champ input` existe aussi en
@@ -383,7 +384,7 @@ describe('Lisibilité : échelle typographique', () => {
     assert.ok(ancre > -1, 'Section « Champs de saisie sur mobile » introuvable');
     const section = css.slice(ancre);
 
-    for (const selecteur of ['.recherche-champ input', '#mode-figure', '#cotation-min', '#cotation-max']) {
+    for (const selecteur of ['.recherche-champ input', '#cotation-min', '#cotation-max']) {
       const i = section.indexOf(selecteur);
       assert.ok(i > -1, `${selecteur} absent de la section mobile`);
       const regle = /\{([\s\S]*?)\}/.exec(section.slice(i));

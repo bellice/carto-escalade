@@ -337,14 +337,28 @@ describe('Vocabulaire de la légende', () => {
         await page.waitForTimeout(700);
 
         const fautifs = await page.evaluate(async () => {
-          const sel = document.getElementById('mode-figure');
+          const cleTexte = () => document.querySelector('#cle-falaises-zone .cle')?.textContent.trim() || '';
           const mauvais = [];
-          for (const mode of [...sel.options].map((o) => o.value)) {
-            sel.value = mode;
-            sel.dispatchEvent(new Event('change', { bubbles: true }));
+          // "Type de voie" : boutons à choix unique (Toutes les voies /
+          // Couenne / Grande voie) — .click() déclenche le même écouteur
+          // qu'un vrai clic, peu importe que le panneau Filtres soit
+          // visuellement actif ou non sur ce viewport mobile.
+          for (const bouton of document.querySelectorAll('.legende-figure .btn-tri-voies')) {
+            bouton.click();
             await new Promise((r) => setTimeout(r, 200));
-            const texte = document.querySelector('#cle-falaises-zone .cle')?.textContent.trim() || '';
-            if (!/secteur/i.test(texte)) mauvais.push(`${mode} → « ${texte} »`);
+            const texte = cleTexte();
+            if (!/secteur/i.test(texte)) mauvais.push(`${bouton.dataset.mode} → « ${texte} »`);
+          }
+          // "Cotation des voies" : plus de 5e option dans un select, ce mode
+          // s'active en touchant l'une des deux bornes (voir definirModeFigure,
+          // carte.js) — absent si cette sortie n'a aucune cotation exploitable
+          // (voir preparerFourchette, qui retire #legende-cotation entier).
+          const min = document.getElementById('cotation-min');
+          if (min && min.options.length) {
+            min.dispatchEvent(new Event('change', { bubbles: true }));
+            await new Promise((r) => setTimeout(r, 200));
+            const texte = cleTexte();
+            if (!/secteur/i.test(texte)) mauvais.push(`cotation → « ${texte} »`);
           }
           return mauvais;
         });
@@ -451,20 +465,16 @@ describe('Filtre par fourchette de cotation', () => {
       await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
       await attendreCarte(page);
 
-      // Les bornes ne s'affichent que dans leur mode : ailleurs, elles
-      // laisseraient croire qu'elles filtrent.
-      assert.equal(await page.evaluate(() => document.getElementById('legende-cotation').hidden), true,
-        'La fourchette ne doit pas être visible hors du mode cotation');
-
-      await page.selectOption('#mode-figure', 'cotation');
-      await page.waitForTimeout(600);
-
+      // "Cotation des voies" est une section à part entière, toujours
+      // visible — plus un mode qu'il faudrait d'abord sélectionner dans un
+      // menu déroulant (voir definirModeFigure, carte.js). Rien ne la
+      // distingue visuellement tant qu'elle reste à l'échelle complète.
       const complet = await page.evaluate(() => ({
         visible: !document.getElementById('legende-cotation').hidden,
         crans: document.querySelectorAll('#cotation-min option').length,
         falaises: window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length,
       }));
-      assert.equal(complet.visible, true);
+      assert.equal(complet.visible, true, 'La fourchette de cotation doit être visible en permanence');
       assert.ok(complet.crans > 5,
         'Les listes doivent être peuplées avec les cotations réellement présentes');
 
@@ -475,10 +485,17 @@ describe('Filtre par fourchette de cotation', () => {
       await page.selectOption('#cotation-max', { label: '5c' });
       await page.waitForTimeout(600);
 
-      const restreint = await page.evaluate(() =>
-        window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length);
-      assert.ok(restreint < complet.falaises,
-        `La fourchette doit masquer des falaises (${restreint} vs ${complet.falaises})`);
+      const apresFourchette = await page.evaluate(() => ({
+        falaises: window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length,
+        // Toucher la fourchette bascule "Type de voie" sur aucun bouton actif
+        // (mutuellement exclusifs, voir definirModeFigure) — pas un select à
+        // 5e option "cotation" comme avant.
+        typeVoieActif: document.querySelector('.legende-figure .btn-tri-voies[aria-pressed="true"]'),
+      }));
+      assert.ok(apresFourchette.falaises < complet.falaises,
+        `La fourchette doit masquer des falaises (${apresFourchette.falaises} vs ${complet.falaises})`);
+      assert.equal(apresFourchette.typeVoieActif, null,
+        'Resserrer la cotation doit désactiver "Type de voie" (mutuellement exclusifs)');
       // Pas de compte affiché : les modes couenne/grande voie masquent eux
       // aussi sans annoncer de total — n'en afficher un que pour la fourchette
       // serait incohérent. Voir majFourchette (carte.js).
@@ -501,8 +518,9 @@ describe('Filtre par fourchette de cotation', () => {
 });
 
 // Bouton "Épurer" : désencombre les cercles sans changer de zoom (donc sans
-// perdre les libellés de secteur). Séparé du select de mode, pas une 6e
-// option — d'où le test de composition avec un mode actif ci-dessous.
+// perdre les libellés de secteur). Indépendant de "Type de voie", pas un 4e
+// bouton du même groupe — d'où le test de composition avec un mode actif
+// ci-dessous.
 describe('Bouton Épurer', () => {
   for (const lieu of LIEUX) {
     test(`${lieu} : cercles uniformes, légende sans taille, filtre conservé`, { timeout: 90000 }, async () => {
@@ -512,10 +530,10 @@ describe('Bouton Épurer', () => {
         await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
         await attendreCarte(page);
 
-        // Un filtre actif (Grandes voies) AVANT d'épurer : doit rester actif
+        // Un filtre actif (Grande voie) AVANT d'épurer : doit rester actif
         // après — les deux contrôles sont indépendants, pas mutuellement
         // exclusifs comme l'étaient les options d'un même sélecteur.
-        await page.selectOption('#mode-figure', 'gv');
+        await page.click('[data-mode="gv"]');
         await page.waitForTimeout(400);
         const avant = await page.evaluate(() =>
           window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length);
@@ -540,7 +558,7 @@ describe('Bouton Épurer', () => {
 
         assert.ok(r.nbFalaises > 0, `${lieu} : aucune falaise rendue en vue épurée`);
         assert.equal(r.nbFalaises, avant,
-          `${lieu} : épurer a changé le nombre de falaises filtrées par "Grandes voies" (${avant} avant, ${r.nbFalaises} après)`);
+          `${lieu} : épurer a changé le nombre de falaises filtrées par "Grande voie" (${avant} avant, ${r.nbFalaises} après)`);
         assert.equal(r.nbRayonsDistincts, 1,
           `${lieu} : les cercles n'ont pas tous le même rayon en vue épurée (${r.nbRayonsDistincts} valeurs)`);
         assert.equal(r.aDesReperes, false,
@@ -582,13 +600,22 @@ describe('Légende sur mobile', () => {
         await page.waitForSelector('.maplibregl-canvas', { timeout: 30000 });
         await page.waitForTimeout(2500);
 
+        // Sur mobile, #legende-contenu n'existe visuellement que dans le
+        // panneau "Filtres" plein écran (voir style-carte.css) — l'atteindre
+        // avant de mesurer, sinon scrollWidth/clientWidth valent 0 tous les
+        // deux (élément non rendu) et le test ne vérifie plus rien.
+        if (vue.tactile) await page.click('#btn-vue-filtres');
+
         const deborde = () => page.evaluate(() => {
           const el = document.querySelector('.legende-contenu');
           return el.scrollWidth > el.clientWidth;
         });
         assert.equal(await deborde(), false, `Débordement de la légende au chargement (${vue.nom})`);
 
-        await page.selectOption('#mode-figure', 'cotation');
+        // Touche une borne pour peupler/afficher la fourchette réellement
+        // large (voir preparerFourchette, carte.js) — plus de 5e option
+        // "cotation" à choisir dans un select.
+        await page.selectOption('#cotation-min', { index: 1 });
         await page.waitForTimeout(700);
         assert.equal(await deborde(), false, `Débordement une fois la fourchette affichée (${vue.nom})`);
       } finally {
@@ -598,8 +625,14 @@ describe('Légende sur mobile', () => {
   });
 
   test('le bouton ne reste pas surligné après un tap', { timeout: 90000 }, async () => {
+    // Viewport large (>640px) mais tactile : simule un écran tactile en mise
+    // en page desktop (tablette/PC à écran tactile), le contexte réel où ce
+    // bouton existe. Sous 640px il est masqué — la bascule Carte/Filtres y
+    // joue ce rôle, avec un fond qui change VOLONTAIREMENT à l'état actif
+    // (aria-pressed), ce que ce test ne doit pas confondre avec un survol
+    // resté collé.
     const contexte = await navigateur.newContext({
-      viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+      viewport: { width: 900, height: 900 }, hasTouch: true, isMobile: false,
     });
     const page = await contexte.newPage();
     try {
@@ -786,7 +819,11 @@ describe('Fiche falaise', () => {
       await page.waitForSelector('.detail-voies-liste', { timeout: 10000 });
 
       const cotation = await page.evaluate(() => ({
-        actif: document.querySelector('.btn-tri-voies.actif')?.dataset.tri,
+        // Scopé à .detail-voies-tri : .btn-tri-voies est aussi la classe des
+        // boutons "Type de voie" de la légende (même grammaire visuelle,
+        // voir style-carte.css) — un querySelector non scopé risquerait de
+        // retomber sur eux plutôt que sur le tri de CETTE fiche.
+        actif: document.querySelector('.detail-voies-tri .btn-tri-voies.actif')?.dataset.tri,
         sousLignes: document.querySelectorAll('.detail-voie-longueur').length,
       }));
       assert.equal(cotation.actif, 'cotation', 'Le tri par cotation est le défaut');
@@ -797,7 +834,11 @@ describe('Fiche falaise', () => {
       await page.waitForTimeout(300);
 
       const position = await page.evaluate(() => ({
-        actif: document.querySelector('.btn-tri-voies.actif')?.dataset.tri,
+        // Scopé à .detail-voies-tri : .btn-tri-voies est aussi la classe des
+        // boutons "Type de voie" de la légende (même grammaire visuelle,
+        // voir style-carte.css) — un querySelector non scopé risquerait de
+        // retomber sur eux plutôt que sur le tri de CETTE fiche.
+        actif: document.querySelector('.detail-voies-tri .btn-tri-voies.actif')?.dataset.tri,
         sousLignes: document.querySelectorAll('.detail-voie-longueur').length,
       }));
       assert.equal(position.actif, 'position');

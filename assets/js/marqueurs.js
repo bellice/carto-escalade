@@ -133,6 +133,19 @@ export function synchroniserPoignee(poignee, reduire) {
   if (spanTexte) spanTexte.textContent = texte;
 }
 
+// Une fiche qui s'ouvre ramène toujours sur "Carte" (jamais sur "Filtres",
+// voir carte.js/definirVueMobile) : la CSS masque déjà .bascule-vue tant que
+// body.fiche-ouverte est posé (voir style-carte.css), mais l'état interne du
+// panneau "Filtres" doit être remis à zéro dès maintenant — sinon fermer
+// cette fiche plus tard réafficherait la pilule bloquée sur "Filtres" et la
+// carte resterait inert.
+function reinitialiserVueMobile(map) {
+  document.body.classList.remove('mode-filtres');
+  document.getElementById('btn-vue-carte')?.setAttribute('aria-pressed', 'true');
+  document.getElementById('btn-vue-filtres')?.setAttribute('aria-pressed', 'false');
+  map.getContainer().removeAttribute('inert');
+}
+
 export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, onSelectionFalaise, suivrePopup, estFicheReduite, urlRoute) {
   const p = feature.properties;
   const [lon, lat] = feature.geometry.coordinates;
@@ -235,6 +248,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     }
     if (suivrePopup) suivrePopup(popup, true);
     document.body.classList.add('fiche-ouverte');
+    reinitialiserVueMobile(map);
     // L'état replié/déplié est partagé (ficheReduite, carte.js) et doit
     // survivre au changement de fiche. toggle(classe, force) et non add/remove
     // conditionnel : ce conteneur est réutilisé et peut porter un état périmé.
@@ -307,6 +321,7 @@ export function ouvrirPopupFalaise(map, entree, ctx) {
   popup.on('open', () => {
     if (suivrePopup) suivrePopup(popup, true);
     document.body.classList.add('fiche-ouverte');
+    reinitialiserVueMobile(map);
     const elPopup = popup.getElement();
     const contenu = elPopup && elPopup.querySelector('.maplibregl-popup-content');
     const poignee = elPopup && elPopup.querySelector('.poignee-fiche');
