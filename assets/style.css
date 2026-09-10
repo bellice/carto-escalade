@@ -150,6 +150,21 @@ a:visited { color: var(--forest); }
   line-height: 1.5;
 }
 
+/* Sur un grand écran, ce bloc mesure 425px de haut pour 900 de fenêtre : il
+   se terminait avant la moitié, calé en haut comme un document plutôt que
+   composé comme une page — plus de la moitié de l'écran restait vide dessous
+   sans que rien ne la joue. Un padding haut proportionnel le descend au
+   centre OPTIQUE (un peu au-dessus du centre géométrique, où l'œil attend le
+   repos). Du padding et non un centrage flex : un flex centré rogne le haut
+   du contenu dès qu'il dépasse la hauteur, ce qui arriverait sur les mentions
+   légales, qui partagent cette classe. 760px de seuil : en dessous (paysage
+   sur téléphone), il n'y a pas de vide à combler. */
+@media (min-height: 760px) {
+  .home {
+    padding-top: 12vh;
+  }
+}
+
 .home h1 {
   font-size: var(--fs-2xl);
   letter-spacing: -0.01em;
@@ -301,6 +316,18 @@ a:visited { color: var(--forest); }
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 4px;
+}
+
+/* Voix « donnée » du site (mono), la même que les cotations et les compteurs
+   de la carte : ces trois lignes sont des mesures, pas de la prose. --muted
+   et un palier sous le nom — elles distinguent les lieux sans jamais
+   concurrencer le lien, qui reste la seule chose à cliquer. Gardée en dehors
+   du survol clay du lien (couleur explicite, donc non héritée) : le nom seul
+   réagit, la mesure ne bouge pas. */
+.sortie-list .sortie-chiffres {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
 }
 
 .note-preparer {

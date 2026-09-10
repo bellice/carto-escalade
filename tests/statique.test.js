@@ -120,6 +120,40 @@ describe('Lieux publiés', () => {
       'Aucun dossier portant un data.geojson : tous les tests par lieu ci-dessous ' +
       'passeraient à vide sans que rien ne le signale.');
   });
+
+  // L'accueil affiche une ligne de mesures par lieu (secteurs, voies, roche)
+  // pour distinguer trois entrées autrement identiques. Elle est écrite en
+  // dur : le site n'a pas d'étape de build, et lire les data.geojson depuis
+  // l'accueil coûterait leur téléchargement sur une page qui doit rester
+  // légère et disponible hors ligne. Écrire en dur ne veut pas dire laisser
+  // dériver — un réexport qui ajoute vingt voies rendrait ces chiffres faux
+  // en silence, exactement le genre d'écart que ce fichier existe pour
+  // attraper (voir le « 111 falaises » corrigé sur cette même page).
+  test('les chiffres de l\'accueil correspondent aux données', async () => {
+    const html = await lire('index.html');
+    for (const lieu of LIEUX) {
+      const bloc = new RegExp(
+        `href="${lieu}/"[\\s\\S]*?class="sortie-chiffres">([^<]+)<`
+      ).exec(html);
+      assert.ok(bloc, `${lieu} : pas de ligne .sortie-chiffres sur l'accueil`);
+
+      const falaises = (await geojsonDe(lieu)).features
+        .map((f) => f.properties)
+        .filter((p) => p.categorie === 'falaise');
+      const secteurs = falaises.length;
+      const voies = falaises.reduce((n, p) => n + (p.nb_voie_total || 0), 0);
+      const roches = new Map();
+      for (const p of falaises) {
+        if (p.type_roche) roches.set(p.type_roche, (roches.get(p.type_roche) || 0) + 1);
+      }
+      const roche = [...roches.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+
+      const attendu = `${secteurs} secteurs · ${voies} voies · ${roche}`;
+      assert.equal(bloc[1].trim(), attendu,
+        `${lieu} : l'accueil annonce « ${bloc[1].trim() }» alors que data.geojson ` +
+        `donne « ${attendu} » — corriger index.html.`);
+    }
+  });
 });
 
 for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
