@@ -1472,20 +1472,31 @@
   margin-bottom: 2px;
 }
 
+/* Contour et non aplat plein : en pastille pleine, ce tag pesait visuellement
+   autant que le nom juste en dessous — or il porte la CATÉGORIE, identique
+   sur toutes les fiches d'un même type, donc sans information, quand le nom
+   est l'identité de ce qu'on regarde. La hiérarchie était inversée au profit
+   du moins informatif. Le contour garde le codage couleur (clay falaise,
+   teal parking, ink gîte) en lui rendant son rang.
+   currentColor pour le filet : une seule déclaration de couleur par
+   catégorie ci-dessous, texte et bordure ne peuvent pas diverger. */
 .popup .cat-tag {
   display: inline-block;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 2px 6px;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
   border-radius: var(--radius-sm);
   margin-bottom: 8px;
-  color: var(--paper);
+  background: none;
 }
-.cat-tag.falaise { background: var(--clay); }
-.cat-tag.parking { background: var(--teal); }
-.cat-tag.gite { background: var(--ink); }
+/* --teal-dark et non --teal : en texte il faut viser 4.5:1 (WCAG 1.4.3) et
+   non les 3:1 d'un aplat. Même arbitrage que .parking-titre plus haut. */
+.cat-tag.falaise { color: var(--clay); }
+.cat-tag.parking { color: var(--teal-dark); }
+.cat-tag.gite { color: var(--ink); }
 
 /* Fiche technique : libellé à gauche, valeur à droite sur la même ligne
    (plutôt qu'un <dl> terme/description empilé verticalement — bien moins
@@ -1798,6 +1809,46 @@
   border-color: var(--forest);
   color: var(--paper);
   cursor: default;
+}
+
+/* Contrôle segmenté — « Type de voie » uniquement (le tri des voies en fiche
+   garde ses boutons détachés, ils n'ont que deux choix et de la place).
+   Trois boutons espacés dans les 288px utiles du panneau desktop tombaient
+   en 2 + 1 : « Toutes les voies » et « Couenne » sur une ligne, « Grande
+   voie » seule dessous. Trois choix de même rang que le seul hasard de la
+   largeur rendait inégaux. Jointifs, ils occupent la ligne entière et se
+   lisent enfin comme un choix unique.
+   flex-grow sur une base "auto" plutôt que des tiers égaux : « Toutes les
+   voies » est deux fois plus long que « Couenne », des tiers l'auraient
+   tronqué. Chacun part de sa largeur de texte, le reste se répartit.
+   Le modificateur porte sur .legende-figure et n'ajoute aucun élément : les
+   sélecteurs JS et de test (.legende-figure .btn-tri-voies) sont inchangés. */
+.legende-figure--segments {
+  gap: 0;
+}
+.legende-figure--segments .btn-tri-voies {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-inline: 6px;
+  border-radius: 0;
+  white-space: nowrap;
+}
+/* Filets mitoyens fondus en un seul trait, sinon chaque jointure en montre
+   deux collés (2px là où le reste du groupe en a 1). */
+.legende-figure--segments .btn-tri-voies:not(:first-of-type) {
+  margin-left: -1px;
+}
+.legende-figure--segments .btn-tri-voies:first-of-type {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.legende-figure--segments .btn-tri-voies:last-of-type {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+/* Le segment actif passe au-dessus : sans ça, la marge négative du suivant
+   recouvre son filet droit, qui est justement celui qui le délimite. */
+.legende-figure--segments .btn-tri-voies.actif {
+  position: relative;
+  z-index: 1;
 }
 
 /* "← Retour" ancré en bas (sticky), pas en haut à côté du titre (1er/2e jet,

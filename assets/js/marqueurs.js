@@ -309,7 +309,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
 
 // Popup d'une falaise (couche native) : ouverte à la demande, faute de
 // marqueur DOM auquel l'attacher.
-export function ouvrirPopupFalaise(map, entree, ctx) {
+export function ouvrirPopupFalaise(map, entree, ctx, cameraDejaEncadree = false) {
   const { enSurbrillance, onSelectionFalaise, suivrePopup, estFicheReduite, urlRoute } = ctx;
   // closeOnClick:false : même raison que dans addMarker.
   const popup = new maplibregl.Popup({ offset: 14, closeOnClick: false })
@@ -335,6 +335,31 @@ export function ouvrirPopupFalaise(map, entree, ctx) {
     }
     if (onSelectionFalaise) onSelectionFalaise(entree.cle);
     enSurbrillance([entree.cle, ...entree.parkingAssocie]);
+
+    // Recadrage mobile — l'équivalent de ce que ouvrirPanneauFalaise fait
+    // depuis toujours côté desktop, et qui manquait ici. Taper un cercle
+    // dans la moitié basse de l'écran ouvrait la feuille PAR-DESSUS lui :
+    // on perdait de vue le point qu'on venait justement de désigner, au
+    // moment précis où on lisait sa fiche, alors que la moitié haute de la
+    // carte était vide.
+    // La visibilité se teste contre le padding CIBLE et non contre
+    // map.getPadding() (que reinitialiserPadding vient de remettre à zéro) :
+    // la feuille occupe ~47% de la hauteur, un point « visible » dans le
+    // conteneur entier est très souvent dessous. Le desktop peut se le
+    // permettre, sa boîte libre reste large ; ici non.
+    // cameraDejaEncadree : allerVers vient peut-être d'animer la caméra vers
+    // cette falaise, on ne coupe pas son vol pour refaire le même travail.
+    if (!cameraDejaEncadree) {
+      map.stop();
+      reinitialiserPadding(map);
+      const padding = margeAvantPopup();
+      const visible = estPointVisible(map, entree.lon, entree.lat, padding);
+      map.easeTo({
+        padding,
+        ...(visible ? {} : { center: [entree.lon, entree.lat] }),
+        duration: dureeAnimation(200),
+      });
+    }
 
     chargerDetailVoies(elPopup, urlRoute);
   });

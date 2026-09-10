@@ -645,7 +645,7 @@ export function initCarte(dataUrl) {
     definirFalaiseSelectionnee(cle);
     popupOuverte = estDesktop()
       ? ouvrirPanneauFalaise(map, entree, ctxPanneau, cameraDejaEncadree)
-      : ouvrirPopupFalaise(map, entree, ctxPopup);
+      : ouvrirPopupFalaise(map, entree, ctxPopup, cameraDejaEncadree);
   }
 
   // Couleur de la couche "falaises" : COULEUR_ELOIGNE (vue lointaine) OU
