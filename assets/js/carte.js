@@ -904,17 +904,22 @@ export function initCarte(dataUrl) {
       // voir" doit revenir à la même vue qu'à l'arrivée, pas à une vue plus
       // zoomée qui réintroduirait le chevauchement des cercles.
       if (borneGlobale) map.fitBounds(borneGlobale, { padding: margeToutVoir(), maxZoom: ZOOM_VUE_ENSEMBLE_MAX });
-      // "Vue d'ensemble" signifie repartir à zéro : ni sélection, ni
-      // recherche, ni aucun filtre qui masque des falaises — sinon la caméra
-      // revient mais les marqueurs restent restreints, contradiction avec
-      // "tout voir". Type de voie compris (couenne/gv masquent des falaises
-      // comme les autres).
+      // "Tout voir" est un contrôle de CAMÉRA, posé dans le coin carte à côté
+      // du zoom — pas un bouton du panneau Filtres. Il efface donc ce qui est
+      // propre à la NAVIGATION (la sélection, et la recherche : un champ
+      // texte transitoire, pas une préférence qu'on veut garder d'une session
+      // à l'autre), mais ne touche plus à Type de voie / Cotation des voies /
+      // Ensoleillement / Trajet depuis le gîte : ce sont des préférences
+      // choisies explicitement, qu'un bouton de caméra n'a pas à défaire.
+      // Zoomer sur l'ensemble avec un filtre actif peut légitimement ne
+      // montrer que quelques secteurs dans un coin de la vue — c'est l'effet
+      // attendu du filtre, pas un bug ; "Réinitialiser" reste le bouton dédié
+      // à l'effacer. (Essayé l'inverse dans un premier temps — tout effacer,
+      // filtres compris — et c'était le mauvais choix : personne ne s'attend
+      // à perdre son filtre "Couenne, ≤30 min du gîte" en cliquant un bouton
+      // de zoom.)
       falaiseSelectionneeCle = null;
       reinitialiserRecherche();
-      reinitialiserFiltreTemps();
-      reinitialiserFiltreEnsoleillement();
-      reinitialiserFiltreCotation();
-      definirModeFigure('aucun');
       appliquerFiltresEtSecteurs();
     }), 'top-right');
 
