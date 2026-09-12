@@ -184,13 +184,21 @@ describe('Fiche parking chargée', () => {
             }
           }
           const [nom, n] = [...compte.entries()].sort((a, b) => b[1] - a[1])[0] || [];
-          if (!nom) return null;
+          // Distingué de "marqueur introuvable" (aucun parking_associe DU
+          // TOUT dans ce data.geojson, PAS juste le plus fourni des deux qui
+          // manquerait) : un lieu publié avant la fin de sa saisie peut
+          // légitimement n'avoir encore aucun parking (voir README.md,
+          // « Ajouter un lieu ») — rien à tester ici tant que ce n'est pas le
+          // cas, mais un marqueur manquant pour un nom qui EXISTE dans les
+          // données reste le bug qu'était ce test.
+          if (!nom) return { pasDeParking: true };
           const el = [...document.querySelectorAll('.maplibregl-marker')]
             .find((e) => (e.getAttribute('aria-label') || '').includes(nom));
           if (!el) return null;
           el.click();
           return { nom, n };
         });
+        if (cible?.pasDeParking) return;
         assert.ok(cible, `${lieu} : aucun marqueur de parking trouvé`);
 
         await page.waitForSelector('.popup .actions', { timeout: 10000 });
@@ -540,6 +548,14 @@ describe('Bouton Épurer', () => {
         await exposerCarte(page);
         await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
         await attendreCarte(page);
+
+        // Les boutons Couenne/Grande voie se retirent tout seuls quand
+        // aucune falaise n'a l'une ou l'autre donnée (voir carte.js,
+        // auMoinsUneAvecType) — cas légitime d'un lieu publié avant la fin de
+        // sa saisie (voir README.md, « Ajouter un lieu »). Rien à composer
+        // avec Épurer dans ce cas, ce test n'a pas d'autre objet.
+        const aTypeVoie = await page.evaluate(() => Boolean(document.querySelector('[data-mode="gv"]')));
+        if (!aTypeVoie) return;
 
         // Un filtre actif (Grande voie) AVANT d'épurer : doit rester actif
         // après — les deux contrôles sont indépendants, pas mutuellement

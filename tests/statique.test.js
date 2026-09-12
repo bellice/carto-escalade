@@ -163,6 +163,17 @@ describe('Lieux publiés', () => {
       }
       const roche = [...roches.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
 
+      // Un lieu encore en cours de saisie (aucun type_roche renseigné dans
+      // falaise.csv pour la moindre falaise, donc roche reste undefined) peut
+      // dire son avancement en mots plutôt qu'un décompte qui montrerait "0
+      // voies" et une roche manquante — voir "Cassis et La Ciotat" et
+      // redaction.html. Rien à comparer dans ce cas : l'assertion juste
+      // au-dessus a déjà vérifié que la ligne existe, son contenu exact n'est
+      // pas de la responsabilité de ce test tant que la donnée est ce
+      // creuse. Le jour où une roche est saisie, le lieu quitte cette
+      // branche et le décompte strict s'applique de lui-même.
+      if (roche === undefined) continue;
+
       const attendu = `${secteurs} secteurs · ${voies} voies · ${roche}`;
       assert.equal(bloc[1].trim(), attendu,
         `${lieu} : l'accueil annonce « ${bloc[1].trim() }» alors que data.geojson ` +
@@ -170,6 +181,19 @@ describe('Lieux publiés', () => {
     }
   });
 });
+
+// Un lieu peut être publié avant la fin de sa saisie (voir README.md,
+// « Ajouter un lieu ») dès que ses falaises sont positionnées, sans attendre
+// voies ni parkings — repéré par l'absence totale de type_roche, la première
+// donnée de falaise.csv à manquer tant que le recensement n'est pas fini
+// (indépendant de voie.csv/parking.csv). Même repère que le test des
+// chiffres de l'accueil ci-dessus : les tests qui suivent s'en servent pour
+// ne pas exiger un parking ou une falaise sportive qui n'existent tout
+// simplement pas encore, sans pour autant cesser de les exiger des lieux qui
+// n'ont plus cette excuse.
+function lieuEncoreEnCoursDeSaisie(geo) {
+  return !geo.features.some((f) => f.properties.categorie === 'falaise' && f.properties.type_roche);
+}
 
 for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
   // Régression réelle : une reconstruction de la base efface le cache des
@@ -183,7 +207,9 @@ for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
     const parkings = geo.features.filter((f) => f.properties.categorie === 'parking');
     const aGite = geo.features.some((f) => f.properties.categorie === 'hebergement');
 
-    assert.ok(parkings.length > 0, `${lieu} : aucun parking dans data.geojson`);
+    if (!lieuEncoreEnCoursDeSaisie(geo)) {
+      assert.ok(parkings.length > 0, `${lieu} : aucun parking dans data.geojson`);
+    }
     if (!aGite) return;
     const sansTrajet = parkings.filter((p) => p.properties.trajet_gite_min == null);
     assert.deepEqual(sansTrajet.map((p) => p.properties.nom), [],
@@ -214,7 +240,9 @@ for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
     const geo = await geojsonDe(lieu);
     const sportives = geo.features.filter((f) => (f.properties.nb_voie_sportive || 0) > 0);
 
-    assert.ok(sportives.length > 0, `${lieu} : aucune falaise sportive dans data.geojson`);
+    if (!lieuEncoreEnCoursDeSaisie(geo)) {
+      assert.ok(sportives.length > 0, `${lieu} : aucune falaise sportive dans data.geojson`);
+    }
     for (const f of sportives) {
       const p = f.properties;
       assert.ok(p.cotations && Object.keys(p.cotations).length,

@@ -149,15 +149,29 @@ seconde région dans les mêmes CSV l'aurait fait apparaître sur **toutes** les
 cartes, et `--lieu` ne nommait que le dossier de destination.
 
 > **La saisie prend du temps** (falaises avant voies avant parkings, souvent
-> sur plusieurs sessions) : une fois les falaises entrées, publier une page
-> `<lieu>/index.html` minimale — pas la carte, juste une notice, voir
-> `cassis-ciotat/` pour un exemple — donne un lien stable à suivre pendant que
-> le reste se remplit. Cette page n'a pas de `data.geojson` : elle échappe donc
-> à `LIEUX` (voir `trouverLieux()` dans `tests/statique.test.js`), au
-> `PRECACHE` de l'étape 4 et aux tests spécifiques à l'interface carte — mais
-> pas aux tests génériques (un seul `<h1>`, CSP déclarée, aucun script inline),
-> qui la découvrent via son propre `index.html`
-> (`trouverPagesPubliees()`, même fichier).
+> sur plusieurs sessions), et il n'est pas nécessaire d'attendre voies et
+> parkings pour publier la vraie carte — seulement que les falaises soient
+> toutes positionnées (`lat`/`lon`, et `site`/`secteur` uniques par lieu, voir
+> `db/schema/01_falaise.sql` dans le dépôt de génération). Sans voie ni
+> parking, la fiche d'une falaise masque d'elle-même ce qui manque
+> (colonnes Voies/Grimpe/Roche, histogramme, liste de parkings — voir
+> `popupFalaise` dans `assets/js/popups.js`, chaque bloc est conditionné à la
+> présence de sa donnée) plutôt que d'afficher un "0" ou un "undefined" :
+> c'est ainsi que `cassis-ciotat/` a été publié dès son recensement de
+> falaises terminé, avant même sa première voie saisie.
+>
+> Tant que les falaises ne sont même pas encore toutes positionnées, publier
+> d'abord une page `<lieu>/index.html` minimale — pas la carte, juste une
+> notice — donne un lien stable à suivre pendant la saisie. Une telle page
+> n'a pas de `data.geojson` : elle échappe donc à `LIEUX` (voir
+> `trouverLieux()` dans `tests/statique.test.js`), au `PRECACHE` de l'étape 4
+> et aux tests spécifiques à l'interface carte — mais pas aux tests
+> génériques (un seul `<h1>`, CSP déclarée, aucun script inline), qui la
+> découvrent via son propre `index.html` (`trouverPagesPubliees()`, même
+> fichier). Si l'accueil affiche un état d'avancement à la place du décompte
+> secteurs/voies/roche habituel (une falaise sans aucun `type_roche` saisi
+> suffit à le signaler), `statique.test.js` le sait aussi et n'exige pas ce
+> décompte pour ce lieu — voir son commentaire.
 
 1. Saisir les falaises/parkings/voies dans les CSV habituels, avec la nouvelle
    valeur de `lieu` (ex. `presquile-crozon`). Un gîte est facultatif : sans

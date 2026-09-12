@@ -214,7 +214,7 @@
   donc rien de réel.
 </p>
 
-<h2>Cassis et La Ciotat (page en construction)</h2>
+<h2>Cassis et La Ciotat</h2>
 
 <h3>Le nom : deux communes, pas une région inventée</h3>
 <p class="decision">
@@ -228,24 +228,36 @@
   choisi pour éviter un homonyme plutôt que pour sonner mieux.
 </p>
 <p class="decision">
-  Pas de forme courte pour l'instant (pas de
-  <code>.titre-long</code>/<code>.titre-court</code>, voir README.md,
-  « Ajouter un lieu ») : cette page n'est pas l'interface carte, seulement une
-  notice. Le jour où <code>cassis-ciotat/</code> reçoit sa vraie carte, la
-  question se posera avec les mêmes contraintes de largeur que pour les
-  trois autres — pas avant.
+  Forme courte : <span class="valeur">Cassis-La Ciotat</span>, pas
+  <span class="ecarte">La Ciotat</span> seul (94 des 100 secteurs saisis
+  sont côté La Ciotat/Ceyreste/Carnoux, 6 seulement à Cassis — Port Miou,
+  une calanque à elle seule — mais un secteur minoritaire reste un secteur
+  réel, à ne pas faire disparaître du titre affiché sur mobile). Seul « et »
+  s'efface : contrairement à « Vallée de la » ou « Presqu'île de », rien
+  d'autre dans ce nom n'est un « qualificatif géographique » au sens de
+  README.md (« Ajouter un lieu ») — retirer une des deux villes aurait donc
+  été retirer un nom propre, pas un qualificatif. Mesuré à 320px (le plus
+  étroit testé sur ce site) : 107px, sans troncature.
 </p>
 
 <h3>La ligne d'accueil : l'état, pas un chiffre</h3>
 <p class="decision">
   Les trois autres lieux affichent secteurs/voies/roche, recalculés depuis
-  leurs data.geojson (voir plus haut, « La liste des lieux »). Impossible ici :
-  ce fichier n'existe pas encore, faute de voies, de parkings et de temps
-  d'approche saisis. Écrire un chiffre de secteurs à la place aurait figé un
-  décompte encore mouvant, exactement l'erreur que ce test existe pour
-  empêcher ailleurs — la ligne dit donc l'avancement en mots
-  (<span class="valeur">Recensement en cours · topoguide FFME 13</span>),
-  jamais en nombre.
+  leurs data.geojson (voir plus haut, « La liste des lieux »). Ce fichier
+  existe désormais pour Cassis et La Ciotat, mais aucune de ses 100 falaises
+  ne porte de <code>type_roche</code> — faute de voies, de parkings et de
+  type de roche saisis, un décompte automatique afficherait « 0 voies » et
+  une roche manquante, une régression déguisée en donnée réelle. La ligne
+  dit donc l'avancement en mots (<span class="valeur">Recensement en
+  cours</span>), jamais en nombre — et <code>statique.test.js</code> le sait :
+  le test qui recalcule ces chiffres saute un lieu sans roche renseignée
+  plutôt que d'exiger un décompte qui n'aurait aucun sens, voir son
+  commentaire. Le jour où une roche est saisie, le lieu sort de lui-même de
+  cette exception.
+  <span class="ecarte">Recensement en cours · topoguide FFME 13</span> a été
+  raccourci : la mention du topoguide est déjà celle de <code>sources.html</code>,
+  qui existe pour ça — la répéter ici alourdissait une ligne censée rester
+  discrète.
 </p>
 
 <footer>
