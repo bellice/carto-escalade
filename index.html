@@ -35,16 +35,21 @@
          romprait la cohérence du vocabulaire entre les pages. -->
     <p class="tagline">falaises · parkings · approches · hors&nbsp;ligne</p>
 
-    <!-- La ligne .sortie-chiffres distingue les trois lieux, qui étaient
-         autrement trois entrées rigoureusement identiques alors que le grès
-         maritime de Crozon et le calcaire du Diois n'ont rien en commun.
-         Chiffres écrits EN DUR, faute d'étape de build (voir _config.yml) et
-         parce que les lire coûterait le téléchargement des trois data.geojson
-         sur une page qui doit rester légère et disponible hors ligne. Ils ne
-         peuvent pas se périmer en silence pour autant : statique.test.js les
-         recompte depuis les data.geojson et échoue s'ils divergent.
+    <!-- La ligne .sortie-chiffres distingue les lieux, qui seraient sinon des
+         entrées rigoureusement identiques alors que le grès maritime de
+         Crozon et le calcaire du Diois n'ont rien en commun. Chiffres écrits
+         EN DUR, faute d'étape de build (voir _config.yml) et parce que les
+         lire coûterait le téléchargement de chaque data.geojson sur une page
+         qui doit rester légère et disponible hors ligne. Ils ne peuvent pas
+         se périmer en silence pour autant : statique.test.js les recompte
+         depuis les data.geojson et échoue s'ils divergent.
          En mono : c'est la voix « donnée » du site, la même que les cotations
-         et les compteurs de la carte. -->
+         et les compteurs de la carte.
+         Cassis et La Ciotat n'a pas encore de data.geojson (recensement des
+         secteurs en cours) : sa ligne dit l'état d'avancement plutôt qu'un
+         chiffre, qui figerait un décompte encore mouvant. statique.test.js ne
+         la vérifie pas pour cette raison précise — un lieu sans data.geojson
+         n'entre pas dans LIEUX, voir trouverLieux(). -->
     <ul class="sortie-list">
       <li>
         <a href="vallee-drome-diois/">
@@ -62,6 +67,12 @@
         <a href="dentelles-montmirail/">
           <span class="nom">Dentelles de Montmirail</span>
           <span class="sortie-chiffres">51 secteurs · 819 voies · calcaire</span>
+        </a>
+      </li>
+      <li>
+        <a href="cassis-ciotat/">
+          <span class="nom">Cassis et La Ciotat</span>
+          <span class="sortie-chiffres">Recensement en cours · topoguide FFME 13</span>
         </a>
       </li>
     </ul>

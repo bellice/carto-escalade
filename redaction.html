@@ -140,6 +140,18 @@
   À rouvrir si départager entre eux redevient un vrai besoin pour le
   lecteur, pas seulement parce que la condition est techniquement remplie.
 </p>
+<p class="decision">
+  Revenus depuis : trois lignes rigoureusement identiques (« Vallée de la
+  Drôme et Diois », « Presqu'île de Crozon », « Dentelles de Montmirail »),
+  alors que le grès maritime de Crozon et le calcaire du Diois n'ont rien en
+  commun — la condition posée ci-dessus (un vrai besoin de différenciation,
+  pas seulement trois lieux) était remplie. Un test
+  (<code>statique.test.js</code>) recalcule ces chiffres depuis les
+  data.geojson à chaque exécution, pour qu'ils ne puissent pas dériver en
+  silence comme <span class="ecarte">le « 111 falaises » qui avait glissé
+  ici même</span> avant sa correction (un secteur ≠ une falaise, voir
+  <code>construireLegendeFalaises</code> dans <code>symboles.js</code>).
+</p>
 
 <h3>La consigne : « Préparez la carte tant que vous avez du réseau »</h3>
 <p class="decision">
@@ -200,6 +212,40 @@
   page aussi courte se remonte d'un geste ; le bouton retour du navigateur
   suffit dans le cas normal (venu de l'accueil). Doubler le lien n'ajoutait
   donc rien de réel.
+</p>
+
+<h2>Cassis et La Ciotat (page en construction)</h2>
+
+<h3>Le nom : deux communes, pas une région inventée</h3>
+<p class="decision">
+  Les secteurs saisis se répartissent entre deux communes du littoral
+  (Bouches-du-Rhône) et les hameaux qui les séparent (Ceyreste,
+  Carnoux-en-Provence) : rien de tout cela n'a de statut de région naturelle
+  reconnue qui l'engloberait. <span class="valeur">Cassis et La Ciotat</span>
+  reprend tel quel le découpage du topoguide source
+  (<em>Escalade Cassis – La Ciotat</em>, FFME 13) plutôt que d'inventer un nom
+  de massif que rien ne viendrait étayer — même principe que « Les Dentelles »,
+  choisi pour éviter un homonyme plutôt que pour sonner mieux.
+</p>
+<p class="decision">
+  Pas de forme courte pour l'instant (pas de
+  <code>.titre-long</code>/<code>.titre-court</code>, voir README.md,
+  « Ajouter un lieu ») : cette page n'est pas l'interface carte, seulement une
+  notice. Le jour où <code>cassis-ciotat/</code> reçoit sa vraie carte, la
+  question se posera avec les mêmes contraintes de largeur que pour les
+  trois autres — pas avant.
+</p>
+
+<h3>La ligne d'accueil : l'état, pas un chiffre</h3>
+<p class="decision">
+  Les trois autres lieux affichent secteurs/voies/roche, recalculés depuis
+  leurs data.geojson (voir plus haut, « La liste des lieux »). Impossible ici :
+  ce fichier n'existe pas encore, faute de voies, de parkings et de temps
+  d'approche saisis. Écrire un chiffre de secteurs à la place aurait figé un
+  décompte encore mouvant, exactement l'erreur que ce test existe pour
+  empêcher ailleurs — la ligne dit donc l'avancement en mots
+  (<span class="valeur">Recensement en cours · topoguide FFME 13</span>),
+  jamais en nombre.
 </p>
 
 <footer>

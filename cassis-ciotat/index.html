@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <!-- Page statique, sans script : ce lieu n'a pas encore de data.geojson
+       (recensement des secteurs en cours dans le dépôt de génération), donc
+       pas de carte à charger ni de MapLibre à autoriser. Même CSP stricte que
+       404.html/mentions-legales.html — aucune balise <script> ici. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'none';
+    style-src 'self';
+    img-src 'self' data:;
+    connect-src 'none';
+    base-uri 'none';
+    form-action 'none';
+    object-src 'none'
+  " />
+  <title>Cassis et La Ciotat - Tokelau</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
+  <meta name="theme-color" content="#fbfaf6" />
+  <link rel="stylesheet" href="../assets/style.css" />
+</head>
+<body>
+  <!-- Pas de .titre-long/.titre-court (voir style-carte.css) : cette page
+       n'est pas l'interface carte, seulement une notice — elle n'en aura
+       besoin que le jour où ce dossier reçoit sa vraie carte (voir README.md,
+       « Ajouter un lieu »). Le nom lui-même est documenté dans
+       redaction.html : ce sont deux communes, pas une région reconnue. -->
+  <div class="home">
+    <h1>Cassis et La Ciotat</h1>
+    <p><a href="../">Revenir à l'accueil</a></p>
+
+    <p>Cette carte est en préparation. Le recensement des secteurs a
+      commencé, d'après le topoguide <em>Escalade Cassis – La Ciotat</em>
+      (FFME 13) ; les voies, les parkings et les temps d'approche restent à
+      saisir avant que la carte n'ouvre ici.</p>
+  </div>
+</body>
+</html>

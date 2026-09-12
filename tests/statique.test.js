@@ -41,6 +41,13 @@ const geojsonDe = async (lieu) => JSON.parse(await lire(`${lieu}/data.geojson`))
 // la liste d'exclusion de _config.yml, la même que celle qui décide ce qui part
 // sur GitHub Pages : une page retirée de la publication sort du lot ici aussi,
 // une page ajoutée y entre sans qu'on ait à y penser.
+// Sous-dossiers : repérés par leur PROPRE index.html, pas par LIEUX — un lieu
+// qui n'a pas encore de data.geojson (une page "en construction" comme
+// cassis-ciotat/, publiée avant que son recensement soit fini) doit rester
+// contrôlé sur ce qui ne dépend pas des données : h1 unique, CSP déclarée,
+// aucun script inline. Ces trois-là ne demandent rien de plus qu'un fichier
+// HTML sur disque. Tout LIEU (qui EN a un) a nécessairement un index.html, ce
+// tour-ci couvre donc l'ancien comme le nouveau sans les lister séparément.
 async function trouverPagesPubliees() {
   const conf = await lire('_config.yml');
   const bloc = conf.slice(conf.indexOf('exclude:'));
@@ -52,7 +59,15 @@ async function trouverPagesPubliees() {
     .filter((e) => e.isFile() && e.name.endsWith('.html') && !exclues.has(e.name))
     .map((e) => e.name)
     .sort();
-  return [...racine, ...LIEUX.map((l) => `${l}/index.html`)];
+  const sousDossiers = [];
+  for (const e of entrees) {
+    if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules' || exclues.has(e.name)) continue;
+    try {
+      await readFile(join(RACINE, e.name, 'index.html'), 'utf8');
+      sousDossiers.push(`${e.name}/index.html`);
+    } catch { /* pas de page à cet endroit */ }
+  }
+  return [...racine, ...sousDossiers.sort()];
 }
 const PAGES_PUBLIEES = await trouverPagesPubliees();
 

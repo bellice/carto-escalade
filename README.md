@@ -91,7 +91,7 @@ clavier pour y naviguer.
 3. Le site est en ligne à `https://<utilisateur>.github.io/<repo>/`.
 
 ### Domaine `tokelau.fr`
-
+                                                
 Hébergement inchangé (GitHub Pages) : le domaine ne fait que pointer vers lui.
 Le fichier `CNAME` à la racine porte le domaine ; GitHub le lit à chaque
 déploiement et redirige l'ancienne adresse `github.io`. « Enforce HTTPS »
@@ -147,6 +147,17 @@ le nom du dossier ici** : c'est la charnière entre la donnée et l'URL publiée
 Avant elle, toutes les requêtes de l'export étaient sans portée — saisir une
 seconde région dans les mêmes CSV l'aurait fait apparaître sur **toutes** les
 cartes, et `--lieu` ne nommait que le dossier de destination.
+
+> **La saisie prend du temps** (falaises avant voies avant parkings, souvent
+> sur plusieurs sessions) : une fois les falaises entrées, publier une page
+> `<lieu>/index.html` minimale — pas la carte, juste une notice, voir
+> `cassis-ciotat/` pour un exemple — donne un lien stable à suivre pendant que
+> le reste se remplit. Cette page n'a pas de `data.geojson` : elle échappe donc
+> à `LIEUX` (voir `trouverLieux()` dans `tests/statique.test.js`), au
+> `PRECACHE` de l'étape 4 et aux tests spécifiques à l'interface carte — mais
+> pas aux tests génériques (un seul `<h1>`, CSP déclarée, aucun script inline),
+> qui la découvrent via son propre `index.html`
+> (`trouverPagesPubliees()`, même fichier).
 
 1. Saisir les falaises/parkings/voies dans les CSV habituels, avec la nouvelle
    valeur de `lieu` (ex. `presquile-crozon`). Un gîte est facultatif : sans
