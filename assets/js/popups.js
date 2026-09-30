@@ -154,7 +154,7 @@ export function popupFalaise(p, lat, lon, cle) {
   // Métadonnées clés en COLONNES ÉTROITES (Voies / Grimpe / Roche) : mini-
   // colonnes sans bordure, label en petite majuscule au-dessus de la valeur.
   // Ordre : VOIES d'abord (le chiffre clé pour choisir un site), puis GRIMPE
-  // (le style : sportive/trad/mixte), puis Roche (qualificatif géologique).
+  // (les styles présents : "sportive · trad"), puis Roche (qualificatif géologique).
   const cols = [];
   if (p.nb_voie_total) cols.push(col('Voies', p.nb_voie_total));
   const grimpe = styleGrimpe(p);
@@ -168,7 +168,7 @@ export function popupFalaise(p, lat, lon, cle) {
     // Histogramme des cotations, chargé à la demande (voir chargerDetailVoies) :
     // il ne couvre que les SPORTIVES — le titre ("Cotation" ou "Cotation
     // (hors trad et artificielle)", voir construireHistogramme) et la colonne
-    // Grimpe (mixte, le cas échéant) signalent l'écart avec le total de la
+    // Grimpe (plusieurs styles, le cas échéant) signalent l'écart avec le total de la
     // colonne Voies. data-autres-disciplines : calculé ici (p est déjà
     // disponible), relu par chargerDetailVoies au moment du rendu différé.
     const autresDisciplines = (p.nb_voie_trad || p.nb_voie_artificielle || p.nb_voie_moulinette) ? '1' : '0';
@@ -453,16 +453,22 @@ function champLiensFalaises(falaises) {
 // demande. "autres" (trad/artificielle) n'est pas détaillé par voie (seul le
 // compte existe dans les données) — pas d'histogramme pour cette part,
 // seulement ce compteur global.
-// Style de grimpe de la falaise (colonne "Grimpe"), déduit du rapport
-// sportives / autres : la colonne Voies porte le TOTAL, l'histogramme ne
-// montre que les SPORTIVES (titre "Cotation voies sportives") — la colonne
-// Grimpe signale l'écart sans ligne de texte séparée. Les données portent
-// désormais la répartition exacte (nb_voie_sportive / nb_voie_trad /
+// Styles de grimpe de la falaise (colonne "Grimpe"), déduits des compteurs :
+// la colonne Voies porte le TOTAL, l'histogramme ne montre que les SPORTIVES
+// (titre "Cotation voies sportives") — la colonne Grimpe signale l'écart sans
+// ligne de texte séparée. Tous les styles présents sont listés ("sportive ·
+// trad"), à la place de l'ancien "mixte" qui ne disait pas lesquels. Les
+// données portent la répartition exacte (nb_voie_sportive / nb_voie_trad /
 // nb_voie_artificielle) : on ne déduit plus le style d'un vague "autres".
+// Libellé affiché quand il diffère du nom de donnée (le type interne reste
+// 'artificielle', comme la clé nb_voie_artificielle et le filtre). Aligné sur
+// la case « Artif » du filtre Style.
+const LIBELLE_GRIMPE = { artificielle: 'artif' };
+
 function styleGrimpe(p) {
   const total = p.nb_voie_total ?? 0;
   if (total <= 0) return '';
-  // Ordre = ordre d'affichage quand une seule discipline est présente.
+  // Ordre = ordre d'affichage de la liste.
   // « moulinette » comptait auparavant comme sportive, faute d'exister dans
   // le modèle : elle était donc annoncée à tort comme grimpe en tête.
   const styles = [
@@ -471,9 +477,7 @@ function styleGrimpe(p) {
     ['artificielle', p.nb_voie_artificielle ?? 0],
     ['moulinette', p.nb_voie_moulinette ?? 0],
   ].filter(([, n]) => n > 0);
-  // Une seule discipline -> son nom ; plusieurs -> "mixte".
-  if (styles.length === 1) return styles[0][0];
-  return styles.length ? 'mixte' : '';
+  return styles.map(([nom]) => LIBELLE_GRIMPE[nom] || nom).join(' · ');
 }
 
 // Histogramme « 1 case = 1 voie » : une colonne par cotation RÉELLEMENT
@@ -484,8 +488,20 @@ function styleGrimpe(p) {
 // L'approximation de cotation ne sert QU'À positionner une case ici ;
 // cotationVersValeur (donnees.js) reste strict, une estimation n'ayant pas sa
 // place dans un filtre.
-export function construireHistogramme(voiesSportives, aAutresDisciplines) {
-  if (!voiesSportives || !voiesSportives.length) return '';
+// nAutresDetaillees : voies trad + artificielles détaillées dans le fichier de
+// routes (0 tant que l'export ne les fournit pas). Sans voie sportive, elles
+// suffisent à justifier le bouton « Voir le détail des voies » : un secteur
+// 100 % trad ou 100 % artif n'aurait sinon aucun accès à son détail.
+const BOUTON_DETAIL_VOIES = '<button type="button" class="btn-voir-detail-voies">Voir le détail des voies</button>';
+
+// Pas d'histogramme (rien de sportif à y montrer), seulement le bouton s'il y
+// a un détail à ouvrir.
+const boutonDetailSeul = (nAutresDetaillees) => (nAutresDetaillees > 0
+  ? `<div class="fiche-voies-resume">${BOUTON_DETAIL_VOIES}</div>`
+  : '');
+
+export function construireHistogramme(voiesSportives, aAutresDisciplines, nAutresDetaillees = 0) {
+  if (!voiesSportives || !voiesSportives.length) return boutonDetailSeul(nAutresDetaillees);
 
   // Regroupe par cotation EXACTE (6a et 6a+ n'ont jamais la même colonne).
   // Les voies à cotation non standard (~2,5% des cas réels — anciennes
@@ -514,9 +530,8 @@ export function construireHistogramme(voiesSportives, aAutresDisciplines) {
     if (!parCotation.has(label)) parCotation.set(label, { val, voies: [] });
     parCotation.get(label).voies.push(v);
   });
-  // Pas de voie sportive à afficher du tout (falaise 100% trad) : rien à
-  // rendre — la synthèse, affichée séparément, suffit.
-  if (!parCotation.size && !nonCotees.length) return '';
+  // Aucune voie sportive positionnable : le bouton seul, voir plus haut.
+  if (!parCotation.size && !nonCotees.length) return boutonDetailSeul(nAutresDetaillees);
 
   const colonnes = Array.from(parCotation.entries())
     .map(([cotation, { val, voies }]) => ({ cotation, val, voies, nonCote: false }))
@@ -579,7 +594,7 @@ export function construireHistogramme(voiesSportives, aAutresDisciplines) {
         ${colonnesHtml}
       </div>
       <div class="histo-legende">${legende.join('')}</div>
-      <button type="button" class="btn-voir-detail-voies">Voir le détail des voies</button>
+      ${BOUTON_DETAIL_VOIES}
     </div>`;
 
   return histo;
@@ -628,8 +643,34 @@ function classeSwatch(v) {
   return v.type_voie === 'couenne' ? 'couenne' : 'gv';
 }
 
-export function construireDetailVoies(voiesSportives, mode = 'cotation') {
-  const n = voiesSportives.length;
+// Rang d'une cotation artificielle : le chiffre du grade A ou C (A0 à A5, "C1").
+// La cotation est saisie telle quelle dans les données, parfois avec le
+// passage libre ("5c/A1", "A1/A2", "C1-5b") : on cherche le grade d'artif, pas
+// le premier chiffre venu. Illisible ou absente, la voie part en fin de liste,
+// même motif que valeurCotationPourTri.
+function valeurAidePourTri(v) {
+  const m = /[AC](\d)/.exec(String(v.cotation_artif ?? ''));
+  return m ? Number(m[1]) : Infinity;
+}
+
+// Les trois styles détaillés, dans l'ordre d'affichage : les sportives
+// d'abord (comme avant), puis trad et artif à la suite. Un groupe vide est
+// omis : clés absentes du fichier de routes (export amont pas encore fait) =
+// détail identique à celui d'avant. `libelle` sert de sous-titre quand
+// plusieurs groupes coexistent (même libellé que la colonne Grimpe).
+const GROUPES_DETAIL = [
+  { groupe: 'sportive', cle: 'sportives', libelle: 'Sportive' },
+  { groupe: 'trad', cle: 'trad', libelle: 'Trad' },
+  { groupe: 'artificielle', cle: 'artificielles', libelle: 'Artif' },
+];
+
+// detail : { sportives, trad, artificielles }, trois tableaux (éventuellement
+// vides), voir detailDepuisEntree dans marqueurs.js.
+export function construireDetailVoies(detail, mode = 'cotation') {
+  const groupes = GROUPES_DETAIL
+    .map((g) => ({ ...g, voies: (detail && detail[g.cle]) || [] }))
+    .filter((g) => g.voies.length);
+  const n = groupes.reduce((total, g) => total + g.voies.length, 0);
   // Juste le compte (utile pour se repérer avant de faire défiler la liste),
   // sans répéter "(hors trad et artificielle)" : cette précision vient déjà
   // d'être lue à l'instant sur l'écran précédent (titre de l'histogramme,
@@ -650,7 +691,7 @@ export function construireDetailVoies(voiesSportives, mode = 'cotation') {
   // (v.longueurs, absent des voies à une seule longueur) — demandé pour
   // préparer une sortie en amont, sans intérêt pour le tri Cotation qui n'a
   // pas vocation à s'alourdir de ce détail.
-  const liste = mode === 'position' ? construireListePosition(voiesSportives) : construireListeCotation(voiesSportives);
+  const liste = construireListeVoies(groupes, mode);
   const bascule = (valeur, libelle) =>
     `<button type="button" class="btn-tri-voies${mode === valeur ? ' actif' : ''}" data-tri="${valeur}" aria-pressed="${mode === valeur}">${libelle}</button>`;
   // « Retour » en bas et non près du titre : fiche quasi plein écran sur
@@ -669,50 +710,60 @@ export function construireDetailVoies(voiesSportives, mode = 'cotation') {
     </div>`;
 }
 
-// Mode Cotation (par défaut, inchangé) : du plus facile en haut au plus dur
-// en bas (pas l'ordre alphabétique du nom, celui renvoyé par défaut côté
-// SQL — sans rapport avec la difficulté). sort() est stable (ES2019+) : à
-// cotation égale, l'ordre alphabétique d'origine sert de sous-tri, sans code
-// dédié pour ça. Une ligne par voie, jamais de détail longueur par longueur
-// ici — voir construireDetailVoies pour pourquoi ce détail reste réservé au
-// mode Position.
-function construireListeCotation(voiesSportives) {
-  const voiesTriees = [...voiesSportives].sort((a, b) => valeurCotationPourTri(a) - valeurCotationPourTri(b));
+// Liste des voies. Une grande voie (v.longueurs renseigné) devient, en mode
+// Position, un GROUPE de lignes — une ligne "voie" (identique à ligneDetailVoie,
+// valeurs globales déjà connues du mode Cotation) suivie d'une ligne indentée
+// par longueur (cotation/points/hauteur DE cette longueur précise). La zébrure
+// suit la VOIE (index), pas la ligne brute, pour que l'en-tête et ses
+// sous-lignes restent visuellement une seule bande — sinon chaque longueur
+// alternerait indépendamment, cassant la lecture "ceci est une seule voie".
+//
+// Mode Cotation (par défaut) : un bloc par style (sportives puis trad puis
+// artif, voir GROUPES_DETAIL), chaque bloc trié séparément : une cotation
+// française et une cotation A0-A5 ne se comparent pas, les mélanger n'aurait
+// aucun ordre lisible. Du plus facile en haut au plus dur en bas (pas l'ordre
+// alphabétique du nom, celui renvoyé par défaut côté SQL — sans rapport avec
+// la difficulté). sort() est stable (ES2019+) : à cotation égale, l'ordre
+// alphabétique d'origine sert de sous-tri, sans code dédié pour ça. Une ligne
+// par voie, jamais de détail longueur par longueur ici. Sous-titre de bloc
+// seulement quand plusieurs styles coexistent : une liste 100 % sportive (ou
+// 100 % trad) reste identique à celle d'avant.
+//
+// Mode Position : UNE seule liste, tous styles confondus, trié de gauche à
+// droite sur la paroi (voir valeurPositionPourTri) : le numéro est unique par
+// secteur, quel que soit le style, et une voie trad entre deux sportives se
+// lit à sa place sur la paroi. Ni sous-titre ni bloc ; le carré couenne /
+// grande voie reste réservé aux sportives (voir ligneDetailVoie). Le nom
+// lui-même ne porte aucun repère de position (pas de préfixe numéro : le
+// badge actif "Position" du bandeau de tri suffit déjà à signaler que ce tri
+// est bien appliqué, voir construireDetailVoies). À numéro égal ou absent,
+// l'ordre sportive, trad, artif sert de départage (tri stable).
+function construireListeVoies(groupes, mode) {
+  let blocs;
+  if (mode === 'position') {
+    const voies = groupes.flatMap(({ groupe, voies }) => voies.map((v) => ({ v, groupe })));
+    voies.sort((a, b) => valeurPositionPourTri(a.v) - valeurPositionPourTri(b.v));
+    blocs = voies.map(({ v, groupe }, index) => {
+      const entete = ligneDetailVoie(v, index, groupe);
+      if (!v.longueurs || !v.longueurs.length) return entete;
+      return entete + v.longueurs.map((l) => ligneDetailLongueur(l, index)).join('');
+    }).join('');
+  } else {
+    const plusieursStyles = groupes.length > 1;
+    blocs = groupes.map(({ groupe, libelle, voies }) => {
+      const valeur = groupe === 'artificielle' ? valeurAidePourTri : valeurCotationPourTri;
+      const lignes = [...voies].sort((a, b) => valeur(a) - valeur(b))
+        .map((v, index) => ligneDetailVoie(v, index, groupe)).join('');
+      const sousTitre = plusieursStyles ? `<li class="detail-voie-groupe">${escapeHtml(libelle)}</li>` : '';
+      return sousTitre + lignes;
+    }).join('');
+  }
   return `
     <ul class="detail-voies-liste">
       <li class="detail-voie detail-voie-entete-colonnes" aria-hidden="true">
         <span class="detail-voie-type"></span><span>Voie</span><span>Cotation</span><span>Points</span><span>Hauteur</span>
       </li>
-      ${voiesTriees.map((v, i) => ligneDetailVoie(v, i)).join('')}
-    </ul>`;
-}
-
-// Mode Position : trié de gauche à droite sur la paroi (voir
-// valeurPositionPourTri) — le nom lui-même ne porte aucun repère de position
-// (pas de préfixe numéro : le badge actif "Position" du bandeau de tri
-// suffit déjà à signaler que ce tri est bien appliqué, voir
-// construireDetailVoies). Une grande voie (v.longueurs renseigné) devient un
-// GROUPE de lignes — une ligne "voie" (identique à ligneDetailVoie, valeurs
-// globales déjà connues du mode Cotation) suivie d'une ligne indentée par
-// longueur (cotation/points/hauteur DE cette longueur précise). La zébrure
-// suit le GROUPE (indexGroupe), pas la ligne brute, pour que l'en-tête et
-// ses sous-lignes restent visuellement une seule bande — sinon chaque
-// longueur alternerait indépendamment, cassant la lecture "ceci est une
-// seule voie" que le groupement est censé donner.
-function construireListePosition(voiesSportives) {
-  const voiesTriees = [...voiesSportives].sort((a, b) => valeurPositionPourTri(a) - valeurPositionPourTri(b));
-  const lignes = voiesTriees.map((v, indexGroupe) => {
-    const entete = ligneDetailVoie(v, indexGroupe);
-    if (!v.longueurs || !v.longueurs.length) return entete;
-    const sousLignes = v.longueurs.map(l => ligneDetailLongueur(l, indexGroupe)).join('');
-    return entete + sousLignes;
-  }).join('');
-  return `
-    <ul class="detail-voies-liste">
-      <li class="detail-voie detail-voie-entete-colonnes" aria-hidden="true">
-        <span class="detail-voie-type"></span><span>Voie</span><span>Cotation</span><span>Points</span><span>Hauteur</span>
-      </li>
-      ${lignes}
+      ${blocs}
     </ul>`;
 }
 
@@ -747,15 +798,35 @@ function formatHauteur(hauteurM) {
   return hauteurM != null ? `${hauteurM} m` : '';
 }
 
-function ligneDetailVoie(v, index) {
+// Cotation affichée selon le style : la française pour sportive (normalisée
+// comme l'histogramme) ; pour trad, telle que saisie ("V+", "6b/A0", pas
+// d'histogramme à laquelle l'aligner), avec la protection R/X/PG à côté quand
+// elle existe ; cotation_artif telle que saisie pour l'artif. Champ absent =
+// cellule vide, jamais "N/A".
+function cotationDetailVoie(v, groupe) {
+  if (groupe === 'artificielle') return escapeHtml(v.cotation_artif ?? '');
+  const cotation = escapeHtml(groupe === 'trad' ? (v.cotation ?? '') : libelleCotationAffichee(v.cotation));
+  if (groupe === 'trad' && v.protection) {
+    return `${cotation}<span class="detail-voie-protection">${escapeHtml(v.protection)}</span>`;
+  }
+  return cotation;
+}
+
+function ligneDetailVoie(v, index, groupe = 'sportive') {
   // Classe posée ici et non par nth-child en CSS : display:contents aplatit
   // chaque voie en 5 cellules et la ligne d'en-tête décale tout calcul CSS.
   const impaire = index % 2 === 1;
+  // Le carré couenne / grande voie n'a de sens que pour une sportive : trad et
+  // artif gardent la cellule, vide, pour que les colonnes restent alignées
+  // avec les sportives du même tableau.
+  const repere = groupe === 'sportive'
+    ? `<span class="histo-swatch ${classeSwatch(v)}"></span>`
+    : '';
   return `
     <li class="detail-voie${impaire ? ' detail-voie-impaire' : ''}">
-      <span class="detail-voie-type"><span class="histo-swatch ${classeSwatch(v)}"></span></span>
+      <span class="detail-voie-type">${repere}</span>
       <span class="detail-voie-nom">${escapeHtml(v.nom)}</span>
-      <span class="detail-voie-cotation">${escapeHtml(libelleCotationAffichee(v.cotation))}</span>
+      <span class="detail-voie-cotation">${cotationDetailVoie(v, groupe)}</span>
       <span class="detail-voie-points">${formatPoints(v.nb_points)}</span>
       <span class="detail-voie-hauteur">${formatHauteur(v.hauteur_estimee_m)}</span>
     </li>`;

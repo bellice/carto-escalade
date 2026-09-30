@@ -224,6 +224,32 @@ export function estFalaiseVideDansMode(entree, mode) {
   return false;
 }
 
+// Styles de grimpe filtrables d'un secteur, dans l'ordre d'affichage. La
+// moulinette est un 4e compteur des données (nb_voie_moulinette), volontairement
+// HORS filtre : ce n'est pas un style qu'on choisit d'aller chercher, et une
+// case de plus alourdirait un contrôle fait pour trois choix. Un secteur
+// moulinette seul n'a donc aucun style (voir estDuStyle).
+// Axe distinct de "Type de voie" (couenne / grande voie, nb_couenne / nb_gv) :
+// une voie sportive peut être l'une ou l'autre, ne pas les mélanger.
+export const STYLES = ['sportive', 'trad', 'artificielle'];
+
+// Styles présents sur un secteur, déduits des seuls compteurs (jamais d'une
+// cotation : "6c/A0" reste une voie sportive, pas de l'artif). Tableau, pas
+// enum : un secteur est souvent multi-styles. Vide = aucun compteur renseigné.
+export function deriverStyles(p) {
+  return STYLES.filter((style) => (p[`nb_voie_${style}`] ?? 0) > 0);
+}
+
+// Vrai si le secteur porte au moins un des styles cochés (OU logique). Aucun
+// style coché = filtre inactif = tout passe. Un secteur sans style connu ne
+// peut satisfaire aucune case cochée (même règle que l'ensoleillement).
+// Miroir exact de la condition posée sur la couche native (carte.js,
+// appliquerFiltres) : les deux doivent rester d'accord.
+export function estDuStyle(entree, styles) {
+  if (!styles.length) return true;
+  return styles.some((style) => entree.types.includes(style));
+}
+
 // Directions du matin (soleil levant) / de l'après-midi (soleil couchant),
 // vues depuis l'hémisphère nord (France).
 const DIRECTIONS_MATIN = new Set(['E', 'NE', 'SE']);

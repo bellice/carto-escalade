@@ -10,6 +10,8 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { STYLES, deriverStyles, estDuStyle } from '../assets/js/donnees.js';
+import { construireHistogramme, construireDetailVoies, popupFalaise } from '../assets/js/popups.js';
 
 const RACINE = fileURLToPath(new URL('..', import.meta.url));
 const lire = (rel) => readFile(join(RACINE, rel), 'utf8');
@@ -256,6 +258,24 @@ for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
     }
   });
 
+  // Le filtre "Style" et la colonne "Grimpe" lisent ces compteurs et rien
+  // d'autre. Avec la moulinette (4e compteur, hors filtre), ils doivent
+  // retomber exactement sur le total affiché dans la colonne "Voies" : un écart
+  // voudrait dire une discipline exportée sans compteur.
+  test('les compteurs de style s’additionnent au total de voies', async () => {
+    const geo = await geojsonDe(lieu);
+    for (const f of geo.features) {
+      const p = f.properties;
+      if (p.categorie !== 'falaise') continue;
+      const compteurs = ['sportive', 'trad', 'artificielle', 'moulinette'].map((s) => p[`nb_voie_${s}`]);
+      assert.ok(compteurs.every((n) => Number.isInteger(n) && n >= 0),
+        `${p.nom} : compteur de style absent ou invalide (${compteurs.join(', ')})`);
+      const somme = compteurs.reduce((a, b) => a + b, 0);
+      assert.equal(somme, p.nb_voie_total,
+        `${p.nom} : sportive + trad + artificielle + moulinette = ${somme}, nb_voie_total = ${p.nb_voie_total}`);
+    }
+  });
+
   test('chaque falaise avec des voies pointe vers un fichier routes existant', async () => {
     const geo = await geojsonDe(lieu);
     const fichiers = new Set(await readdir(join(RACINE, `${lieu}/routes`)));
@@ -306,6 +326,214 @@ for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
     assert.ok(diagonale < 300,
       `${lieu} : ${Math.round(diagonale)} km de diagonale — des points d'un autre ` +
       'lieu ont fui dans cet export (export_geojson.py --lieu filtre-t-il bien ?)');
+  });
+});
+
+// Filtre "Style" (sportive / trad / artif) : ce que les données lui donnent à
+// filtrer, et la règle de dérivation, sans navigateur.
+describe('Filtre Style', () => {
+  test('au moins un lieu propose deux styles ou plus, artificielle comprise', async () => {
+    const styles = new Set();
+    const lieuxAvecFiltre = [];
+    for (const lieu of LIEUX) {
+      const geo = await geojsonDe(lieu);
+      const duLieu = new Set();
+      for (const f of geo.features) {
+        if (f.properties.categorie !== 'falaise') continue;
+        deriverStyles(f.properties).forEach((s) => { styles.add(s); duLieu.add(s); });
+      }
+      if (duLieu.size >= 2) lieuxAvecFiltre.push(lieu);
+    }
+    assert.ok(lieuxAvecFiltre.length > 0, 'aucun lieu n’a deux styles : le filtre ne s’afficherait nulle part');
+    assert.ok(styles.has('artificielle'),
+      'aucun secteur artificielle dans aucun lieu : la case « Artif » ne retiendrait rien, où que ce soit');
+    assert.ok(styles.has('trad'), 'aucun secteur trad dans aucun lieu');
+  });
+
+  test('deriverStyles ne lit que les compteurs', () => {
+    // Cotation "6c/A0" (voie sportive à un pas d'artif, présente en Drôme) :
+    // aucun compteur artificielle, donc aucun style artificielle.
+    assert.deepEqual(deriverStyles({ nb_voie_sportive: 3, nb_voie_trad: 0, nb_voie_artificielle: 0, cotations: { '6c/A0': 1 } }), ['sportive']);
+    assert.deepEqual(deriverStyles({ nb_voie_sportive: 2, nb_voie_trad: 1, nb_voie_artificielle: 4 }), ['sportive', 'trad', 'artificielle']);
+    // Moulinette seule, ou secteur sans voie saisie : aucun style.
+    assert.deepEqual(deriverStyles({ nb_voie_moulinette: 5 }), []);
+    assert.deepEqual(deriverStyles({ nb_voie_sportive: 0, nb_voie_trad: 0, nb_voie_artificielle: 0 }), []);
+    assert.deepEqual(STYLES, ['sportive', 'trad', 'artificielle']);
+  });
+
+  test('estDuStyle : OU logique, vide = tout passe, secteur sans style exclu', () => {
+    const mixte = { types: ['sportive', 'trad'] };
+    const sansStyle = { types: [] };
+    assert.equal(estDuStyle(mixte, []), true);
+    assert.equal(estDuStyle(sansStyle, []), true);
+    assert.equal(estDuStyle(mixte, ['trad']), true);
+    assert.equal(estDuStyle(mixte, ['artificielle', 'trad']), true);
+    assert.equal(estDuStyle(mixte, ['artificielle']), false);
+    assert.equal(estDuStyle(sansStyle, ['sportive']), false);
+  });
+
+  for (const lieu of LIEUX) {
+    test(`${lieu} : la page porte le contrôle « Style », masqué au départ`, async () => {
+      const html = await lire(`${lieu}/index.html`);
+      assert.match(html, /<div[^>]*id="legende-style"[^>]*\shidden[\s>]/,
+        `${lieu} : #legende-style absent ou visible avant que carte.js ne juge les données`);
+      for (const s of STYLES) {
+        assert.ok(html.includes(`data-style="${s}"`), `${lieu} : case data-style="${s}" absente`);
+      }
+    });
+  }
+});
+
+// Détail des voies : sportives, puis trad et artif à la suite. Rendu pur
+// (chaînes HTML), donc testable sans navigateur, y compris quand les clés
+// voies_trad / voies_artificielles n'existent pas encore dans les routes.
+describe('Détail des voies : trad et artif', () => {
+  const sportive = { nom: 'S1', numero: 1, cotation: '6a', type_voie: 'couenne' };
+  const trad = [
+    { nom: 'Trad alpha', numero: 2, cotation: '6a', protection: 'R' },
+    { nom: 'Trad beta', numero: 3, cotation: '5c' },
+  ];
+  const artif = [
+    { nom: 'Aid gamma', numero: 4, cotation_artif: 'A2' },
+    { nom: 'Aid delta', numero: 5 },
+  ];
+  const lignes = (html) => [...html.matchAll(/<li class="detail-voie(?: detail-voie-impaire)?">([\s\S]*?)<\/li>/g)].map((m) => m[1]);
+
+  test('le bouton du détail apparaît sans voie sportive, dès qu\u2019une voie trad ou artif est détaillée', () => {
+    assert.match(construireHistogramme([], true, 2), /btn-voir-detail-voies/);
+    assert.doesNotMatch(construireHistogramme([], true, 2), /voies-histo"/, 'pas d\u2019histogramme sans voie sportive');
+    // Rien à détailler : comme avant, aucun bouton.
+    assert.equal(construireHistogramme([], true, 0), '');
+    assert.equal(construireHistogramme([], true), '');
+    assert.equal(construireHistogramme(undefined, false), '');
+    // Avec des sportives, appel à deux arguments (ancien) inchangé.
+    assert.match(construireHistogramme([sportive], false), /btn-voir-detail-voies/);
+  });
+
+  test('sportives, trad puis artif, chaque bloc sous son sous-titre', () => {
+    const html = construireDetailVoies({ sportives: [sportive], trad, artificielles: artif });
+    assert.deepEqual([...html.matchAll(/detail-voie-groupe">([^<]*)</g)].map((m) => m[1]), ['Sportive', 'Trad', 'Artif']);
+    assert.match(html, /4 voies|5 voies/);
+    const noms = [...html.matchAll(/detail-voie-nom">([^<]*)</g)].map((m) => m[1]);
+    // Tri Cotation, bloc par bloc : 5c avant 6a en trad, A2 avant « sans cotation » en artif.
+    assert.deepEqual(noms, ['S1', 'Trad beta', 'Trad alpha', 'Aid gamma', 'Aid delta']);
+  });
+
+  test('le carré couenne / grande voie reste réservé aux sportives, les colonnes restent alignées', () => {
+    const html = construireDetailVoies({ sportives: [sportive], trad, artificielles: artif });
+    const l = lignes(html);
+    assert.equal(l.length, 5);
+    assert.equal((html.match(/histo-swatch/g) || []).length, 1, 'un carré, pour la seule sportive');
+    for (const ligne of l) {
+      assert.equal((ligne.match(/<span class="detail-voie-(?:type|nom|cotation|points|hauteur)"/g) || []).length, 5,
+        'cinq cellules par ligne, sinon la grille se décale');
+    }
+    assert.match(l[1], /detail-voie-type"><\/span>/, 'cellule type vide en trad');
+    assert.match(l[3], /detail-voie-type"><\/span>/, 'cellule type vide en artif');
+  });
+
+  test('artif : le tri vise le grade A/C, pas le passage libre ("5c/A1", "C1-5b")', () => {
+    const html = construireDetailVoies({ sportives: [], trad: [], artificielles: [
+      { nom: 'x3', cotation_artif: '5c/A2' },
+      { nom: 'x1', cotation_artif: 'C1-5b' },
+      { nom: 'x2', cotation_artif: 'A1/6c' },
+      { nom: 'x9' },
+    ] });
+    assert.deepEqual([...html.matchAll(/detail-voie-nom">([^<]*)</g)].map((m) => m[1]), ['x1', 'x2', 'x3', 'x9']);
+  });
+
+  test('trad : cotation telle que saisie, avec la protection quand elle existe ; artif : cotation_artif', () => {
+    const html = construireDetailVoies({ sportives: [], trad, artificielles: artif });
+    const l = lignes(html);
+    // Ordre : beta (5c, sans protection), alpha (6a R), gamma (A2), delta (sans cotation).
+    assert.match(l[0], /detail-voie-cotation">5c<\/span>/);
+    assert.doesNotMatch(l[0], /protection/, 'pas de protection : rien à afficher');
+    assert.match(l[1], /detail-voie-cotation">6a<span class="detail-voie-protection">R<\/span><\/span>/);
+    assert.match(l[2], /detail-voie-cotation">A2<\/span>/);
+    assert.match(l[3], /detail-voie-cotation"><\/span>/, 'artif sans cotation_artif : cellule vide, pas de « undefined »');
+    assert.doesNotMatch(html, /undefined|null|NaN/);
+  });
+
+  test('un seul style : pas de sous-titre, rendu identique à celui d\u2019avant', () => {
+    assert.doesNotMatch(construireDetailVoies({ sportives: [sportive], trad: [], artificielles: [] }), /detail-voie-groupe/);
+    assert.doesNotMatch(construireDetailVoies({ sportives: [], trad, artificielles: [] }), /detail-voie-groupe/);
+  });
+
+  test('clés absentes ou vides : aucune erreur, aucune section vide', () => {
+    for (const detail of [{ sportives: [sportive] }, { sportives: [sportive], trad: undefined, artificielles: null }, {}, undefined]) {
+      const html = construireDetailVoies(detail);
+      assert.doesNotMatch(html, /detail-voie-groupe/);
+      assert.doesNotMatch(html, /undefined|NaN/);
+    }
+    assert.equal(lignes(construireDetailVoies({ sportives: [sportive] })).length, 1);
+  });
+
+  test('le mode Position est une seule liste triée par numéro, styles mêlés, sans sous-titre', () => {
+    const html = construireDetailVoies({
+      sportives: [{ nom: 'S1', numero: 1, cotation: '6a', type_voie: 'couenne' }, { nom: 'S7', numero: 7, cotation: '6b', type_voie: 'couenne' }],
+      trad: [{ nom: 'T2', numero: 2, cotation: '5c' }, { nom: 'T9', numero: 9 }],
+      artificielles: [{ nom: 'A5', numero: 5, cotation_artif: 'A1' }, { nom: 'Asans' }],
+    }, 'position');
+    const noms = [...html.matchAll(/detail-voie-nom">([^<]*)</g)].map((m) => m[1]);
+    // Numéro croissant tous styles confondus ; sans numéro, en fin de liste.
+    assert.deepEqual(noms, ['S1', 'T2', 'A5', 'S7', 'T9', 'Asans']);
+    assert.doesNotMatch(html, /detail-voie-groupe/, 'pas de bloc par style en Position');
+    assert.equal((html.match(/histo-swatch/g) || []).length, 2, 'le carré reste réservé aux sportives');
+    // Le mode Cotation, lui, garde ses blocs.
+    assert.match(construireDetailVoies({ sportives: [sportive], trad, artificielles: artif }), /detail-voie-groupe/);
+  });
+
+  test('les textes issus des données sont échappés', () => {
+    const html = construireDetailVoies({
+      sportives: [],
+      trad: [{ nom: '<img src=x onerror=alert(1)>', cotation: '6a', protection: '"><b>X' }],
+      artificielles: [{ nom: 'A', cotation_artif: '<i>A1' }],
+    });
+    assert.doesNotMatch(html, /<img|<b>|<i>/);
+  });
+
+  test('la colonne « Grimpe » écrit « artif », jamais « artificielle »', () => {
+    // popupFalaise ne touche au navigateur que pour matchMedia (pointeur tactile).
+    globalThis.window ??= { matchMedia: () => ({ matches: false }) };
+    const grimpe = (p) => {
+      const html = popupFalaise({ nom: 'X', nb_voie_total: 10, ...p }, 44, 5, 'X');
+      return (/Grimpe<\/span><span class="col-valeur">([^<]*)</.exec(html) || [])[1];
+    };
+    assert.equal(grimpe({ nb_voie_sportive: 8, nb_voie_trad: 1, nb_voie_artificielle: 1 }), 'sportive · trad · artif');
+    assert.equal(grimpe({ nb_voie_sportive: 9, nb_voie_artificielle: 1 }), 'sportive · artif');
+    assert.equal(grimpe({ nb_voie_artificielle: 10 }), 'artif');
+    assert.equal(grimpe({ nb_voie_sportive: 10 }), 'sportive');
+    assert.equal(grimpe({ nb_voie_sportive: 5, nb_voie_moulinette: 5 }), 'sportive · moulinette');
+  });
+});
+
+// Le détail des voies trad et artif est produit par l'export amont
+// (export_geojson.py) : ce test vérifie que ce qu'il a livré reste cohérent
+// avec les compteurs de data.geojson, lieu par lieu.
+for (const lieu of LIEUX) describe(`Détail des voies exporté — ${lieu}`, () => {
+  test('chaque liste détaillée a autant de voies que son compteur', async () => {
+    const geo = await geojsonDe(lieu);
+    for (const f of geo.features) {
+      const p = f.properties;
+      if (p.categorie !== 'falaise' || !p.routes) continue;
+      const site = JSON.parse(await lire(`${lieu}/routes/${p.routes}.json`));
+      const entree = site[String(p.routes_falaise)];
+      assert.ok(entree, `${p.nom} : absent de routes/${p.routes}.json`);
+      assert.equal((entree.voies_sportives || []).length, p.nb_voie_sportive, `${p.nom} : voies sportives détaillées ≠ compteur`);
+      assert.equal((entree.voies_trad || []).length, p.nb_voie_trad, `${p.nom} : voies trad détaillées ≠ compteur`);
+      assert.equal((entree.voies_artificielles || []).length, p.nb_voie_artificielle, `${p.nom} : voies artificielles détaillées ≠ compteur`);
+    }
+  });
+
+  test('un secteur qui a des voies sportives, trad ou artif pointe vers un fichier de routes', async () => {
+    const geo = await geojsonDe(lieu);
+    for (const f of geo.features) {
+      const p = f.properties;
+      if (p.categorie !== 'falaise') continue;
+      const detaille = p.nb_voie_sportive + p.nb_voie_trad + p.nb_voie_artificielle;
+      assert.equal(Boolean(p.routes), detaille > 0,
+        `${p.nom} / ${p.secteur} : routes=${p.routes} pour ${detaille} voie(s) détaillable(s) (sans fichier, le site n'affiche aucun bouton de détail)`);
+    }
   });
 });
 

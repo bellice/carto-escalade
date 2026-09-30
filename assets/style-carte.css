@@ -1957,6 +1957,27 @@
   font-size: var(--fs-2xs);
 }
 
+/* Sous-titre d'un bloc de style ("Trad", "Artif") dans le détail des voies,
+   affiché seulement quand plusieurs styles coexistent : pleine largeur de la
+   grille, même voix que l'en-tête de colonnes. Les voies trad et artif n'ont
+   pas de carré couenne / grande voie (leur cellule "type" reste vide). */
+.detail-voie-groupe {
+  grid-column: 1 / -1;
+  padding: 12px 8px 4px;
+  border-bottom: 1px solid var(--stone-dark);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+/* Protection d'une voie trad (R/X/PG) : collée à la cotation française, un
+   cran plus discrète. */
+.detail-voie-protection {
+  margin-left: 6px;
+  font-size: var(--fs-xs);
+}
+
 /* Sous-ligne "L1"/"L2"... d'une grande voie (mode Position uniquement, voir
    popups.js/ligneDetailLongueur) : indentée pour signaler visuellement son
    appartenance à la ligne "voie" juste au-dessus plutôt qu'une voie

@@ -536,6 +536,372 @@ describe('Filtre par fourchette de cotation', () => {
   });
 });
 
+// Filtre « Style » (sportive / trad / artif), au niveau du secteur. Trois
+// chiffres doivent tomber d'accord : ce que la couche native peint (condition
+// posée par map.setFilter), le résumé « N secteurs affichés » (falaisesVisibles,
+// le second calcul du même prédicat) et le décompte refait ici depuis
+// data.geojson. Un des deux calculs qui dérive seul n'est visible que par cette
+// comparaison.
+describe('Filtre « Style »', () => {
+  const STYLES_DONNEES = { sportive: 'nb_voie_sportive', trad: 'nb_voie_trad', artificielle: 'nb_voie_artificielle' };
+
+  async function secteursDuLieu(lieu) {
+    const geo = await (await fetch(`${serveur.base}/${lieu}/data.geojson`)).json();
+    return geo.features.map((f) => f.properties).filter((p) => p.categorie === 'falaise');
+  }
+  const attendus = (secteurs, styles) => secteurs
+    .filter((p) => !styles.length || styles.some((s) => p[STYLES_DONNEES[s]] > 0)).length;
+
+  // Ce que la carte montre, lu aux deux endroits : couche peinte (secteurs
+  // distincts) et résumé texte.
+  const lireEtat = (page) => page.evaluate(() => {
+    const peintes = window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] });
+    return {
+      peints: new Set(peintes.map((f) => f.properties.cle)).size,
+      resume: Number((document.getElementById('legende-resultat').textContent.match(/\d+/) || [NaN])[0]),
+      bouton: document.getElementById('btn-vue-filtres').textContent.trim(),
+      reinitialiserGrise: document.getElementById('reinitialiser-filtres').disabled,
+      // Plus de note sous « Style » : ce qu'elle disait se lit déjà sur la
+      // fiche du secteur. Toujours '' si le filtre n'en pose aucune.
+      note: document.querySelector('#legende-style + .legende-note')?.textContent || '',
+      url: location.search,
+    };
+  });
+
+  for (const lieu of LIEUX) {
+    test(`${lieu} : cocher Trad réduit les secteurs, décocher les rend tous`, { timeout: 90000 }, async () => {
+      const { contexte, page, erreurs } = await nouveauContexte(navigateur);
+      try {
+        const secteurs = await secteursDuLieu(lieu);
+        await exposerCarte(page);
+        await page.goto(`${serveur.base}/${lieu}/index.html`, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+
+        const presents = Object.keys(STYLES_DONNEES).filter((s) => secteurs.some((p) => p[STYLES_DONNEES[s]] > 0));
+        const masque = await page.evaluate(() => document.getElementById('legende-style').hidden);
+        // Moins de deux styles dans la sortie (Cassis et La Ciotat, pas encore
+        // saisi) : le contrôle n'a rien à proposer et doit rester caché.
+        assert.equal(masque, presents.length < 2,
+          `${lieu} : contrôle « Style » ${masque ? 'caché' : 'affiché'} alors que ${presents.length} style(s) existent dans les données`);
+        if (masque) return;
+
+        // Une case n'existe que pour un style présent dans ce lieu.
+        const cases = await page.evaluate(() =>
+          Array.from(document.querySelectorAll('#legende-style input[data-style]')).map((c) => c.dataset.style));
+        assert.deepEqual(cases, presents, `${lieu} : cases proposées ≠ styles présents`);
+
+        const total = secteurs.length;
+        const repos = await lireEtat(page);
+        assert.equal(repos.resume, total, `${lieu} : résumé au repos`);
+        assert.equal(repos.bouton, 'Filtres');
+        assert.equal(repos.reinitialiserGrise, true);
+
+        await page.check('#legende-style [data-style="trad"]');
+        await page.waitForTimeout(500);
+        const trad = await lireEtat(page);
+        const nTrad = attendus(secteurs, ['trad']);
+        assert.ok(nTrad > 0 && nTrad < total, `${lieu} : jeu de données inadapté (${nTrad} trad sur ${total})`);
+        assert.equal(trad.peints, nTrad, `${lieu} : la couche peint ${trad.peints} secteurs, ${nTrad} attendus avec Trad`);
+        assert.equal(trad.resume, nTrad, `${lieu} : le résumé annonce ${trad.resume}, ${nTrad} attendus (les deux prédicats ont divergé)`);
+        assert.equal(trad.bouton, 'Filtres · 1');
+        assert.equal(trad.reinitialiserGrise, false);
+        assert.match(trad.url, /style=trad/, `${lieu} : ?style= absent de l'URL`);
+        assert.equal(trad.note, '', `${lieu} : le filtre Style ne doit plus poser de note`);
+
+        // OU logique : ajouter un style élargit, ne restreint pas.
+        if (presents.includes('artificielle')) {
+          await page.check('#legende-style [data-style="artificielle"]');
+          await page.waitForTimeout(500);
+          const ou = await lireEtat(page);
+          const nOu = attendus(secteurs, ['trad', 'artificielle']);
+          assert.equal(ou.peints, nOu, `${lieu} : Trad + Artif, couche`);
+          assert.equal(ou.resume, nOu, `${lieu} : Trad + Artif, résumé`);
+          assert.ok(nOu >= nTrad, `${lieu} : ajouter un style ne doit pas réduire le résultat`);
+          assert.equal(ou.bouton, 'Filtres · 1', 'un seul filtre actif, même à deux cases');
+          await page.uncheck('#legende-style [data-style="artificielle"]');
+        }
+
+        await page.uncheck('#legende-style [data-style="trad"]');
+        await page.waitForTimeout(500);
+        const fin = await lireEtat(page);
+        assert.equal(fin.peints, total, `${lieu} : décocher ne rend pas tous les secteurs`);
+        assert.equal(fin.resume, total);
+        assert.equal(fin.bouton, 'Filtres');
+        assert.equal(fin.reinitialiserGrise, true);
+        assert.doesNotMatch(fin.url, /style=/, `${lieu} : ?style= reste dans l'URL`);
+        assert.equal(fin.note, '', `${lieu} : une note reste affichée sans filtre actif`);
+        assert.deepEqual(erreurs, [], `${lieu} : erreurs JavaScript`);
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+
+  test('« Réinitialiser » décoche Style et vide l\'URL', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      const total = (await secteursDuLieu('vallee-drome-diois')).length;
+
+      await page.check('#legende-style [data-style="artificielle"]');
+      await page.waitForTimeout(500);
+      const avant = await lireEtat(page);
+      assert.ok(avant.resume < total, 'Artif doit réduire les secteurs');
+      // Sans style renseigné, un secteur ne peut satisfaire aucune case et
+      // disparaît (Drôme : Roche Rousse, aucune voie saisie), sans note.
+      assert.equal(avant.note, '');
+
+      await page.click('#reinitialiser-filtres');
+      await page.waitForTimeout(500);
+      const apres = await lireEtat(page);
+      assert.equal(apres.resume, total);
+      assert.equal(apres.peints, total);
+      assert.equal(await page.evaluate(() => document.querySelectorAll('#legende-style input:checked').length), 0);
+      assert.doesNotMatch(apres.url, /style=/);
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('« Tout voir » ne touche pas au filtre Style', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+
+      await page.check('#legende-style [data-style="trad"]');
+      await page.waitForTimeout(400);
+      const avant = (await lireEtat(page)).resume;
+      await page.click('.btn-tout-voir');
+      await page.waitForTimeout(800);
+      const apres = await lireEtat(page);
+      assert.equal(apres.resume, avant, '« Tout voir » a changé le nombre de secteurs filtrés');
+      assert.equal(await page.isChecked('#legende-style [data-style="trad"]'), true);
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('un lien ?style= pré-coche les cases, sauf avec ?falaise=', { timeout: 90000 }, async () => {
+    const secteurs = await secteursDuLieu('vallee-drome-diois');
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(`${serveur.base}${CHEMIN_SORTIE}?style=trad,artif`, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      const coches = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('#legende-style input:checked')).map((c) => c.dataset.style));
+      assert.deepEqual(coches, ['trad', 'artificielle']);
+      const etat = await lireEtat(page);
+      assert.equal(etat.resume, attendus(secteurs, ['trad', 'artificielle']));
+      assert.equal(etat.bouton, 'Filtres · 1');
+
+      // Avec ?falaise= : la fiche ouverte ne doit pas être masquée par le
+      // filtre du même lien, donc ?style= est ignoré.
+      const p2 = await contexte.newPage();
+      await p2.goto(`${serveur.base}${CHEMIN_SORTIE}?falaise=${encodeURIComponent(REPERES.lesRoches.nom)}&style=artif`,
+        { waitUntil: 'domcontentloaded' });
+      await p2.waitForSelector('#legende-style', { state: 'attached' });
+      await p2.waitForTimeout(2500);
+      assert.equal(await p2.evaluate(() => document.querySelectorAll('#legende-style input:checked').length), 0,
+        '?style= appliqué malgré ?falaise=');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('un lien ?style= s\'ouvre hors ligne', { timeout: 120000 }, async () => {
+    // Le service worker replie une navigation sans réseau sur index.html du
+    // même dossier : le paramètre ne doit pas faire manquer le cache.
+    const { contexte, page } = await nouveauContexte(navigateur, { serviceWorkers: 'allow' });
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      // Attend que le service worker ait fini de pré-cacher la coquille.
+      await page.evaluate(async () => {
+        const reg = await navigator.serviceWorker.ready;
+        await new Promise((ok) => {
+          if (navigator.serviceWorker.controller) return ok();
+          navigator.serviceWorker.addEventListener('controllerchange', ok, { once: true });
+          reg.active?.postMessage({ type: 'CLIENTS_CLAIM' });
+          setTimeout(ok, 8000);
+        });
+      });
+      await page.waitForTimeout(3000);
+
+      await contexte.setOffline(true);
+      const reponse = await page.goto(`${serveur.base}${CHEMIN_SORTIE}?style=trad`, { waitUntil: 'domcontentloaded' });
+      assert.ok(reponse && reponse.ok(), 'la page avec ?style= ne se charge pas hors ligne');
+      assert.equal(await page.evaluate(() => document.querySelectorAll('#legende-style').length), 1);
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
+// Détail des voies : trad et artif à la suite des sportives. Les données
+// actuelles ne portent pas voies_trad / voies_artificielles (export amont pas
+// encore fait) : les tests qui en ont besoin les injectent dans la réponse du
+// fichier de routes, sans toucher au dépôt.
+describe('Détail des voies : trad et artif', () => {
+  const TRAD = [
+    { nom: 'Trad alpha', numero: 901, cotation: '6a', protection: 'R', nb_longueur: 1 },
+    { nom: 'Trad beta', numero: 902, cotation: '5c', nb_longueur: 1 },
+  ];
+  const ARTIF = [
+    { nom: 'Aid gamma', numero: 903, cotation_artif: 'A2', nb_longueur: 1 },
+    { nom: 'Aid delta', numero: 904, nb_longueur: 1 },
+  ];
+
+  // Ajoute (ou remplace) des clés dans chaque entrée du fichier de routes de La
+  // Tour (saou-ii). serviceWorkers bloqués : sinon le worker répondrait avant
+  // l'interception.
+  async function ouvrirLaTourAvec(modifier) {
+    const ctx = await nouveauContexte(navigateur, { serviceWorkers: 'block' });
+    await exposerCarte(ctx.page);
+    if (modifier) {
+      await ctx.page.route('**/routes/saou-ii.json', async (route) => {
+        const reponse = await route.fetch();
+        const json = await reponse.json();
+        for (const id of Object.keys(json)) modifier(json[id]);
+        await route.fulfill({ response: reponse, json });
+      });
+    }
+    await ctx.page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+    await attendreCarte(ctx.page);
+    await ouvrirFalaise(ctx.page, REPERES.laTour);
+    return ctx;
+  }
+
+  // Avec les workers bloqués, sw-client.js échoue à s'enregistrer ("reading
+  // 'update'") : bruit propre à ce contexte de test, pas du site.
+  const sansBruitSw = (erreurs) => erreurs.filter((e) => !/reading 'update'/.test(e));
+
+  const lireDetail = (page) => page.evaluate(() => {
+    // Sans les sous-lignes "L1/L2" des grandes voies (tri Position) : elles
+    // ne sont pas des voies.
+    const lignes = Array.from(document.querySelectorAll(
+      '.detail-voies-liste .detail-voie:not(.detail-voie-entete-colonnes):not(.detail-voie-longueur)'));
+    return {
+      sousTitres: Array.from(document.querySelectorAll('.detail-voie-groupe')).map((e) => e.textContent.trim()),
+      carres: document.querySelectorAll('.detail-voies-liste .histo-swatch').length,
+      lignes: lignes.length,
+      trad: lignes.filter((l) => /^Trad /.test(l.querySelector('.detail-voie-nom').textContent)).map((l) => ({
+        nom: l.querySelector('.detail-voie-nom').textContent,
+        cotation: l.querySelector('.detail-voie-cotation').textContent,
+        protection: l.querySelector('.detail-voie-protection')?.textContent ?? null,
+        carre: Boolean(l.querySelector('.histo-swatch')),
+      })),
+      artif: lignes.filter((l) => /^Aid /.test(l.querySelector('.detail-voie-nom').textContent)).map((l) => ({
+        nom: l.querySelector('.detail-voie-nom').textContent,
+        cotation: l.querySelector('.detail-voie-cotation').textContent,
+        carre: Boolean(l.querySelector('.histo-swatch')),
+      })),
+    };
+  });
+
+  test('les voies trad et artif suivent les sportives, sans carré, hors de l\u2019histogramme', { timeout: 90000 }, async () => {
+    const { contexte, page, erreurs } = await ouvrirLaTourAvec((e) => { e.voies_trad = TRAD; e.voies_artificielles = ARTIF; });
+    try {
+      // L'histogramme ne compte que les sportives : mêmes cases qu'avant l'ajout.
+      const cases = await page.evaluate(() => document.querySelectorAll('.voies-histo .histo-case').length);
+      await page.click('.btn-voir-detail-voies');
+      await page.waitForSelector('.detail-voies-liste', { timeout: 10000 });
+      const d = await lireDetail(page);
+
+      assert.deepEqual(d.sousTitres, ['Sportive', 'Trad', 'Artif']);
+      assert.equal(d.carres, cases, 'un carré par sportive, aucun pour trad ni artif');
+      assert.equal(d.lignes, cases + TRAD.length + ARTIF.length);
+      // Tri Cotation, bloc par bloc.
+      assert.deepEqual(d.trad.map((v) => v.nom), ['Trad beta', 'Trad alpha']);
+      assert.deepEqual(d.trad[0], { nom: 'Trad beta', cotation: '5c', protection: null, carre: false });
+      assert.deepEqual(d.trad[1], { nom: 'Trad alpha', cotation: '6aR', protection: 'R', carre: false });
+      assert.deepEqual(d.artif.map((v) => [v.nom, v.cotation, v.carre]),
+        [['Aid gamma', 'A2', false], ['Aid delta', '', false]]);
+
+      await page.click('.btn-tri-voies[data-tri="position"]');
+      await page.waitForTimeout(300);
+      const p = await lireDetail(page);
+      assert.deepEqual(p.sousTitres, [], 'en Position, une seule liste : pas de bloc par style');
+      assert.equal(p.lignes, d.lignes);
+      assert.equal(p.carres, cases, 'le carré reste réservé aux sportives');
+      assert.deepEqual(sansBruitSw(erreurs), []);
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('un secteur sans voie sportive détaillée garde l\u2019accès au détail', { timeout: 90000 }, async () => {
+    const { contexte, page, erreurs } = await ouvrirLaTourAvec((e) => {
+      e.voies_sportives = [];
+      e.voies_trad = TRAD;
+    });
+    try {
+      const avant = await page.evaluate(() => ({
+        bouton: Boolean(document.querySelector('.btn-voir-detail-voies')),
+        histogramme: Boolean(document.querySelector('.voies-histo')),
+      }));
+      assert.equal(avant.bouton, true, 'le bouton « Voir le détail des voies » doit apparaître');
+      assert.equal(avant.histogramme, false, 'sans sportive, pas d\u2019histogramme');
+
+      await page.click('.btn-voir-detail-voies');
+      await page.waitForSelector('.detail-voies-liste', { timeout: 10000 });
+      const d = await lireDetail(page);
+      assert.deepEqual(d.trad.map((v) => v.nom), ['Trad beta', 'Trad alpha']);
+      assert.deepEqual(d.sousTitres, [], 'un seul style : pas de sous-titre');
+      assert.equal(d.carres, 0);
+
+      await page.click('.btn-retour-fiche');
+      assert.equal(await page.evaluate(() => Boolean(document.querySelector('.btn-voir-detail-voies'))), true);
+      assert.deepEqual(sansBruitSw(erreurs), []);
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('routes sans voies_trad ni voies_artificielles : détail inchangé, sans erreur', { timeout: 90000 }, async () => {
+    // La Tour a désormais de vraies voies trad dans les données : on retire les
+    // clés pour rejouer le fichier tel qu'il était avant l'export.
+    const { contexte, page, erreurs } = await ouvrirLaTourAvec((e) => {
+      delete e.voies_trad;
+      delete e.voies_artificielles;
+    });
+    try {
+      await page.click('.btn-voir-detail-voies');
+      await page.waitForSelector('.detail-voies-liste', { timeout: 10000 });
+      const d = await lireDetail(page);
+      assert.deepEqual(d.sousTitres, []);
+      assert.ok(d.lignes > 0 && d.carres === d.lignes, 'que des sportives, avec leur carré');
+      assert.deepEqual(sansBruitSw(erreurs), []);
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('la colonne « Grimpe » d\u2019une fiche affiche « artif »', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur, { serviceWorkers: 'block' });
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      // Romeyer, « Usine à gaz » : 24 sportives, 1 trad, 2 artif.
+      await ouvrirFalaise(page, { nom: 'Usine à gaz', coord: [5.398187, 44.772714] });
+      const grimpe = await page.evaluate(() => {
+        const col = Array.from(document.querySelectorAll('.popup .col'))
+          .find((c) => c.querySelector('.col-label')?.textContent.trim() === 'Grimpe');
+        return col?.querySelector('.col-valeur').textContent.trim();
+      });
+      assert.equal(grimpe, 'sportive · trad · artif');
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
 // Bouton "Épurer" : désencombre les cercles sans changer de zoom (donc sans
 // perdre les libellés de secteur). Indépendant de "Type de voie", pas un 4e
 // bouton du même groupe — d'où le test de composition avec un mode actif

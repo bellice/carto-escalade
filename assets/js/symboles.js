@@ -120,7 +120,7 @@ export function couleurFalaisePourMode(mode) {
 //  - valeur : pour l'ordre de dessin et la légende
 //  - recherche : texte bas-de-casse pour le filtre de recherche
 //  - tempsGite : null si inconnu (filtre "Depuis le gîte")
-//  - ensoleillement / nbDansFourchette : lus par les filtres du même nom
+//  - ensoleillement / styles / nbDansFourchette : lus par les filtres du même nom
 //    (map.setFilter dans carte.js), pas par ce fichier
 // Triées par valeur DÉCROISSANTE : le plus petit est peint en dernier (dessus),
 // même règle que l'ancien réordonnancement DOM des cercles.
@@ -149,6 +149,10 @@ export function construireSourceFalaises(entries, mode, maxima, epuree) {
         // nbDansFourchette est recalculé par majFourchette (carte.js) à chaque
         // changement de bornes ; la source est reconstruite dans la foulée.
         ensoleillement: entree.ensoleillement,
+        // Texte et non tableau : les tableaux traversent mal le découpage en
+        // tuiles de MapLibre. Lu par le filtre "Style" (index-of, comme
+        // "recherche") ; aucun des trois noms n'est contenu dans un autre.
+        styles: entree.types.join(' '),
         nbDansFourchette: entree.nbDansFourchette ?? 0,
       },
       geometry: { type: 'Point', coordinates: [entree.lon, entree.lat] },

@@ -182,6 +182,16 @@
           <button type="button" class="btn-tri-voies" data-mode="couenne" id="option-couenne" aria-pressed="false">Couenne</button>
           <button type="button" class="btn-tri-voies" data-mode="gv" id="option-gv" aria-pressed="false">Grande voie</button>
         </div>
+        <!-- Filtre "Style" (configurerFiltreStyle, carte.js) : cases à cocher EN
+             OU, mêmes classes que Ensoleillement (aucun CSS propre). Masqué tant
+             que la sortie compte moins de deux styles. Axe distinct de "Type de
+             voie" (couenne, grande voie) ; la moulinette reste hors filtre. -->
+        <div class="legende-ensoleillement" id="legende-style" hidden role="group" aria-label="Filtrer par style de grimpe">
+          <span class="legende-ensoleillement-label">Style</span>
+          <label class="case-ensoleillement"><input type="checkbox" data-style="sportive" />Sportive</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-style="trad" />Trad</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-style="artificielle" />Artif</label>
+        </div>
         <!-- Toujours visible (pas de hidden) : au repos, les bornes couvrent
              toute l'échelle présente dans cette sortie, ce qui dit "inactif"
              aussi clairement qu'un repli — même principe que le curseur

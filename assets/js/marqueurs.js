@@ -2,14 +2,14 @@
 // DOM, accessibilité, popup attachée, gestion d'ouverture/fermeture.
 
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
-import { cleFalaise, libelleFalaise, secteurDistinct, categoriserEnsoleillement } from './donnees.js';
+import { cleFalaise, libelleFalaise, secteurDistinct, categoriserEnsoleillement, deriverStyles } from './donnees.js';
 import { poserTailleMarqueur } from './symboles.js';
 import { popupFalaise, popupParking, popupGite, construireHistogramme, construireDetailVoies } from './popups.js';
 import { reinitialiserPadding, margeAvantPopup, estPointVisible, dureeAnimation } from './carte-utils.js';
 
-// id_falaise -> tableau BRUT de voies_sportives, jamais du HTML pré-rendu :
-// l'histogramme et le détail des voies consomment la même donnée, cacher du
-// HTML figerait celui des deux rendus demandé en premier.
+// id_falaise -> { sportives, trad, artificielles } (tableaux BRUTS, jamais du
+// HTML pré-rendu) : l'histogramme et le détail des voies consomment la même
+// donnée, cacher du HTML figerait celui des deux rendus demandé en premier.
 const cacheVoiesParFalaise = new Map();
 const cacheSitesRoutes = new Map(); // slug-site -> Promise<JSON du site>
 
@@ -36,6 +36,18 @@ function chargerJsonSite(siteId, urlRoute) {
   return cacheSitesRoutes.get(siteId);
 }
 
+// Fichier de routes -> les trois listes. voies_trad / voies_artificielles
+// n'existent qu'une fois l'export amont mis à jour : absentes = listes vides,
+// le rendu reste celui d'avant (sportives seules).
+function detailDepuisEntree(entree) {
+  const liste = (cle) => (entree && Array.isArray(entree[cle]) ? entree[cle] : []);
+  return {
+    sportives: liste('voies_sportives'),
+    trad: liste('voies_trad'),
+    artificielles: liste('voies_artificielles'),
+  };
+}
+
 function chargerDetailVoies(racineEl, urlRoute) {
   const placeholder = racineEl && racineEl.querySelector('[data-route]');
   remplirPlaceholderVoies(placeholder, urlRoute);
@@ -48,10 +60,13 @@ export function remplirPlaceholderVoies(placeholder, urlRoute) {
   const siteId = placeholder.dataset.route;
   const falaiseId = placeholder.dataset.routeFalaise;
   const aAutresDisciplines = placeholder.dataset.autresDisciplines === '1';
-  const rendre = (voies) => {
+  const rendre = (detail) => {
     // La fiche (popup ou panneau) peut avoir été refermée ou réutilisée
     // entre-temps : on n'écrit que si ce placeholder est toujours dans le DOM.
-    if (placeholder.isConnected) placeholder.innerHTML = construireHistogramme(voies, aAutresDisciplines);
+    if (placeholder.isConnected) {
+      placeholder.innerHTML = construireHistogramme(
+        detail.sportives, aAutresDisciplines, detail.trad.length + detail.artificielles.length);
+    }
   };
   if (cacheVoiesParFalaise.has(falaiseId)) {
     rendre(cacheVoiesParFalaise.get(falaiseId));
@@ -59,9 +74,9 @@ export function remplirPlaceholderVoies(placeholder, urlRoute) {
   }
   chargerJsonSite(siteId, urlRoute)
     .then(donneesSite => {
-      const voies = (donneesSite[falaiseId] && donneesSite[falaiseId].voies_sportives) || [];
-      cacheVoiesParFalaise.set(falaiseId, voies);
-      rendre(voies);
+      const detail = detailDepuisEntree(donneesSite[falaiseId]);
+      cacheVoiesParFalaise.set(falaiseId, detail);
+      rendre(detail);
     })
     .catch(() => {
       // Afficher l'échec plutôt que retirer le placeholder : une disparition
@@ -81,9 +96,9 @@ export function afficherDetailVoies(popupEl, falaiseId) {
   const placeholder = popupEl.querySelector('.voies-histo-placeholder');
   if (!placeholder) return;
   if (!placeholder.querySelector('.fiche-voies-detail')) {
-    const voies = cacheVoiesParFalaise.get(falaiseId);
-    if (!voies) return;
-    placeholder.insertAdjacentHTML('beforeend', construireDetailVoies(voies));
+    const detail = cacheVoiesParFalaise.get(falaiseId);
+    if (!detail) return;
+    placeholder.insertAdjacentHTML('beforeend', construireDetailVoies(detail));
   }
   popupEl.classList.add('mode-detail-voies');
   // .maplibregl-popup-content n'existe que côté mobile : distinction fiable
@@ -105,9 +120,9 @@ export function afficherDetailVoies(popupEl, falaiseId) {
 // Retour dépendent tous du mode. Relit le cache, jamais un nouveau fetch.
 export function basculerTriDetailVoies(popupEl, falaiseId, mode) {
   const ancien = popupEl.querySelector('.fiche-voies-detail');
-  const voies = cacheVoiesParFalaise.get(falaiseId);
-  if (!ancien || !voies) return;
-  ancien.outerHTML = construireDetailVoies(voies, mode);
+  const detail = cacheVoiesParFalaise.get(falaiseId);
+  if (!ancien || !detail) return;
+  ancien.outerHTML = construireDetailVoies(detail, mode);
 }
 
 // ficheReduite vient de l'appelant (carte.js en est seul propriétaire) :
@@ -176,6 +191,9 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
       // Précalculée comme nbCouenne/nbGrandeVoie, pas relue à chaque frame
       // depuis p.orientation : voir categoriserEnsoleillement (donnees.js).
       ensoleillement: categoriserEnsoleillement(p.orientation),
+      // Styles de grimpe du secteur (sportive/trad/artificielle), lus par le
+      // filtre "Style" — voir deriverStyles et estDuStyle (donnees.js).
+      types: deriverStyles(p),
     };
   }
 

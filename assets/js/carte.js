@@ -6,7 +6,7 @@ import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist
 import { escapeHtml } from './utils.js';
 import {
   indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite, indexerSources,
-  estFalaiseVideDansMode, libelleFalaise,
+  estFalaiseVideDansMode, libelleFalaise, estDuStyle, STYLES,
   compterDansFourchette, valeurCotationApprochee,
   cotationVersValeur, approximerCotation,
 } from './donnees.js';
@@ -16,6 +16,11 @@ import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from '
 import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop, dureeAnimation, dureeReduite } from './carte-utils.js';
 import { monterPreparationHorsLigne } from './hors-ligne.js';
 import { cablerActionsFiche } from './actions-fiche.js';
+
+// Valeur de ?style= dans l'URL pour chaque style (lien partageable, ex.
+// ?style=trad,artif) : les libellés courts de la légende, pas les noms de
+// données.
+const JETON_URL_STYLE = { sportive: 'sportive', trad: 'trad', artificielle: 'artif' };
 
 // Seuil de zoom en dessous duquel les falaises sont simplifiées en petit
 // point uniforme (voir appliquerSimplificationZoom dans initCarte) — à
@@ -116,6 +121,10 @@ export function initCarte(dataUrl) {
   // configurerFiltreEnsoleillement.
   const filtres = {
     recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity, ensoleillement: [],
+    // styles: tableau des styles cochés (sportive/trad/artificielle, dans
+    // l'ordre de STYLES), EN OU : un secteur passe s'il porte au moins un des
+    // styles cochés (voir estDuStyle, donnees.js). Vide = aucun filtre actif.
+    styles: [],
     // Fourchette de cotation : filtre à part entière, au même titre
     // qu'Ensoleillement ou "Depuis le gîte" — il n'agit ni sur la taille ni
     // sur la couleur des cercles, seulement sur qui reste affiché, et se
@@ -143,6 +152,7 @@ export function initCarte(dataUrl) {
   const filtreTempsValeur = document.getElementById('filtre-temps-valeur');
   const legendeTemps = document.getElementById('legende-temps');
   const legendeEnsoleillement = document.getElementById('legende-ensoleillement');
+  const legendeStyle = document.getElementById('legende-style');
   const btnReinitialiserFiltres = document.getElementById('reinitialiser-filtres');
   const resumeResultats = document.getElementById('legende-resultat');
   const btnVueCarte = document.getElementById('btn-vue-carte');
@@ -189,6 +199,34 @@ export function initCarte(dataUrl) {
     rafraichirBoutonReinitialiserFiltres();
   }
 
+  // Remet le filtre "Style" à "aucune case cochée" et retire ?style= de
+  // l'URL — même usage que reinitialiserFiltreEnsoleillement.
+  function reinitialiserFiltreStyle() {
+    filtres.styles = [];
+    if (legendeStyle) {
+      legendeStyle.querySelectorAll('input[data-style]').forEach((case_) => {
+        case_.checked = false;
+      });
+    }
+    synchroniserUrlStyle();
+    rafraichirBoutonReinitialiserFiltres();
+  }
+
+  // Reflète les styles cochés dans ?style= sans ajouter d'entrée d'historique
+  // et sans toucher aux autres paramètres (?falaise=). Échec silencieux : un
+  // contexte sans History API garde son filtre, seulement sans lien partageable.
+  function synchroniserUrlStyle() {
+    try {
+      const url = new URL(location.href);
+      if (filtres.styles.length) {
+        url.searchParams.set('style', filtres.styles.map((s) => JETON_URL_STYLE[s]).join(','));
+      } else {
+        url.searchParams.delete('style');
+      }
+      history.replaceState(history.state, '', url.pathname + url.search.replace(/%2C/g, ',') + url.hash);
+    } catch { /* pas de History API : filtre gardé, lien non mis à jour */ }
+  }
+
   // Fourchette de cotation resserrée par rapport à l'amplitude réelle des
   // données : au moins une borne a quitté son extrême, donc le filtre exclut
   // des falaises. Sortie sans cotation exploitable (preparerFourchette a
@@ -233,6 +271,7 @@ export function initCarte(dataUrl) {
   // — bascule mobile ET repli desktop (voir son texte, .legende-toggle-texte).
   function rafraichirBoutonReinitialiserFiltres() {
     const nActifs = (filtres.ensoleillement.length > 0 ? 1 : 0)
+      + (filtres.styles.length > 0 ? 1 : 0)
       + (filtres.tempsMaxGite < filtres.tempsGitePlafond ? 1 : 0)
       + (modeFigureActuel !== 'aucun' ? 1 : 0)
       + (filtreCotationActif() ? 1 : 0);
@@ -254,6 +293,7 @@ export function initCarte(dataUrl) {
     btnReinitialiserFiltres.addEventListener('click', () => {
       reinitialiserFiltreTemps();
       reinitialiserFiltreEnsoleillement();
+      reinitialiserFiltreStyle();
       reinitialiserFiltreCotation();
       definirModeFigure('aucun');
       appliquerFiltresEtSecteurs();
@@ -718,12 +758,14 @@ export function initCarte(dataUrl) {
     // explicite, chacun est levé si c'est le cas.
     const tempsGiteEmpecheVisibilite = (entree) => entree.tempsGite != null && entree.tempsGite > filtres.tempsMaxGite;
     const ensoleillementEmpecheVisibilite = (entree) => filtres.ensoleillement.length && !filtres.ensoleillement.includes(entree.ensoleillement);
+    const styleEmpecheVisibilite = (entree) => !estDuStyle(entree, filtres.styles);
     const cotationEmpecheVisibilite = (entree) => filtreCotationActif()
       && !compterDansFourchette(entree.cotations, filtres.cotationMin, filtres.cotationMax);
     const seraitMasquee = (entree) => entree && entree.cat === 'falaise' && (
       estFalaiseVideDansMode(entree, modeFigureActuel)
       || tempsGiteEmpecheVisibilite(entree)
       || ensoleillementEmpecheVisibilite(entree)
+      || styleEmpecheVisibilite(entree)
       || cotationEmpecheVisibilite(entree));
     const cibleSeraitMasquee = seraitMasquee(cible);
     const origineSeraitMasquee = seraitMasquee(origine);
@@ -731,6 +773,7 @@ export function initCarte(dataUrl) {
       definirModeFigure('aucun');
       reinitialiserFiltreTemps();
       reinitialiserFiltreEnsoleillement();
+      reinitialiserFiltreStyle();
       reinitialiserFiltreCotation();
     }
 
@@ -835,6 +878,7 @@ export function initCarte(dataUrl) {
         ajusterLegendeAuxDonnees(geojson);
         configurerFiltreTemps(tempsDepuisGite);
         configurerFiltreEnsoleillement();
+        configurerFiltreStyle();
         configurerReinitialisationFiltres();
         // "Réinitialiser" devient visible une fois pour toutes ici, puis ne
         // fait plus que se griser/dégriser (rafraichirBoutonReinitialiserFiltres)
@@ -1161,6 +1205,51 @@ export function initCarte(dataUrl) {
       filtreTempsValeur.textContent = `≤ ${filtreTemps.value} min`;
       rafraichirBoutonReinitialiserFiltres();
       appliquerFiltresEtSecteurs();
+    });
+  }
+
+  // Filtre "Style" : masqué par défaut (voir HTML, attribut hidden) et montré
+  // seulement si au moins DEUX styles existent dans cette sortie : avec un
+  // seul (ou aucun, Cassis et La Ciotat) les cases donneraient le même
+  // résultat ou rien, même règle que configurerFiltreEnsoleillement. Cases
+  // cochables ensemble EN OU, sur le modèle de l'ensoleillement (voir
+  // filtres.styles). ?style=trad,artif à l'arrivée pré-coche les cases, sauf
+  // avec ?falaise= : la fiche ouverte ne doit pas se retrouver masquée par un
+  // filtre que le même lien a posé.
+  function configurerFiltreStyle() {
+    if (!legendeStyle) return;
+    const cases = Array.from(legendeStyle.querySelectorAll('input[data-style]'));
+    if (!cases.length) return;
+    const presents = STYLES.filter((style) => entries.some((e) => e.cat === 'falaise' && e.types.includes(style)));
+    if (presents.length < 2) return;
+    // Une case pour un style absent de cette sortie ne retiendrait aucun
+    // secteur : retirée plutôt que laissée inerte.
+    cases.forEach((case_) => {
+      if (!presents.includes(case_.dataset.style)) case_.closest('label').remove();
+    });
+    legendeStyle.hidden = false;
+
+    const lireCases = () => cases
+      .filter((c) => c.isConnected && c.checked)
+      .map((c) => c.dataset.style);
+
+    const params = new URLSearchParams(location.search);
+    if (!params.has('falaise') && params.has('style')) {
+      const demandes = params.get('style').split(',').map((t) => t.trim());
+      cases.forEach((c) => {
+        c.checked = c.isConnected && demandes.includes(JETON_URL_STYLE[c.dataset.style]);
+      });
+      filtres.styles = lireCases();
+      rafraichirBoutonReinitialiserFiltres();
+    }
+
+    cases.forEach((case_) => {
+      case_.addEventListener('change', () => {
+        filtres.styles = lireCases();
+        synchroniserUrlStyle();
+        rafraichirBoutonReinitialiserFiltres();
+        appliquerFiltresEtSecteurs();
+      });
     });
   }
 
@@ -1604,6 +1693,13 @@ export function initCarte(dataUrl) {
   if (filtres.ensoleillement.length) {
     conditions.push(['in', ['get', 'ensoleillement'], ['literal', filtres.ensoleillement]]);
   }
+  // Union des styles cochés : le texte "styles" de la source (voir
+  // construireSourceFalaises) contient le nom de chaque style du secteur.
+  // Miroir de estDuStyle (donnees.js), utilisé plus bas pour falaisesVisibles :
+  // les deux doivent rester d'accord.
+  if (filtres.styles.length) {
+    conditions.push(['any', ...filtres.styles.map((s) => ['>=', ['index-of', s, ['get', 'styles']], 0])]);
+  }
   // Fourchette de cotation resserrée : ne garde que les falaises avec au
   // moins une voie dans les bornes (nbDansFourchette, propriété posée par
   // construireSourceFalaises et rafraîchie à chaque changement de bornes via
@@ -1623,6 +1719,7 @@ export function initCarte(dataUrl) {
       !estFalaiseVideDansMode(entree, mode) &&
       (entree.tempsGite == null || entree.tempsGite <= filtres.tempsMaxGite) &&
       (!filtres.ensoleillement.length || filtres.ensoleillement.includes(entree.ensoleillement)) &&
+      estDuStyle(entree, filtres.styles) &&
       (!filtreCotationActif() || entree.nbDansFourchette > 0);
     if (visible) {
       falaisesVisibles.add(entree.cle);
