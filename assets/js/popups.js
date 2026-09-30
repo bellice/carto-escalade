@@ -101,8 +101,21 @@ function afficherLienMaps() {
 // rien à quoi rattacher un itinéraire. Répéter les coordonnées avant le « ? »
 // garde la compatibilité RFC 5870 pour les applis qui ignorent q=.
 // Desktop : geo: n'ouvre en général rien, d'où le lien Google Maps direct.
+// iPhone / iPad : iOS ne connaît pas le schéma geo: (le lien ne fait rien, sans
+// message) ; le lien https://maps.apple.com ouvre Plans directement, appli
+// présente sur tous les appareils Apple, en itinéraire vers le point.
+function estAppareilApple() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent)
+    // iPadOS se présente comme un Mac : seul le tactile le distingue.
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function lienItineraire(lat, lon, nom) {
   const coords = `${lat},${lon}`;
+  if (estAppareilApple()) {
+    const libelle = nom ? `&q=${encodeURIComponent(nom)}` : '';
+    return `https://maps.apple.com/?daddr=${coords}&dirflg=d${libelle}`;
+  }
   if (afficherLienMaps()) {
     const libelle = nom ? `(${encodeURIComponent(nom)})` : '';
     return `geo:${coords}?q=${coords}${libelle}`;

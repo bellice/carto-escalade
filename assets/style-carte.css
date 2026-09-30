@@ -789,7 +789,10 @@
     content: '';
     width: 14px;
     height: 14px;
-    border: 1px solid var(--stone-dark);
+    /* --muted et non --stone-dark : la case décochée n'a que son contour pour
+       exister, il doit atteindre 3:1 sur le fond (WCAG 1.4.11). --stone-dark
+       donnait 1,36:1, la case disparaissait sur téléphone. */
+    border: 1px solid var(--muted);
     border-radius: var(--radius);
     background: var(--paper);
   }

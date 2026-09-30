@@ -542,6 +542,36 @@ describe('Filtre par fourchette de cotation', () => {
 // le second calcul du même prédicat) et le décompte refait ici depuis
 // data.geojson. Un des deux calculs qui dérive seul n'est visible que par cette
 // comparaison.
+// Itinéraire : le schéma geo: ouvre les applis de navigation sur Android mais
+// ne fait rien sur iOS ; Apple Plans s'y ouvre par un lien https.
+describe('Lien Itinéraire selon l\u2019appareil', () => {
+  const cas = [
+    { nom: 'iPhone', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1', attendu: /^https:\/\/maps\.apple\.com\/\?daddr=[\d.,-]+&dirflg=d&q=/ },
+    { nom: 'Android', ua: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36', attendu: /^geo:[\d.,-]+\?q=/ },
+  ];
+  for (const { nom, ua, attendu } of cas) {
+    test(`${nom} : lien d'itinéraire adapté`, { timeout: 90000 }, async () => {
+      const contexte = await navigateur.newContext({
+        userAgent: ua, viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, serviceWorkers: 'block',
+      });
+      const page = await contexte.newPage();
+      try {
+        await exposerCarte(page);
+        await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+        await ouvrirFalaise(page, REPERES.laTour);
+        const href = await page.evaluate(() => {
+          const a = Array.from(document.querySelectorAll('.popup a.btn-primary')).find((e) => /Itinéraire/.test(e.textContent));
+          return a?.getAttribute('href');
+        });
+        assert.match(href, attendu, `${nom} : href = ${href}`);
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+});
+
 describe('Filtre « Style »', () => {
   const STYLES_DONNEES = { sportive: 'nb_voie_sportive', trad: 'nb_voie_trad', artificielle: 'nb_voie_artificielle' };
 
