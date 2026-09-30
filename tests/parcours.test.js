@@ -347,7 +347,7 @@ describe('Vocabulaire de la légende', () => {
         const fautifs = await page.evaluate(async () => {
           const cleTexte = () => document.querySelector('#cle-falaises-zone .cle')?.textContent.trim() || '';
           const mauvais = [];
-          // "Type de voie" : cases Couenne / Grande voie — .click() déclenche
+          // "Type de voie" : choix Tous / Couenne / Grande voie — .click() déclenche
           // le même écouteur qu'un vrai clic, peu importe que le panneau
           // Filtres soit visuellement actif ou non sur ce viewport mobile.
           for (const case_ of document.querySelectorAll('#legende-type-voie input')) {
@@ -808,17 +808,18 @@ describe('Filtre « Pratique »', () => {
   });
 });
 
-// Filtre « Type de voie » : deux cases. Un type coché restreint aux secteurs
-// qui en ont ; aucun ou les deux cochés, tous les secteurs.
+// Filtre « Type de voie » : choix unique (Tous / Couenne / Grande voie). Un type
+// restreint aux secteurs qui en ont, toutes pratiques confondues.
 describe('Filtre « Type de voie »', () => {
   const lire = (page) => page.evaluate(() => ({
     peints: new Set(window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).map((f) => f.properties.cle)).size,
     resume: Number((document.getElementById('legende-resultat').textContent.match(/\d+/) || [NaN])[0]),
     bouton: document.getElementById('btn-vue-filtres').textContent.trim(),
     couleur: window.__carteTest.getPaintProperty('falaises', 'circle-color'),
+    coche: document.querySelector('#legende-type-voie input:checked')?.dataset.typeVoie ?? null,
   }));
 
-  test('un type coché restreint, les deux cochés ou aucun montrent tout', { timeout: 90000 }, async () => {
+  test('un type restreint, un autre le remplace, Tous rend tout', { timeout: 90000 }, async () => {
     const geo = await (await fetch(`${serveur.base}/vallee-drome-diois/data.geojson`)).json();
     const secteurs = geo.features.map((f) => f.properties).filter((p) => p.categorie === 'falaise');
     // Toutes pratiques confondues (nb_par_type), pas seulement les sportives.
@@ -833,12 +834,11 @@ describe('Filtre « Type de voie »', () => {
       await exposerCarte(page);
       await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
       await attendreCarte(page);
-      const coches = () => page.evaluate(() =>
-        Array.from(document.querySelectorAll('#legende-type-voie input:checked')).map((c) => c.dataset.typeVoie));
 
       const repos = await lire(page);
+      assert.equal(repos.coche, 'aucun', 'Tous est coché au départ');
       assert.equal(repos.resume, total);
-      assert.deepEqual(await coches(), []);
+      assert.equal(repos.bouton, 'Filtres');
 
       await page.check('#legende-type-voie [data-type-voie="gv"]');
       await page.waitForTimeout(500);
@@ -846,27 +846,31 @@ describe('Filtre « Type de voie »', () => {
       assert.equal(gv.peints, nGv, 'couche : secteurs avec grande voie');
       assert.equal(gv.resume, nGv, 'résumé : secteurs avec grande voie');
       assert.equal(gv.bouton, 'Filtres · 1');
-      assert.notDeepEqual(gv.couleur, repos.couleur, 'la couleur suit le type coché');
+      assert.notDeepEqual(gv.couleur, repos.couleur, 'la couleur suit le type choisi');
 
+      // Choix unique : Couenne remplace Grande voie, il ne s'y ajoute pas.
       await page.check('#legende-type-voie [data-type-voie="couenne"]');
       await page.waitForTimeout(500);
-      const deux = await lire(page);
-      assert.deepEqual(await coches(), ['couenne', 'gv'], 'les deux cases restent cochées');
-      assert.equal(deux.resume, total, 'les deux types = toutes les voies, secteurs trad ou artif seuls compris');
-      assert.equal(deux.peints, total);
-      assert.equal(deux.bouton, 'Filtres', 'aucune restriction, donc aucun filtre actif');
-      assert.deepEqual(deux.couleur, repos.couleur);
-
-      await page.uncheck('#legende-type-voie [data-type-voie="gv"]');
-      await page.waitForTimeout(500);
       const couenne = await lire(page);
+      assert.equal(couenne.coche, 'couenne');
       assert.equal(couenne.resume, nCouenne);
       assert.equal(couenne.peints, nCouenne);
+      assert.equal(couenne.bouton, 'Filtres · 1');
 
+      await page.check('#legende-type-voie [data-type-voie="aucun"]');
+      await page.waitForTimeout(500);
+      const tous = await lire(page);
+      assert.equal(tous.resume, total, 'Tous rend les secteurs trad ou artif seuls aussi');
+      assert.equal(tous.peints, total);
+      assert.equal(tous.bouton, 'Filtres');
+      assert.deepEqual(tous.couleur, repos.couleur);
+
+      await page.check('#legende-type-voie [data-type-voie="gv"]');
+      await page.waitForTimeout(400);
       await page.click('#reinitialiser-filtres');
       await page.waitForTimeout(500);
       const fin = await lire(page);
-      assert.deepEqual(await coches(), [], 'Réinitialiser décoche Type de voie');
+      assert.equal(fin.coche, 'aucun', 'Réinitialiser remet Type de voie sur Tous');
       assert.equal(fin.resume, total);
     } finally {
       await contexte.close();

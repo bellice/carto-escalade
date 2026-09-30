@@ -158,17 +158,16 @@
              côté Carte, en montre le titre fixe et le résultat), et la cotation
              à laquelle on s'intéresse. Vivent ici et non côté Carte : question
              de réglage, pas de lecture de la carte.
-             Cases à cocher, comme Style et Ensoleillement : un seul type coché
-             restreint aux secteurs qui en ont, et donne aux cercles la taille
-             et la couleur de ce type ; aucun ou les deux cochés, toutes les
-             voies (les deux types réunis ne laisseraient de côté que les
-             secteurs sans couenne ni grande voie, trad ou artif seuls).
-             Se combine avec "Cotation des voies" juste en dessous, un filtre
-             indépendant (voir appliquerFiltreCotation, carte.js). -->
-        <div class="legende-ensoleillement" id="legende-type-voie" role="group" aria-label="Filtrer par type de voie">
+             Choix unique en pastilles (boutons radio), comme Pratique : "Tous"
+             par défaut, sinon Couenne ou Grande voie, qui restreint aux
+             secteurs qui en ont et donne aux cercles la taille et la couleur
+             de ce type. Se combine avec "Cotation des voies" juste en dessous,
+             un filtre indépendant (voir appliquerFiltreCotation, carte.js). -->
+        <div class="legende-ensoleillement" id="legende-type-voie" role="radiogroup" aria-label="Filtrer par type de voie">
           <span class="legende-ensoleillement-label">Type de voie</span>
-          <label class="case-ensoleillement"><input type="checkbox" data-type-voie="couenne" />Couenne</label>
-          <label class="case-ensoleillement"><input type="checkbox" data-type-voie="gv" />Grande voie</label>
+          <label class="case-ensoleillement"><input type="radio" name="type-voie" data-type-voie="aucun" checked />Tous</label>
+          <label class="case-ensoleillement"><input type="radio" name="type-voie" data-type-voie="couenne" />Couenne</label>
+          <label class="case-ensoleillement"><input type="radio" name="type-voie" data-type-voie="gv" />Grande voie</label>
         </div>
         <!-- Filtre "Pratique" (configurerFiltreStyle, carte.js) : choix unique en
              pastilles (boutons radio), "Tous" par défaut, mêmes classes que

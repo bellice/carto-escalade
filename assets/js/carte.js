@@ -705,9 +705,9 @@ export function initCarte(dataUrl) {
   // thème qui l'aurait masquée (voir estFalaiseVideDansMode). "Cotation des
   // voies" ne passe pas par ici : c'est un filtre indépendant qui se combine
   // avec ce mode (voir appliquerFiltreCotation).
-  // synchroniserCases : faux quand l'appel vient des cases elles-mêmes (leur
-  // état est la source, y compris "les deux cochées" = 'aucun') ; vrai pour
-  // les appels de code (Réinitialiser, allerVers), qui les remettent d'accord.
+  // synchroniserCases : faux quand l'appel vient des pastilles elles-mêmes
+  // (leur état est la source) ; vrai pour les appels de code (Réinitialiser,
+  // allerVers), qui les remettent d'accord.
   function definirModeFigure(nouveauMode, synchroniserCases = true) {
     modeFigureActuel = nouveauMode;
     if (synchroniserCases) {
@@ -1455,21 +1455,18 @@ export function initCarte(dataUrl) {
   if (btnVueCarte) btnVueCarte.addEventListener('click', () => definirVueMobile('carte'));
   if (btnVueFiltres) btnVueFiltres.addEventListener('click', () => definirVueMobile('filtres'));
 
-  // --- "Type de voie" (grandeur encodée par la taille des cercles) : deux cases
-  // à cocher, Couenne et Grande voie. Un seul coché = le mode de ce type
-  // (secteurs qui en ont, cercles à la taille et à la couleur de ce type) ;
-  // aucun ou les deux = 'aucun', toutes les voies. Deux types cochés ne
-  // pourraient pas porter une seule taille ni une seule couleur (une falaise
-  // n'affiche qu'une grandeur à la fois, voir symboles.js), et leur réunion
-  // exclurait les secteurs trad ou artif seuls : on retombe donc sur "tout".
+  // --- "Type de voie" (grandeur encodée par la taille des cercles) : choix
+  // unique, comme "Pratique" — "Tous" (mode 'aucun'), "Couenne" ou "Grande
+  // voie" (boutons radio en pastilles). Une falaise n'affiche qu'une grandeur
+  // à la fois (voir symboles.js) : un seul type porte la taille et la couleur.
   // "Cotation des voies" juste en dessous est un filtre indépendant qui se
   // combine avec ce mode (fourchette 5a-6b + "Grande voie" = falaises avec
   // des grandes voies, dont au moins une voie cotée 5a-6b). ---
   const casesTypeVoie = document.querySelectorAll('#legende-type-voie input[data-type-voie]');
   casesTypeVoie.forEach((case_) => {
     case_.addEventListener('change', () => {
-      const cochees = Array.from(casesTypeVoie).filter((c) => c.checked);
-      definirModeFigure(cochees.length === 1 ? cochees[0].dataset.typeVoie : 'aucun', false);
+      if (!case_.checked) return;
+      definirModeFigure(case_.dataset.typeVoie, false);
       // Une falaise sans donnée pour ce thème disparaît (source reconstruite
       // par construireSourceFalaises) — son parking ne doit pas rester
       // affiché seul, sans rien à proposer.
