@@ -347,15 +347,14 @@ describe('Vocabulaire de la légende', () => {
         const fautifs = await page.evaluate(async () => {
           const cleTexte = () => document.querySelector('#cle-falaises-zone .cle')?.textContent.trim() || '';
           const mauvais = [];
-          // "Type de voie" : boutons à choix unique (Toutes les voies /
-          // Couenne / Grande voie) — .click() déclenche le même écouteur
-          // qu'un vrai clic, peu importe que le panneau Filtres soit
-          // visuellement actif ou non sur ce viewport mobile.
-          for (const bouton of document.querySelectorAll('.legende-figure .btn-tri-voies')) {
-            bouton.click();
+          // "Type de voie" : cases Couenne / Grande voie — .click() déclenche
+          // le même écouteur qu'un vrai clic, peu importe que le panneau
+          // Filtres soit visuellement actif ou non sur ce viewport mobile.
+          for (const case_ of document.querySelectorAll('#legende-type-voie input')) {
+            case_.click();
             await new Promise((r) => setTimeout(r, 200));
             const texte = cleTexte();
-            if (!/secteur/i.test(texte)) mauvais.push(`${bouton.dataset.mode} → « ${texte} »`);
+            if (!/secteur/i.test(texte)) mauvais.push(`${case_.dataset.typeVoie} → « ${texte} »`);
           }
           // "Cotation des voies" : filtre indépendant réglé par ses deux
           // bornes (voir appliquerFiltreCotation, carte.js) — absent si cette
@@ -491,7 +490,7 @@ describe('Filtre par fourchette de cotation', () => {
       // qui se cumulent (ils étaient mutuellement exclusifs avant). On active
       // "Grande voie" d'abord : resserrer la fourchette ensuite ne doit ni le
       // désélectionner ni cesser de filtrer.
-      await page.click('[data-mode="gv"]');
+      await page.check('#legende-type-voie [data-type-voie="gv"]');
       await page.waitForTimeout(400);
       const avecType = await page.evaluate(() =>
         window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length);
@@ -507,7 +506,7 @@ describe('Filtre par fourchette de cotation', () => {
         falaises: window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length,
         // Le bouton "Type de voie" actif : resserrer la cotation ne doit pas
         // le lâcher (filtres combinables, voir appliquerFiltreCotation).
-        typeVoieActif: document.querySelector('.legende-figure .btn-tri-voies[aria-pressed="true"]')?.dataset.mode || null,
+        typeVoieActif: document.querySelector('#legende-type-voie input:checked')?.dataset.typeVoie || null,
       }));
       assert.ok(apresFourchette.falaises < complet.falaises,
         `La fourchette doit masquer des falaises (${apresFourchette.falaises} vs ${complet.falaises})`);
@@ -932,6 +931,70 @@ describe('Détail des voies : trad et artif', () => {
   });
 });
 
+// Filtre « Type de voie » : deux cases. Un type coché restreint aux secteurs
+// qui en ont ; aucun ou les deux cochés, tous les secteurs.
+describe('Filtre « Type de voie »', () => {
+  const lire = (page) => page.evaluate(() => ({
+    peints: new Set(window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).map((f) => f.properties.cle)).size,
+    resume: Number((document.getElementById('legende-resultat').textContent.match(/\d+/) || [NaN])[0]),
+    bouton: document.getElementById('btn-vue-filtres').textContent.trim(),
+    couleur: window.__carteTest.getPaintProperty('falaises', 'circle-color'),
+  }));
+
+  test('un type coché restreint, les deux cochés ou aucun montrent tout', { timeout: 90000 }, async () => {
+    const geo = await (await fetch(`${serveur.base}/vallee-drome-diois/data.geojson`)).json();
+    const secteurs = geo.features.map((f) => f.properties).filter((p) => p.categorie === 'falaise');
+    const nCouenne = secteurs.filter((p) => p.nb_couenne > 0).length;
+    const nGv = secteurs.filter((p) => p.nb_gv > 0).length;
+    const total = secteurs.length;
+    assert.ok(nGv > 0 && nGv < total && nCouenne < total, 'jeu de données inadapté');
+
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      const coches = () => page.evaluate(() =>
+        Array.from(document.querySelectorAll('#legende-type-voie input:checked')).map((c) => c.dataset.typeVoie));
+
+      const repos = await lire(page);
+      assert.equal(repos.resume, total);
+      assert.deepEqual(await coches(), []);
+
+      await page.check('#legende-type-voie [data-type-voie="gv"]');
+      await page.waitForTimeout(500);
+      const gv = await lire(page);
+      assert.equal(gv.peints, nGv, 'couche : secteurs avec grande voie');
+      assert.equal(gv.resume, nGv, 'résumé : secteurs avec grande voie');
+      assert.equal(gv.bouton, 'Filtres · 1');
+      assert.notDeepEqual(gv.couleur, repos.couleur, 'la couleur suit le type coché');
+
+      await page.check('#legende-type-voie [data-type-voie="couenne"]');
+      await page.waitForTimeout(500);
+      const deux = await lire(page);
+      assert.deepEqual(await coches(), ['couenne', 'gv'], 'les deux cases restent cochées');
+      assert.equal(deux.resume, total, 'les deux types = toutes les voies, secteurs trad ou artif seuls compris');
+      assert.equal(deux.peints, total);
+      assert.equal(deux.bouton, 'Filtres', 'aucune restriction, donc aucun filtre actif');
+      assert.deepEqual(deux.couleur, repos.couleur);
+
+      await page.uncheck('#legende-type-voie [data-type-voie="gv"]');
+      await page.waitForTimeout(500);
+      const couenne = await lire(page);
+      assert.equal(couenne.resume, nCouenne);
+      assert.equal(couenne.peints, nCouenne);
+
+      await page.click('#reinitialiser-filtres');
+      await page.waitForTimeout(500);
+      const fin = await lire(page);
+      assert.deepEqual(await coches(), [], 'Réinitialiser décoche Type de voie');
+      assert.equal(fin.resume, total);
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
 // Bouton "Épurer" : désencombre les cercles sans changer de zoom (donc sans
 // perdre les libellés de secteur). Indépendant de "Type de voie", pas un 4e
 // bouton du même groupe — d'où le test de composition avec un mode actif
@@ -950,13 +1013,13 @@ describe('Bouton Épurer', () => {
         // auMoinsUneAvecType) — cas légitime d'un lieu publié avant la fin de
         // sa saisie (voir README.md, « Ajouter un lieu »). Rien à composer
         // avec Épurer dans ce cas, ce test n'a pas d'autre objet.
-        const aTypeVoie = await page.evaluate(() => Boolean(document.querySelector('[data-mode="gv"]')));
+        const aTypeVoie = await page.evaluate(() => Boolean(document.querySelector('[data-type-voie="gv"]')));
         if (!aTypeVoie) return;
 
         // Un filtre actif (Grande voie) AVANT d'épurer : doit rester actif
         // après — les deux contrôles sont indépendants, pas mutuellement
         // exclusifs comme l'étaient les options d'un même sélecteur.
-        await page.click('[data-mode="gv"]');
+        await page.check('#legende-type-voie [data-type-voie="gv"]');
         await page.waitForTimeout(400);
         const avant = await page.evaluate(() =>
           window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] }).length);

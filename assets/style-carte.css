@@ -758,11 +758,6 @@
 @media (pointer: coarse) {
   .legende-toggle { min-height: 44px; padding: 4px 12px; }
   .case-ensoleillement { min-height: 44px; }
-  /* "Type de voie" : même contrôle que .btn-tri-voies dans les popups
-     (jamais 44px là-bas), mais devenu ici un des contrôles principaux d'un
-     écran dédié plutôt qu'un détail dans une fiche — vaut la contrainte
-     tactile du reste du site. */
-  .legende-figure .btn-tri-voies { min-height: 44px; }
   .legende-cotation-bornes select { min-height: 44px; }
   /* Curseur de trajet : 254x16 mesuré. La piste reste fine (le navigateur la
      centre dans la boite), seule la zone attrapable grandit — c'est elle
@@ -1024,9 +1019,8 @@
    au-dessus d'eux dans le HTML. La bordure du haut le sépare des catégories
    (Falaises/Parkings/Gîte), le margin-bottom laisse un peu d'air avant les
    cercles de référence.
-   Même classe réutilisée côté Filtres pour "Type de voie" (label + 3
-   boutons) : même rythme de séparateur, flex-wrap nécessaire cette fois --
-   label et boutons ne tiennent pas sur une ligne à la largeur du panneau. */
+   Côté Filtres, "Type de voie" est désormais un groupe de cases à cocher
+   (.legende-ensoleillement), comme Style. */
 .legende-figure {
   display: flex;
   flex-wrap: wrap;
@@ -1809,46 +1803,6 @@
   border-color: var(--forest);
   color: var(--paper);
   cursor: default;
-}
-
-/* Contrôle segmenté — « Type de voie » uniquement (le tri des voies en fiche
-   garde ses boutons détachés, ils n'ont que deux choix et de la place).
-   Trois boutons espacés dans les 288px utiles du panneau desktop tombaient
-   en 2 + 1 : « Toutes les voies » et « Couenne » sur une ligne, « Grande
-   voie » seule dessous. Trois choix de même rang que le seul hasard de la
-   largeur rendait inégaux. Jointifs, ils occupent la ligne entière et se
-   lisent enfin comme un choix unique.
-   flex-grow sur une base "auto" plutôt que des tiers égaux : « Toutes les
-   voies » est deux fois plus long que « Couenne », des tiers l'auraient
-   tronqué. Chacun part de sa largeur de texte, le reste se répartit.
-   Le modificateur porte sur .legende-figure et n'ajoute aucun élément : les
-   sélecteurs JS et de test (.legende-figure .btn-tri-voies) sont inchangés. */
-.legende-figure--segments {
-  gap: 0;
-}
-.legende-figure--segments .btn-tri-voies {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding-inline: 6px;
-  border-radius: 0;
-  white-space: nowrap;
-}
-/* Filets mitoyens fondus en un seul trait, sinon chaque jointure en montre
-   deux collés (2px là où le reste du groupe en a 1). */
-.legende-figure--segments .btn-tri-voies:not(:first-of-type) {
-  margin-left: -1px;
-}
-.legende-figure--segments .btn-tri-voies:first-of-type {
-  border-radius: var(--radius) 0 0 var(--radius);
-}
-.legende-figure--segments .btn-tri-voies:last-of-type {
-  border-radius: 0 var(--radius) var(--radius) 0;
-}
-/* Le segment actif passe au-dessus : sans ça, la marge négative du suivant
-   recouvre son filet droit, qui est justement celui qui le délimite. */
-.legende-figure--segments .btn-tri-voies.actif {
-  position: relative;
-  z-index: 1;
 }
 
 /* "← Retour" ancré en bas (sticky), pas en haut à côté du titre (1er/2e jet,

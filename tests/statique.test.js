@@ -701,7 +701,7 @@ describe('Lisibilité : échelle typographique', () => {
   // iOS zoome au focus de TOUT contrôle de formulaire sous 16px, <select>
   // compris — vérifié en documentation après avoir failli les en exclure.
   // Le zoom ne se défait pas tout seul : l'utilisateur reste coincé zoomé sur
-  // la carte. #mode-figure n'y figure plus : remplacé par des boutons
+  // la carte. #mode-figure n'y figure plus : remplacé par des cases à cocher
   // ("Type de voie"), que ce bug Safari ne concerne pas — seuls restent les
   // deux <select> de cotation.
   test('les contrôles de formulaire font 16 px sur mobile', async () => {

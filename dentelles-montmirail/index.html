@@ -156,27 +156,22 @@
              (voir style-carte.css) : falaisesVisibles est déjà tenue à jour
              par appliquerFiltres, aucun nouveau calcul (carte.js). -->
         <p class="legende-resultat" id="legende-resultat" aria-live="polite"></p>
-        <!-- Deux questions distinctes, pas un seul choix à 4 options comme
-             avant (voir l'historique git) : le type de voie compté par la
-             taille des cercles (.legende-figure dans .legende-cercles,
-             toujours visible côté Carte, en montre le titre fixe et le
-             résultat), et la cotation à laquelle on s'intéresse. Vivent ici
-             et non côté Carte : question de réglage, pas de lecture de la
-             carte — comme Ensoleillement/Depuis le gîte juste en dessous.
-             Boutons à choix unique (même grammaire que .btn-tri-voies
-             ailleurs sur le site), pas un select : "Toutes les voies" reste
-             un 3e choix à part entière plutôt qu'un état "aucune case
-             cochée" ambigu. Se combine avec "Cotation des voies" juste en
-             dessous, un filtre indépendant (voir appliquerFiltreCotation,
-             carte.js) : choisir "Couenne" et resserrer la fourchette agit
-             sur les deux critères à la fois. Seule la taille du cercle
-             n'encode qu'une grandeur à la fois, celle du type ; la cotation
-             n'y touche pas et s'y ajoute sans conflit (en-tête symboles.js). -->
-        <div class="legende-figure legende-figure--segments">
-          <span class="legende-figure-label">Type de voie</span>
-          <button type="button" class="btn-tri-voies actif" data-mode="aucun" aria-pressed="true">Toutes les voies</button>
-          <button type="button" class="btn-tri-voies" data-mode="couenne" id="option-couenne" aria-pressed="false">Couenne</button>
-          <button type="button" class="btn-tri-voies" data-mode="gv" id="option-gv" aria-pressed="false">Grande voie</button>
+        <!-- Deux questions distinctes : le type de voie compté par la taille des
+             cercles (.legende-figure dans .legende-cercles, toujours visible
+             côté Carte, en montre le titre fixe et le résultat), et la cotation
+             à laquelle on s'intéresse. Vivent ici et non côté Carte : question
+             de réglage, pas de lecture de la carte.
+             Cases à cocher, comme Style et Ensoleillement : un seul type coché
+             restreint aux secteurs qui en ont, et donne aux cercles la taille
+             et la couleur de ce type ; aucun ou les deux cochés, toutes les
+             voies (les deux types réunis ne laisseraient de côté que les
+             secteurs sans couenne ni grande voie, trad ou artif seuls).
+             Se combine avec "Cotation des voies" juste en dessous, un filtre
+             indépendant (voir appliquerFiltreCotation, carte.js). -->
+        <div class="legende-ensoleillement" id="legende-type-voie" role="group" aria-label="Filtrer par type de voie">
+          <span class="legende-ensoleillement-label">Type de voie</span>
+          <label class="case-ensoleillement"><input type="checkbox" data-type-voie="couenne" />Couenne</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-type-voie="gv" />Grande voie</label>
         </div>
         <!-- Filtre "Style" (configurerFiltreStyle, carte.js) : cases à cocher EN
              OU, mêmes classes que Ensoleillement (aucun CSS propre). Masqué tant
