@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { STYLES, deriverStyles, estDuStyle } from '../assets/js/donnees.js';
+import { STYLES, deriverStyles, estDuStyle, valeurSelection, estFalaiseVideDansMode, statsSelection } from '../assets/js/donnees.js';
 import { construireHistogramme, construireDetailVoies, popupFalaise } from '../assets/js/popups.js';
 
 const RACINE = fileURLToPath(new URL('..', import.meta.url));
@@ -332,7 +332,7 @@ for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
 // Filtre "Style" (sportive / trad / artif) : ce que les données lui donnent à
 // filtrer, et la règle de dérivation, sans navigateur.
 describe('Filtre Style', () => {
-  test('au moins un lieu propose deux styles ou plus, artificielle comprise', async () => {
+  test('au moins un lieu propose deux pratiques ou plus, artificielle comprise', async () => {
     const styles = new Set();
     const lieuxAvecFiltre = [];
     for (const lieu of LIEUX) {
@@ -361,25 +361,62 @@ describe('Filtre Style', () => {
     assert.deepEqual(STYLES, ['sportive', 'trad', 'artificielle']);
   });
 
-  test('estDuStyle : OU logique, vide = tout passe, secteur sans style exclu', () => {
+  test('estDuStyle : choix unique, « tous » laisse tout passer, secteur sans pratique exclu', () => {
     const mixte = { types: ['sportive', 'trad'] };
     const sansStyle = { types: [] };
-    assert.equal(estDuStyle(mixte, []), true);
-    assert.equal(estDuStyle(sansStyle, []), true);
-    assert.equal(estDuStyle(mixte, ['trad']), true);
-    assert.equal(estDuStyle(mixte, ['artificielle', 'trad']), true);
-    assert.equal(estDuStyle(mixte, ['artificielle']), false);
-    assert.equal(estDuStyle(sansStyle, ['sportive']), false);
+    assert.equal(estDuStyle(mixte, 'tous'), true);
+    assert.equal(estDuStyle(sansStyle, 'tous'), true);
+    assert.equal(estDuStyle(mixte, 'trad'), true);
+    assert.equal(estDuStyle(mixte, 'artificielle'), false);
+    assert.equal(estDuStyle(sansStyle, 'sportive'), false);
+  });
+
+  // La taille d'un cercle = les voies qui correspondent à la sélection ; le
+  // secteur disparaît si ce nombre est nul (sauf sans aucun filtre).
+  const secteur = {
+    nbVoies: 40,
+    nbStyle: { sportive: 30, trad: 8, artificielle: 2 },
+    nbParType: { sportive: { couenne: 25, gv: 5 }, trad: { couenne: 1, gv: 7 }, artificielle: { gv: 2 } },
+  };
+  test('valeurSelection : une seule règle pour toutes les combinaisons', () => {
+    assert.equal(valeurSelection(secteur, 'aucun', 'tous'), 40);
+    assert.equal(valeurSelection(secteur, 'aucun', 'trad'), 8);
+    assert.equal(valeurSelection(secteur, 'couenne', 'tous'), 26, 'couenne, toutes pratiques');
+    assert.equal(valeurSelection(secteur, 'gv', 'tous'), 14);
+    assert.equal(valeurSelection(secteur, 'gv', 'trad'), 7, 'trad ET grande voie');
+    assert.equal(valeurSelection(secteur, 'couenne', 'artificielle'), 0);
+    // Export ancien, sans nb_par_type : seules les sportives sont connues.
+    assert.equal(valeurSelection({ nbVoies: 3, nbStyle: {}, nbParType: { sportive: { couenne: 3 } } }, 'couenne', 'tous'), 3);
+  });
+
+  test('estFalaiseVideDansMode : masque seulement quand un filtre est actif', () => {
+    const vide = { nbVoies: 0, nbStyle: {}, nbParType: {} };
+    assert.equal(estFalaiseVideDansMode(vide, 'aucun', 'tous'), false, 'sans filtre, un secteur sans voie reste affiché');
+    assert.equal(estFalaiseVideDansMode(vide, 'couenne', 'tous'), true);
+    assert.equal(estFalaiseVideDansMode(secteur, 'couenne', 'artificielle'), true);
+    assert.equal(estFalaiseVideDansMode(secteur, 'gv', 'artificielle'), false);
+    assert.equal(estFalaiseVideDansMode(secteur, 'aucun', 'trad'), false);
+  });
+
+  test('statsSelection : max et médiane des secteurs concernés', () => {
+    const entries = [
+      { cat: 'falaise', nbVoies: 10, nbStyle: {}, nbParType: {} },
+      { cat: 'falaise', nbVoies: 30, nbStyle: {}, nbParType: {} },
+      { cat: 'falaise', nbVoies: 0, nbStyle: {}, nbParType: {} },
+      { cat: 'parking' },
+    ];
+    assert.deepEqual(statsSelection(entries, 'aucun', 'tous'), { max: 30, median: 20 });
   });
 
   for (const lieu of LIEUX) {
-    test(`${lieu} : la page porte le contrôle « Style », masqué au départ`, async () => {
+    test(`${lieu} : la page porte le contrôle « Pratique », masqué au départ, « Tous » coché`, async () => {
       const html = await lire(`${lieu}/index.html`);
       assert.match(html, /<div[^>]*id="legende-style"[^>]*\shidden[\s>]/,
         `${lieu} : #legende-style absent ou visible avant que carte.js ne juge les données`);
-      for (const s of STYLES) {
-        assert.ok(html.includes(`data-style="${s}"`), `${lieu} : case data-style="${s}" absente`);
+      for (const s of ['tous', ...STYLES]) {
+        assert.ok(html.includes(`data-style="${s}"`), `${lieu} : choix data-style="${s}" absent`);
       }
+      assert.match(html, /data-style="tous"\s+checked/, `${lieu} : « Tous » n'est pas coché au départ`);
     });
   }
 });
@@ -504,6 +541,26 @@ describe('Détail des voies : trad et artif', () => {
     assert.equal(grimpe({ nb_voie_artificielle: 10 }), 'artif');
     assert.equal(grimpe({ nb_voie_sportive: 10 }), 'sportive');
     assert.equal(grimpe({ nb_voie_sportive: 5, nb_voie_moulinette: 5 }), 'sportive · moulinette');
+  });
+});
+
+// nb_par_type (croisement pratique x couenne / grande voie) dimensionne les
+// cercles du site : il doit rester d'accord avec les autres compteurs.
+for (const lieu of LIEUX) describe(`Croisement pratique x type de voie — ${lieu}`, () => {
+  test('nb_par_type est cohérent avec nb_couenne, nb_gv et les compteurs de pratique', async () => {
+    const geo = await geojsonDe(lieu);
+    for (const f of geo.features) {
+      const p = f.properties;
+      if (p.categorie !== 'falaise') continue;
+      assert.ok(p.nb_par_type && typeof p.nb_par_type === 'object', `${p.nom} : nb_par_type absent`);
+      const sport = p.nb_par_type.sportive || {};
+      assert.equal(sport.couenne ?? 0, p.nb_couenne, `${p.nom} : sportives en couenne ≠ nb_couenne`);
+      assert.equal(sport.gv ?? 0, p.nb_gv, `${p.nom} : sportives en grande voie ≠ nb_gv`);
+      for (const style of STYLES) {
+        const somme = Object.values(p.nb_par_type[style] || {}).reduce((a, b) => a + b, 0);
+        assert.ok(somme <= p[`nb_voie_${style}`], `${p.nom} : ${somme} voies ${style} typées pour ${p[`nb_voie_${style}`]} au compteur`);
+      }
+    }
   });
 });
 

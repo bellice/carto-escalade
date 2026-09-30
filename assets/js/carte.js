@@ -6,7 +6,7 @@ import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist
 import { escapeHtml } from './utils.js';
 import {
   indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite, indexerSources,
-  estFalaiseVideDansMode, libelleFalaise, estDuStyle, STYLES,
+  estFalaiseVideDansMode, libelleFalaise, estDuStyle, STYLES, valeurSelection,
   compterDansFourchette, valeurCotationApprochee,
   cotationVersValeur, approximerCotation,
 } from './donnees.js';
@@ -121,10 +121,11 @@ export function initCarte(dataUrl) {
   // configurerFiltreEnsoleillement.
   const filtres = {
     recherche: '', tempsMaxGite: Infinity, tempsGitePlafond: Infinity, ensoleillement: [],
-    // styles: tableau des styles cochés (sportive/trad/artificielle, dans
-    // l'ordre de STYLES), EN OU : un secteur passe s'il porte au moins un des
-    // styles cochés (voir estDuStyle, donnees.js). Vide = aucun filtre actif.
-    styles: [],
+    // pratique: 'tous' (aucun filtre) ou une des pratiques (sportive / trad /
+    // artificielle), CHOIX UNIQUE : un secteur passe s'il porte cette pratique
+    // (voir estDuStyle, donnees.js). Comme "Type de voie", elle donne aussi sa
+    // taille aux cercles (voir valeurSelection).
+    pratique: 'tous',
     // Fourchette de cotation : filtre à part entière, au même titre
     // qu'Ensoleillement ou "Depuis le gîte" — il n'agit ni sur la taille ni
     // sur la couleur des cercles, seulement sur qui reste affiché, et se
@@ -199,31 +200,32 @@ export function initCarte(dataUrl) {
     rafraichirBoutonReinitialiserFiltres();
   }
 
-  // Remet le filtre "Style" à "aucune case cochée" et retire ?style= de
-  // l'URL — même usage que reinitialiserFiltreEnsoleillement.
+  // Remet "Pratique" sur "Tous" et retire ?pratique= de l'URL. Ne redessine
+  // pas les cercles : l'appelant enchaîne avec definirModeFigure (qui
+  // reconstruit la source, taille comprise) — à appeler AVANT lui.
   function reinitialiserFiltreStyle() {
-    filtres.styles = [];
+    filtres.pratique = 'tous';
     if (legendeStyle) {
-      legendeStyle.querySelectorAll('input[data-style]').forEach((case_) => {
-        case_.checked = false;
-      });
+      const tous = legendeStyle.querySelector('input[data-style="tous"]');
+      if (tous) tous.checked = true;
     }
     synchroniserUrlStyle();
     rafraichirBoutonReinitialiserFiltres();
   }
 
-  // Reflète les styles cochés dans ?style= sans ajouter d'entrée d'historique
-  // et sans toucher aux autres paramètres (?falaise=). Échec silencieux : un
-  // contexte sans History API garde son filtre, seulement sans lien partageable.
+  // Reflète la pratique choisie dans ?pratique= sans ajouter d'entrée
+  // d'historique et sans toucher aux autres paramètres (?falaise=). Échec
+  // silencieux : un contexte sans History API garde son filtre, seulement sans
+  // lien partageable.
   function synchroniserUrlStyle() {
     try {
       const url = new URL(location.href);
-      if (filtres.styles.length) {
-        url.searchParams.set('style', filtres.styles.map((s) => JETON_URL_STYLE[s]).join(','));
+      if (filtres.pratique !== 'tous') {
+        url.searchParams.set('pratique', JETON_URL_STYLE[filtres.pratique]);
       } else {
-        url.searchParams.delete('style');
+        url.searchParams.delete('pratique');
       }
-      history.replaceState(history.state, '', url.pathname + url.search.replace(/%2C/g, ',') + url.hash);
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     } catch { /* pas de History API : filtre gardé, lien non mis à jour */ }
   }
 
@@ -250,7 +252,7 @@ export function initCarte(dataUrl) {
     // qu'on vient de remettre à leurs extrêmes et recalcule nbDansFourchette.
     majFourchette();
     const source = map.getSource('falaises');
-    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle));
+    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle, filtres.pratique));
     rafraichirBoutonReinitialiserFiltres();
   }
 
@@ -271,7 +273,7 @@ export function initCarte(dataUrl) {
   // — bascule mobile ET repli desktop (voir son texte, .legende-toggle-texte).
   function rafraichirBoutonReinitialiserFiltres() {
     const nActifs = (filtres.ensoleillement.length > 0 ? 1 : 0)
-      + (filtres.styles.length > 0 ? 1 : 0)
+      + (filtres.pratique !== 'tous' ? 1 : 0)
       + (filtres.tempsMaxGite < filtres.tempsGitePlafond ? 1 : 0)
       + (modeFigureActuel !== 'aucun' ? 1 : 0)
       + (filtreCotationActif() ? 1 : 0);
@@ -539,7 +541,7 @@ export function initCarte(dataUrl) {
   // confondues : "épurée" prime sur le zoom (un choix explicite, avec un
   // message qui ne dit pas "zoomez" — dézoomer n'y changerait rien).
   function rafraichirLegendeFalaises() {
-    const { max, median, remplissage } = infosLegendePourMode(modeFigureActuel, maxima);
+    const { max, median, remplissage } = infosLegendePourMode(modeFigureActuel, entries, filtres.pratique);
     const raisonSansTaille = epureeActuelle ? 'epuree' : modeSimplifieActuel ? 'zoom' : null;
     construireLegendeFalaises(max, median, remplissage, raisonSansTaille, maxima.total);
   }
@@ -718,7 +720,7 @@ export function initCarte(dataUrl) {
     // epureeActuelle transmis tel quel : changer de mode ne doit pas
     // désactiver la vue épurée en cours.
     const source = map.getSource('falaises');
-    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle));
+    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle, filtres.pratique));
     if (map.getLayer('falaises')) {
       map.setPaintProperty('falaises', 'circle-color', expressionCouleurCercles());
     }
@@ -759,22 +761,21 @@ export function initCarte(dataUrl) {
     // explicite, chacun est levé si c'est le cas.
     const tempsGiteEmpecheVisibilite = (entree) => entree.tempsGite != null && entree.tempsGite > filtres.tempsMaxGite;
     const ensoleillementEmpecheVisibilite = (entree) => filtres.ensoleillement.length && !filtres.ensoleillement.includes(entree.ensoleillement);
-    const styleEmpecheVisibilite = (entree) => !estDuStyle(entree, filtres.styles);
     const cotationEmpecheVisibilite = (entree) => filtreCotationActif()
       && !compterDansFourchette(entree.cotations, filtres.cotationMin, filtres.cotationMax);
     const seraitMasquee = (entree) => entree && entree.cat === 'falaise' && (
-      estFalaiseVideDansMode(entree, modeFigureActuel)
+      estFalaiseVideDansMode(entree, modeFigureActuel, filtres.pratique)
+      || !estDuStyle(entree, filtres.pratique)
       || tempsGiteEmpecheVisibilite(entree)
       || ensoleillementEmpecheVisibilite(entree)
-      || styleEmpecheVisibilite(entree)
       || cotationEmpecheVisibilite(entree));
     const cibleSeraitMasquee = seraitMasquee(cible);
     const origineSeraitMasquee = seraitMasquee(origine);
     if (cibleSeraitMasquee || origineSeraitMasquee) {
+      reinitialiserFiltreStyle();
       definirModeFigure('aucun');
       reinitialiserFiltreTemps();
       reinitialiserFiltreEnsoleillement();
-      reinitialiserFiltreStyle();
       reinitialiserFiltreCotation();
     }
 
@@ -1037,7 +1038,7 @@ export function initCarte(dataUrl) {
   function afficherCoucheFalaises() {
     const poser = () => {
       construireCoucheFalaises();
-      map.getSource('falaises').setData(construireSourceFalaises(entries, 'aucun', maxima));
+      map.getSource('falaises').setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle, filtres.pratique));
     };
     if (map.isStyleLoaded()) {
       poser();
@@ -1154,7 +1155,7 @@ export function initCarte(dataUrl) {
     // (nbGrandeVoie/nbCouenne précalculés à la génération, voir
     // export_geojson.py) plutôt que de rescanner le geojson brut une 2e fois.
     const auMoinsUneAvecType = entries.some(e =>
-      e.cat === 'falaise' && (e.nbGrandeVoie > 0 || e.nbCouenne > 0)
+      e.cat === 'falaise' && (valeurSelection(e, 'couenne') > 0 || valeurSelection(e, 'gv') > 0)
     );
     if (!auMoinsUneAvecType) {
       const typeVoie = document.getElementById('legende-type-voie');
@@ -1207,46 +1208,46 @@ export function initCarte(dataUrl) {
     });
   }
 
-  // Filtre "Style" : masqué par défaut (voir HTML, attribut hidden) et montré
-  // seulement si au moins DEUX styles existent dans cette sortie : avec un
-  // seul (ou aucun, Cassis et La Ciotat) les cases donneraient le même
-  // résultat ou rien, même règle que configurerFiltreEnsoleillement. Cases
-  // cochables ensemble EN OU, sur le modèle de l'ensoleillement (voir
-  // filtres.styles). ?style=trad,artif à l'arrivée pré-coche les cases, sauf
-  // avec ?falaise= : la fiche ouverte ne doit pas se retrouver masquée par un
-  // filtre que le même lien a posé.
+  // Filtre "Pratique" (sportive / trad / artif) : masqué par défaut (voir HTML,
+  // attribut hidden) et montré seulement si au moins DEUX pratiques existent
+  // dans cette sortie : avec une seule (ou aucune, Cassis et La Ciotat) les
+  // choix donneraient le même résultat ou rien, même règle que
+  // configurerFiltreEnsoleillement. CHOIX UNIQUE (boutons radio en pastilles,
+  // "Tous" par défaut) : on vient pour une pratique, et une seule grandeur
+  // peut donner sa taille aux cercles (voir valeurSelection). ?pratique=trad
+  // à l'arrivée présélectionne le choix, sauf avec ?falaise= : la fiche
+  // ouverte ne doit pas se retrouver masquée par un filtre que le même lien a
+  // posé.
   function configurerFiltreStyle() {
     if (!legendeStyle) return;
-    const cases = Array.from(legendeStyle.querySelectorAll('input[data-style]'));
-    if (!cases.length) return;
+    const choix = Array.from(legendeStyle.querySelectorAll('input[data-style]'));
+    if (!choix.length) return;
     const presents = STYLES.filter((style) => entries.some((e) => e.cat === 'falaise' && e.types.includes(style)));
     if (presents.length < 2) return;
-    // Une case pour un style absent de cette sortie ne retiendrait aucun
-    // secteur : retirée plutôt que laissée inerte.
-    cases.forEach((case_) => {
-      if (!presents.includes(case_.dataset.style)) case_.closest('label').remove();
+    // Un choix pour une pratique absente de cette sortie ne retiendrait aucun
+    // secteur : retiré plutôt que laissé inerte.
+    choix.forEach((c) => {
+      if (c.dataset.style !== 'tous' && !presents.includes(c.dataset.style)) c.closest('label').remove();
     });
     legendeStyle.hidden = false;
 
-    const lireCases = () => cases
-      .filter((c) => c.isConnected && c.checked)
-      .map((c) => c.dataset.style);
-
     const params = new URLSearchParams(location.search);
-    if (!params.has('falaise') && params.has('style')) {
-      const demandes = params.get('style').split(',').map((t) => t.trim());
-      cases.forEach((c) => {
-        c.checked = c.isConnected && demandes.includes(JETON_URL_STYLE[c.dataset.style]);
-      });
-      filtres.styles = lireCases();
-      rafraichirBoutonReinitialiserFiltres();
+    const demande = params.get('pratique');
+    const styleDemande = STYLES.find((s) => JETON_URL_STYLE[s] === demande);
+    if (!params.has('falaise') && styleDemande && presents.includes(styleDemande)) {
+      filtres.pratique = styleDemande;
+      choix.forEach((c) => { c.checked = c.dataset.style === styleDemande; });
+      // La source des cercles dépend de la pratique (taille et secteurs
+      // retenus) : à redessiner, pas seulement à filtrer.
+      definirModeFigure(modeFigureActuel, false);
     }
 
-    cases.forEach((case_) => {
-      case_.addEventListener('change', () => {
-        filtres.styles = lireCases();
+    choix.forEach((c) => {
+      c.addEventListener('change', () => {
+        if (!c.checked) return;
+        filtres.pratique = c.dataset.style;
         synchroniserUrlStyle();
-        rafraichirBoutonReinitialiserFiltres();
+        definirModeFigure(modeFigureActuel, false);
         appliquerFiltresEtSecteurs();
       });
     });
@@ -1492,7 +1493,7 @@ export function initCarte(dataUrl) {
         ? 'Réafficher la taille des cercles'
         : "Simplifier l'affichage des cercles");
       const source = map.getSource('falaises');
-      if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle));
+      if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle, filtres.pratique));
       if (map.getLayer('falaises')) {
         map.setPaintProperty('falaises', 'circle-color', expressionCouleurCercles());
       }
@@ -1535,7 +1536,7 @@ export function initCarte(dataUrl) {
   function appliquerFiltreCotation() {
     majFourchette();
     const source = map.getSource('falaises');
-    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle));
+    if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle, filtres.pratique));
     appliquerFiltresEtSecteurs();
     rafraichirBoutonReinitialiserFiltres();
   }
@@ -1693,12 +1694,14 @@ export function initCarte(dataUrl) {
   if (filtres.ensoleillement.length) {
     conditions.push(['in', ['get', 'ensoleillement'], ['literal', filtres.ensoleillement]]);
   }
-  // Union des styles cochés : le texte "styles" de la source (voir
-  // construireSourceFalaises) contient le nom de chaque style du secteur.
+  // Pratique choisie : le texte "styles" de la source (voir
+  // construireSourceFalaises) contient le nom de chaque pratique du secteur.
   // Miroir de estDuStyle (donnees.js), utilisé plus bas pour falaisesVisibles :
-  // les deux doivent rester d'accord.
-  if (filtres.styles.length) {
-    conditions.push(['any', ...filtres.styles.map((s) => ['>=', ['index-of', s, ['get', 'styles']], 0])]);
+  // les deux doivent rester d'accord. La combinaison avec le type de voie
+  // (un secteur sans voie trad ET grande voie) est, elle, posée dans la SOURCE,
+  // comme le mode "Type de voie" (voir estFalaiseVideDansMode).
+  if (filtres.pratique !== 'tous') {
+    conditions.push(['>=', ['index-of', filtres.pratique, ['get', 'styles']], 0]);
   }
   // Fourchette de cotation resserrée : ne garde que les falaises avec au
   // moins une voie dans les bornes (nbDansFourchette, propriété posée par
@@ -1716,10 +1719,10 @@ export function initCarte(dataUrl) {
     if (entree.cat !== 'falaise') return;
     const visible =
       (!filtres.recherche || entree.recherche.includes(filtres.recherche)) &&
-      !estFalaiseVideDansMode(entree, mode) &&
+      !estFalaiseVideDansMode(entree, mode, filtres.pratique) &&
       (entree.tempsGite == null || entree.tempsGite <= filtres.tempsMaxGite) &&
       (!filtres.ensoleillement.length || filtres.ensoleillement.includes(entree.ensoleillement)) &&
-      estDuStyle(entree, filtres.styles) &&
+      estDuStyle(entree, filtres.pratique) &&
       (!filtreCotationActif() || entree.nbDansFourchette > 0);
     if (visible) {
       falaisesVisibles.add(entree.cle);

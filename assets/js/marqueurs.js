@@ -188,6 +188,16 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
       nbDansFourchette: 0, // recalculé par majFourchette (carte.js)
       nbGrandeVoie: p.nb_gv ?? 0,
       nbCouenne: p.nb_couenne ?? 0,
+      // Voies par pratique, et croisement pratique x type de voie
+      // ({trad: {couenne: n, gv: m}}) : la taille des cercles en dépend, voir
+      // valeurSelection (donnees.js). Sans nb_par_type (export ancien), seules
+      // les sportives sont connues.
+      nbStyle: {
+        sportive: p.nb_voie_sportive ?? 0,
+        trad: p.nb_voie_trad ?? 0,
+        artificielle: p.nb_voie_artificielle ?? 0,
+      },
+      nbParType: p.nb_par_type || { sportive: { couenne: p.nb_couenne ?? 0, gv: p.nb_gv ?? 0 } },
       // Précalculée comme nbCouenne/nbGrandeVoie, pas relue à chaque frame
       // depuis p.orientation : voir categoriserEnsoleillement (donnees.js).
       ensoleillement: categoriserEnsoleillement(p.orientation),

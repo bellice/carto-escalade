@@ -173,15 +173,17 @@
           <label class="case-ensoleillement"><input type="checkbox" data-type-voie="couenne" />Couenne</label>
           <label class="case-ensoleillement"><input type="checkbox" data-type-voie="gv" />Grande voie</label>
         </div>
-        <!-- Filtre "Style" (configurerFiltreStyle, carte.js) : cases à cocher EN
-             OU, mêmes classes que Ensoleillement (aucun CSS propre). Masqué tant
-             que la sortie compte moins de deux styles. Axe distinct de "Type de
-             voie" (couenne, grande voie) ; la moulinette reste hors filtre. -->
-        <div class="legende-ensoleillement" id="legende-style" hidden role="group" aria-label="Filtrer par style de grimpe">
-          <span class="legende-ensoleillement-label">Style</span>
-          <label class="case-ensoleillement"><input type="checkbox" data-style="sportive" />Sportive</label>
-          <label class="case-ensoleillement"><input type="checkbox" data-style="trad" />Trad</label>
-          <label class="case-ensoleillement"><input type="checkbox" data-style="artificielle" />Artif</label>
+        <!-- Filtre "Pratique" (configurerFiltreStyle, carte.js) : choix unique en
+             pastilles (boutons radio), "Tous" par défaut, mêmes classes que
+             Ensoleillement (aucun CSS propre). Donne sa taille aux cercles,
+             comme Type de voie. Masqué tant que la sortie compte moins de deux
+             pratiques. La moulinette reste hors filtre. -->
+        <div class="legende-ensoleillement" id="legende-style" hidden role="radiogroup" aria-label="Filtrer par pratique">
+          <span class="legende-ensoleillement-label">Pratique</span>
+          <label class="case-ensoleillement"><input type="radio" name="pratique" data-style="tous" checked />Tous</label>
+          <label class="case-ensoleillement"><input type="radio" name="pratique" data-style="sportive" />Sportive</label>
+          <label class="case-ensoleillement"><input type="radio" name="pratique" data-style="trad" />Trad</label>
+          <label class="case-ensoleillement"><input type="radio" name="pratique" data-style="artificielle" />Artif</label>
         </div>
         <!-- Toujours visible (pas de hidden) : au repos, les bornes couvrent
              toute l'échelle présente dans cette sortie, ce qui dit "inactif"
@@ -220,11 +222,11 @@
              pertinent pour tout le monde, contrairement au trajet depuis un
              hébergement qu'on n'a pas forcément. -->
         <div class="legende-ensoleillement" id="legende-ensoleillement" hidden role="group" aria-label="Filtrer par ensoleillement">
-          <span class="legende-ensoleillement-label">Ensoleillement</span>
-          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="matin" />Matin</label>
-          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="journee" />Journée</label>
-          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="apres-midi" />Après-midi</label>
-          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="nord" />Non</label>
+          <span class="legende-ensoleillement-label">Soleil</span>
+          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="matin" />Le matin</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="journee" />Toute la journée</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="apres-midi" />L’après-midi</label>
+          <label class="case-ensoleillement"><input type="checkbox" data-ensoleillement="nord" />Sans soleil</label>
         </div>
         <div class="legende-temps" id="legende-temps" hidden>
           <div class="legende-temps-ligne1">

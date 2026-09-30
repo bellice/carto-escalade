@@ -2,7 +2,7 @@
 // légende) : la traduction visuelle des grandeurs quantitatives du mode
 // "Cercles" en figurés ponctuels sur la carte.
 
-import { estFalaiseVideDansMode } from './donnees.js';
+import { estFalaiseVideDansMode, valeurSelection, statsSelection } from './donnees.js';
 
 // Rayon min/max des cercles proportionnels (falaises) — taille VISUELLE
 // réelle, cf. CIBLE_TACTILE_MIN ci-dessous pour la zone cliquable (les deux
@@ -70,12 +70,11 @@ function remplissagePourMode(mode) {
   return 'var(--clay)';
 }
 
-// Quelle grandeur (max + médiane) affiche la mini-légende selon le mode courant.
-export function infosLegendePourMode(mode, maxima) {
-  const remplissage = remplissagePourMode(mode);
-  if (mode === 'couenne') return { max: maxima.couenne, median: maxima.couenneMedian, remplissage };
-  if (mode === 'gv') return { max: maxima.gv, median: maxima.gvMedian, remplissage };
-  return { max: maxima.total, median: maxima.totalMedian, remplissage };
+// Quelle grandeur (max + médiane) affiche la mini-légende selon le type de voie
+// ET la pratique sélectionnés (voir valeurSelection, donnees.js). La couleur
+// ne suit que le type : la pratique change la taille, pas la teinte.
+export function infosLegendePourMode(mode, entries, pratique = 'tous') {
+  return { ...statsSelection(entries, mode, pratique), remplissage: remplissagePourMode(mode) };
 }
 
 // Redessine une falaise selon le mode "Type de voie" choisi.
@@ -89,15 +88,6 @@ export function infosLegendePourMode(mode, maxima) {
 // n'entre pas ici. Le remplissage suit la même logique : uni / teinte dédiée
 // par sous-catégorie (grande voie-couenne, catégorielle donc couleur, pas
 // taille).
-// Grandeur encodée par la taille selon le mode courant — factorisé ici car
-// carte.js en a aussi besoin (construireSourceFalaises, tri par valeur
-// décroissante dans la source), sans dupliquer ce mapping mode -> propriété.
-function valeurPourMode(entree, mode) {
-  return mode === 'couenne' ? entree.nbCouenne
-    : mode === 'gv' ? entree.nbGrandeVoie
-    : entree.nbVoies;
-}
-
 // Couleur "plume" d'un mode pour la COUCHE NATIVE MapLibre. remplissagePourMode
 // renvoie un var(--...) : parfait pour le DOM/la légende, mais MapLibre ne
 // résout pas var() dans les expressions de style (circle-color). On lit donc
@@ -127,12 +117,12 @@ export function couleurFalaisePourMode(mode) {
 // "epuree" (bouton "Épurer") : force un rayon constant sans toucher au
 // filtrage par "mode" — questions différentes, donc combinables (un filtre
 // "Grandes voies" actif le reste une fois la vue épurée).
-export function construireSourceFalaises(entries, mode, maxima, epuree) {
+export function construireSourceFalaises(entries, mode, maxima, epuree, pratique = 'tous') {
   const features = [];
   entries.forEach((entree) => {
     if (entree.cat !== 'falaise') return;
-    if (estFalaiseVideDansMode(entree, mode)) return;
-    const valeur = valeurPourMode(entree, mode);
+    if (estFalaiseVideDansMode(entree, mode, pratique)) return;
+    const valeur = valeurSelection(entree, mode, pratique);
     features.push({
       type: 'Feature',
       properties: {

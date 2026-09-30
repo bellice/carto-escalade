@@ -218,17 +218,47 @@ export function compterDansFourchette(cotations, min, max) {
 // (construireSourceFalaises, symboles.js) et de la cascade de visibilité des
 // parkings (appliquerFiltres, carte.js) — sinon un parking reste affiché
 // seul, sans qu'aucune falaise visible ne justifie sa présence sur ce thème.
-export function estFalaiseVideDansMode(entree, mode) {
-  if (mode === 'couenne') return !entree.nbCouenne;
-  if (mode === 'gv') return !entree.nbGrandeVoie;
-  return false;
+export function estFalaiseVideDansMode(entree, mode, pratique = 'tous') {
+  // Aucun filtre de figuré actif (toutes les voies, toutes les pratiques) :
+  // un secteur sans voie saisie reste affiché.
+  if (mode === 'aucun' && pratique === 'tous') return false;
+  return !valeurSelection(entree, mode, pratique);
 }
 
-// Styles de grimpe filtrables d'un secteur, dans l'ordre d'affichage. La
+// Nombre de voies d'un secteur qui correspondent à ce qui est sélectionné :
+// c'est la grandeur que la taille du cercle représente. Une seule règle pour
+// toutes les combinaisons ("pratique" = sportive / trad / artificielle ou
+// "tous", "mode" = couenne / gv ou "aucun") :
+//  - rien de sélectionné : toutes les voies du secteur ;
+//  - une pratique : ses voies (nb_voie_<pratique>) ;
+//  - un type de voie : ses voies, toutes pratiques confondues ;
+//  - les deux : les voies qui sont à la fois de cette pratique ET de ce type
+//    (une voie trad peut être en couenne ou en grande voie) — lu dans
+//    nb_par_type, le croisement précalculé à l'export.
+export function valeurSelection(entree, mode, pratique = 'tous') {
+  if (mode === 'aucun') {
+    return pratique === 'tous' ? entree.nbVoies : (entree.nbStyle[pratique] ?? 0);
+  }
+  const styles = pratique === 'tous' ? STYLES : [pratique];
+  return styles.reduce((total, s) => total + (entree.nbParType[s]?.[mode] ?? 0), 0);
+}
+
+// Max et médiane de la grandeur ci-dessus sur les secteurs qui en ont (ceux
+// qui n'en ont pas sont masqués, voir estFalaiseVideDansMode) : les repères de
+// la légende des cercles (1 / médiane / max).
+export function statsSelection(entries, mode, pratique = 'tous') {
+  const valeurs = entries
+    .filter((e) => e.cat === 'falaise')
+    .map((e) => valeurSelection(e, mode, pratique))
+    .filter((v) => v > 0);
+  return { max: Math.max(0, ...valeurs), median: mediane(valeurs) };
+}
+
+// Pratiques de grimpe filtrables d'un secteur, dans l'ordre d'affichage. La
 // moulinette est un 4e compteur des données (nb_voie_moulinette), volontairement
-// HORS filtre : ce n'est pas un style qu'on choisit d'aller chercher, et une
-// case de plus alourdirait un contrôle fait pour trois choix. Un secteur
-// moulinette seul n'a donc aucun style (voir estDuStyle).
+// HORS filtre : ce n'est pas une pratique qu'on choisit d'aller chercher, et un
+// choix de plus alourdirait un contrôle fait pour trois. Un secteur
+// moulinette seul n'a donc aucune pratique (voir estDuStyle).
 // Axe distinct de "Type de voie" (couenne / grande voie, nb_couenne / nb_gv) :
 // une voie sportive peut être l'une ou l'autre, ne pas les mélanger.
 export const STYLES = ['sportive', 'trad', 'artificielle'];
@@ -240,14 +270,13 @@ export function deriverStyles(p) {
   return STYLES.filter((style) => (p[`nb_voie_${style}`] ?? 0) > 0);
 }
 
-// Vrai si le secteur porte au moins un des styles cochés (OU logique). Aucun
-// style coché = filtre inactif = tout passe. Un secteur sans style connu ne
-// peut satisfaire aucune case cochée (même règle que l'ensoleillement).
+// Vrai si le secteur porte la pratique choisie ("tous" = aucun filtre). Choix
+// unique : sportive, trad ou artificielle. Un secteur sans pratique connue ne
+// peut satisfaire aucun choix (même règle que l'ensoleillement).
 // Miroir exact de la condition posée sur la couche native (carte.js,
 // appliquerFiltres) : les deux doivent rester d'accord.
-export function estDuStyle(entree, styles) {
-  if (!styles.length) return true;
-  return styles.some((style) => entree.types.includes(style));
+export function estDuStyle(entree, pratique) {
+  return pratique === 'tous' || entree.types.includes(pratique);
 }
 
 // Directions du matin (soleil levant) / de l'après-midi (soleil couchant),
