@@ -763,38 +763,9 @@
      centre dans la boite), seule la zone attrapable grandit — c'est elle
      qu'on vise en glissant le pouce. */
   #filtre-temps { min-height: 44px; }
-  /* Case à cocher native mesurée à 13x13 par le navigateur (Chromium),
-     sous le minimum tactile de 44px — même principe que le curseur
-     ci-dessus : agrandir la zone attrapable (l'input, en 44x44) sans
-     grossir l'apparence, une case pleine page aurait détonné à côté du
-     texte du libellé. Coche redessinée en ::before (appearance:none sinon
-     ::before ne s'applique pas à un input) : remplissage plein à la coche,
-     pas de coche dessinée dessus — même grammaire que .btn-epuree
-     ci-dessus. */
-  .case-ensoleillement input {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 44px;
-    height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .case-ensoleillement input::before {
-    content: '';
-    width: 14px;
-    height: 14px;
-    /* --muted et non --stone-dark : la case décochée n'a que son contour pour
-       exister, il doit atteindre 3:1 sur le fond (WCAG 1.4.11). --stone-dark
-       donnait 1,36:1, la case disparaissait sur téléphone. */
-    border: 1px solid var(--muted);
-    border-radius: var(--radius);
-    background: var(--paper);
-  }
-  .case-ensoleillement input:checked::before {
-    background: var(--forest);
-    border-color: var(--forest);
-  }
+  /* Pastille de filtre (.case-ensoleillement) : zone tactile de 44px, largeur
+     comprise — l'input la recouvre entièrement, le libellé entier se tape. */
+  .case-ensoleillement { min-width: 44px; padding-inline: 14px; }
   /* Le bouton de l'en-tête ne peut pas grandir : l'en-tête a une hauteur
      fixe (--hauteur-entete) dont dépend le calage de la carte. On étend donc
      la zone tactile au-delà de la boîte visible, via un pseudo-élément
@@ -1019,7 +990,7 @@
    au-dessus d'eux dans le HTML. La bordure du haut le sépare des catégories
    (Falaises/Parkings/Gîte), le margin-bottom laisse un peu d'air avant les
    cercles de référence.
-   Côté Filtres, "Type de voie" est désormais un groupe de cases à cocher
+   Côté Filtres, "Type de voie" est un groupe de pastilles à choix multiples
    (.legende-ensoleillement), comme Style. */
 .legende-figure {
   display: flex;
@@ -1148,23 +1119,26 @@
 /* Filtre "Ensoleillement" (configurerFiltreEnsoleillement, carte.js) : même
    voix typographique et même séparateur que .legende-temps, chacun sa
    propre section depuis le retrait du repli commun qui les enveloppait.
-   Cases à cocher, pas des boutons-bascule façon .btn-tri-voies/.btn-epuree :
-   ceux-ci signifient déjà "un seul choix à la fois" ailleurs sur ce site,
-   alors que PLUSIEURS catégories sont cochables ici — une case le dit
-   nativement, sans un mot d'explication (voir le commentaire du HTML). */
+   Les filtres à choix multiples (Type de voie, Style, Ensoleillement) sont
+   des pastilles : un vrai <input type="checkbox"> les porte (clavier,
+   lecteur d'écran, état coché), mais il est invisible et recouvre la
+   pastille entière ; c'est la pastille qui se remplit quand elle est
+   cochée. Même grammaire que .btn-epuree (bordure fine, texte --forest,
+   plein --forest à l'état actif). Plusieurs pastilles remplies en même
+   temps disent "plusieurs choix", sans qu'une case ait à le dire. */
 .legende-ensoleillement {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 12px;
+  gap: 6px 6px;
   border-top: 1px solid var(--stone-dark);
   padding-top: 8px;
   font-size: var(--fs-base);
 }
 .legende-ensoleillement[hidden] { display: none; }
 /* Voir le commentaire de .legende-figure-label (même grammaire : titre plus
-   gras que ses valeurs, flex-basis:100% pour renvoyer les cases à cocher
-   sur leur propre rangée en dessous). */
+   gras que ses valeurs, flex-basis:100% pour renvoyer les pastilles sur leur
+   propre rangée en dessous). */
 .legende-ensoleillement-label {
   display: block;
   flex-basis: 100%;
@@ -1173,18 +1147,40 @@
   color: var(--muted);
 }
 .case-ensoleillement {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  padding: 3px 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  color: var(--ink);
+  color: var(--forest);
   cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .case-ensoleillement input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
-  accent-color: var(--forest);
+  opacity: 0;
   cursor: pointer;
+}
+.case-ensoleillement:has(input:checked) {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--paper);
+}
+.case-ensoleillement:has(input:focus-visible) {
+  outline: 2px solid var(--forest);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .case-ensoleillement:not(:has(input:checked)):hover { border-color: var(--forest); }
 }
 
 /* .legende-cats et non .legende : les pictos vivent dans .legende-cats,
