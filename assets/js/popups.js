@@ -174,7 +174,7 @@ export function popupFalaise(p, lat, lon, cle) {
   if (grimpe) cols.push(col('Grimpe', grimpe));
   const haut = colonneHauteur(p);
   if (haut) cols.push(col(haut.label, haut.valeur));
-  if (p.type_roche) cols.push(col('Roche', p.type_roche));
+  if (p.type_roche) cols.push(col('Roche', libelleRoche(p.type_roche)));
   let contenuCaractere = cols.length ? `<div class="fiche-infos-cols">${cols.join('')}</div>` : '';
 
   if (p.nb_voie_total && p.routes) {
@@ -477,6 +477,13 @@ function champLiensFalaises(falaises) {
 // 'artificielle', comme la clé nb_voie_artificielle et le filtre). Aligné sur
 // la case « Artif » du filtre Style.
 const LIBELLE_GRIMPE = { artificielle: 'artif' };
+
+// Un secteur peut avoir plusieurs roches, saisies séparées par "|" dans
+// falaise.csv (même convention que l'orientation) : affichées avec " · ", comme
+// les styles de la colonne Grimpe, sans les barres verticales de la saisie.
+function libelleRoche(typeRoche) {
+  return String(typeRoche).split('|').map((r) => r.trim()).filter(Boolean).join(' · ');
+}
 
 function styleGrimpe(p) {
   const total = p.nb_voie_total ?? 0;

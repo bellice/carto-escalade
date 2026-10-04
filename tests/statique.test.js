@@ -154,7 +154,8 @@ describe('Lieux publiés', () => {
       ).exec(html);
       assert.ok(bloc, `${lieu} : pas de ligne .sortie-chiffres sur l'accueil`);
 
-      const falaises = (await geojsonDe(lieu)).features
+      const geo = await geojsonDe(lieu);
+      const falaises = geo.features
         .map((f) => f.properties)
         .filter((p) => p.categorie === 'falaise');
       const secteurs = falaises.length;
@@ -165,16 +166,15 @@ describe('Lieux publiés', () => {
       }
       const roche = [...roches.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
 
-      // Un lieu encore en cours de saisie (aucun type_roche renseigné dans
-      // falaise.csv pour la moindre falaise, donc roche reste undefined) peut
-      // dire son avancement en mots plutôt qu'un décompte qui montrerait "0
-      // voies" et une roche manquante — voir "Cassis et La Ciotat" et
-      // redaction.html. Rien à comparer dans ce cas : l'assertion juste
+      // Un lieu encore en cours de saisie (aucune roche, ou aucune voie, voir
+      // lieuEncoreEnCoursDeSaisie) peut dire son avancement en mots plutôt
+      // qu'un décompte qui montrerait "0 voies" — voir "Cassis et La Ciotat"
+      // et redaction.html. Rien à comparer dans ce cas : l'assertion juste
       // au-dessus a déjà vérifié que la ligne existe, son contenu exact n'est
       // pas de la responsabilité de ce test tant que la donnée est ce
-      // creuse. Le jour où une roche est saisie, le lieu quitte cette
+      // creuse. Le jour où roche ET voies sont saisies, le lieu quitte cette
       // branche et le décompte strict s'applique de lui-même.
-      if (roche === undefined) continue;
+      if (lieuEncoreEnCoursDeSaisie(geo) || roche === undefined) continue;
 
       const attendu = `${secteurs} secteurs · ${voies} voies · ${roche}`;
       assert.equal(bloc[1].trim(), attendu,
@@ -186,15 +186,17 @@ describe('Lieux publiés', () => {
 
 // Un lieu peut être publié avant la fin de sa saisie (voir README.md,
 // « Ajouter un lieu ») dès que ses falaises sont positionnées, sans attendre
-// voies ni parkings — repéré par l'absence totale de type_roche, la première
-// donnée de falaise.csv à manquer tant que le recensement n'est pas fini
-// (indépendant de voie.csv/parking.csv). Même repère que le test des
-// chiffres de l'accueil ci-dessus : les tests qui suivent s'en servent pour
-// ne pas exiger un parking ou une falaise sportive qui n'existent tout
-// simplement pas encore, sans pour autant cesser de les exiger des lieux qui
-// n'ont plus cette excuse.
+// voies ni parkings — repéré par l'absence totale de type_roche (la première
+// donnée de falaise.csv à manquer tant que le recensement n'est pas fini) OU
+// par l'absence de toute voie : Cassis et La Ciotat a reçu sa roche, ses
+// orientations et ses parkings avant ses voies, et reste en cours tant que
+// voie.csv n'est pas saisi. Même repère que le test des chiffres de l'accueil
+// ci-dessus : les tests qui suivent s'en servent pour ne pas exiger un parking
+// ou une falaise sportive qui n'existent tout simplement pas encore, sans pour
+// autant cesser de les exiger des lieux qui n'ont plus cette excuse.
 function lieuEncoreEnCoursDeSaisie(geo) {
-  return !geo.features.some((f) => f.properties.categorie === 'falaise' && f.properties.type_roche);
+  const falaises = geo.features.map((f) => f.properties).filter((p) => p.categorie === 'falaise');
+  return !falaises.some((p) => p.type_roche) || !falaises.some((p) => (p.nb_voie_total || 0) > 0);
 }
 
 for (const lieu of LIEUX) describe(`Données exportées — ${lieu}`, () => {
@@ -527,6 +529,16 @@ describe('Détail des voies : trad et artif', () => {
       artificielles: [{ nom: 'A', cotation_artif: '<i>A1' }],
     });
     assert.doesNotMatch(html, /<img|<b>|<i>/);
+  });
+
+  test('la colonne « Roche » sépare plusieurs roches par « · », sans barre verticale', () => {
+    globalThis.window ??= { matchMedia: () => ({ matches: false }) };
+    const roche = (typeRoche) => {
+      const html = popupFalaise({ nom: 'X', nb_voie_total: 10, nb_voie_sportive: 10, type_roche: typeRoche }, 44, 5, 'X');
+      return (/Roche<\/span><span class="col-valeur">([^<]*)</.exec(html) || [])[1];
+    };
+    assert.equal(roche('calcaire|grès|poudingue'), 'calcaire · grès · poudingue');
+    assert.equal(roche('calcaire'), 'calcaire');
   });
 
   test('la colonne « Grimpe » écrit « artif », jamais « artificielle »', () => {
