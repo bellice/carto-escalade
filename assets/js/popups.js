@@ -167,7 +167,7 @@ export function popupFalaise(p, lat, lon, cle) {
   // Métadonnées clés en COLONNES ÉTROITES (Voies / Grimpe / Roche) : mini-
   // colonnes sans bordure, label en petite majuscule au-dessus de la valeur.
   // Ordre : VOIES d'abord (le chiffre clé pour choisir un site), puis GRIMPE
-  // (les styles présents : "sportive · trad"), puis Roche (qualificatif géologique).
+  // (les styles présents : "sportive, trad"), puis Roche (qualificatif géologique).
   const cols = [];
   if (p.nb_voie_total) cols.push(col('Voies', p.nb_voie_total));
   const grimpe = styleGrimpe(p);
@@ -469,7 +469,7 @@ function champLiensFalaises(falaises) {
 // Styles de grimpe de la falaise (colonne "Grimpe"), déduits des compteurs :
 // la colonne Voies porte le TOTAL, l'histogramme ne montre que les SPORTIVES
 // (titre "Cotation voies sportives") — la colonne Grimpe signale l'écart sans
-// ligne de texte séparée. Tous les styles présents sont listés ("sportive ·
+// ligne de texte séparée. Tous les styles présents sont listés ("sportive,
 // trad"), à la place de l'ancien "mixte" qui ne disait pas lesquels. Les
 // données portent la répartition exacte (nb_voie_sportive / nb_voie_trad /
 // nb_voie_artificielle) : on ne déduit plus le style d'un vague "autres".
@@ -479,10 +479,10 @@ function champLiensFalaises(falaises) {
 const LIBELLE_GRIMPE = { artificielle: 'artif' };
 
 // Un secteur peut avoir plusieurs roches, saisies séparées par "|" dans
-// falaise.csv (même convention que l'orientation) : affichées avec " · ", comme
+// falaise.csv (même convention que l'orientation) : affichées avec ", ", comme
 // les styles de la colonne Grimpe, sans les barres verticales de la saisie.
 function libelleRoche(typeRoche) {
-  return String(typeRoche).split('|').map((r) => r.trim()).filter(Boolean).join(' · ');
+  return String(typeRoche).split('|').map((r) => r.trim()).filter(Boolean).join(', ');
 }
 
 function styleGrimpe(p) {
@@ -497,7 +497,7 @@ function styleGrimpe(p) {
     ['artificielle', p.nb_voie_artificielle ?? 0],
     ['moulinette', p.nb_voie_moulinette ?? 0],
   ].filter(([, n]) => n > 0);
-  return styles.map(([nom]) => LIBELLE_GRIMPE[nom] || nom).join(' · ');
+  return styles.map(([nom]) => LIBELLE_GRIMPE[nom] || nom).join(', ');
 }
 
 // Histogramme « 1 case = 1 voie » : une colonne par cotation RÉELLEMENT

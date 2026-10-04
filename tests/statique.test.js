@@ -531,13 +531,13 @@ describe('Détail des voies : trad et artif', () => {
     assert.doesNotMatch(html, /<img|<b>|<i>/);
   });
 
-  test('la colonne « Roche » sépare plusieurs roches par « · », sans barre verticale', () => {
+  test('la colonne « Roche » sépare plusieurs roches par une virgule, sans barre verticale', () => {
     globalThis.window ??= { matchMedia: () => ({ matches: false }) };
     const roche = (typeRoche) => {
       const html = popupFalaise({ nom: 'X', nb_voie_total: 10, nb_voie_sportive: 10, type_roche: typeRoche }, 44, 5, 'X');
       return (/Roche<\/span><span class="col-valeur">([^<]*)</.exec(html) || [])[1];
     };
-    assert.equal(roche('calcaire|grès|poudingue'), 'calcaire · grès · poudingue');
+    assert.equal(roche('calcaire|grès|poudingue'), 'calcaire, grès, poudingue');
     assert.equal(roche('calcaire'), 'calcaire');
   });
 
@@ -548,11 +548,11 @@ describe('Détail des voies : trad et artif', () => {
       const html = popupFalaise({ nom: 'X', nb_voie_total: 10, ...p }, 44, 5, 'X');
       return (/Grimpe<\/span><span class="col-valeur">([^<]*)</.exec(html) || [])[1];
     };
-    assert.equal(grimpe({ nb_voie_sportive: 8, nb_voie_trad: 1, nb_voie_artificielle: 1 }), 'sportive · trad · artif');
-    assert.equal(grimpe({ nb_voie_sportive: 9, nb_voie_artificielle: 1 }), 'sportive · artif');
+    assert.equal(grimpe({ nb_voie_sportive: 8, nb_voie_trad: 1, nb_voie_artificielle: 1 }), 'sportive, trad, artif');
+    assert.equal(grimpe({ nb_voie_sportive: 9, nb_voie_artificielle: 1 }), 'sportive, artif');
     assert.equal(grimpe({ nb_voie_artificielle: 10 }), 'artif');
     assert.equal(grimpe({ nb_voie_sportive: 10 }), 'sportive');
-    assert.equal(grimpe({ nb_voie_sportive: 5, nb_voie_moulinette: 5 }), 'sportive · moulinette');
+    assert.equal(grimpe({ nb_voie_sportive: 5, nb_voie_moulinette: 5 }), 'sportive, moulinette');
   });
 });
 
