@@ -686,18 +686,23 @@ const GROUPES_DETAIL = [
 
 // detail : { sportives, trad, artificielles }, trois tableaux (éventuellement
 // vides), voir detailDepuisEntree dans marqueurs.js.
-export function construireDetailVoies(detail, mode = 'cotation') {
-  const groupes = GROUPES_DETAIL
-    .map((g) => ({ ...g, voies: (detail && detail[g.cle]) || [] }))
+// selection : (voie, groupe) => booléen, les filtres de voie actifs sur la
+// carte (voir definirSelectionVoies, marqueurs.js). Absente = toutes les voies.
+export function construireDetailVoies(detail, mode = 'cotation', selection = null) {
+  const compte = (gs) => gs.reduce((total, g) => total + g.voies.length, 0);
+  const tous = GROUPES_DETAIL.map((g) => ({ ...g, voies: (detail && detail[g.cle]) || [] }));
+  const groupes = tous
+    .map((g) => (selection ? { ...g, voies: g.voies.filter((v) => selection(v, g.groupe)) } : g))
     .filter((g) => g.voies.length);
-  const n = groupes.reduce((total, g) => total + g.voies.length, 0);
+  const n = compte(groupes);
+  const nTotal = compte(tous);
   // Juste le compte (utile pour se repérer avant de faire défiler la liste),
   // sans répéter "(hors trad et artificielle)" : cette précision vient déjà
   // d'être lue à l'instant sur l'écran précédent (titre de l'histogramme,
   // voir construireHistogramme) — la redire ici alourdit sans rien apporter
   // de nouveau, contrairement à sa 1ère apparition où elle évite une
   // confusion avec le total "Voies" de la fiche compacte.
-  const titre = `${n} voie${n > 1 ? 's' : ''}`;
+  const titre = `${n} voie${n > 1 ? 's' : ''}` + (n < nTotal ? ` sur ${nTotal}` : '');
   // En-tête TEXTE (pas d'icône) pour "Points"/"Hauteur" : ce site a déjà une
   // règle posée ailleurs (le "P" du marqueur parking) — texte plutôt
   // qu'icône, aucun pictogramme nulle part sur ce site, justement parce

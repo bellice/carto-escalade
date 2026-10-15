@@ -11,7 +11,7 @@ import {
   cotationVersValeur, approximerCotation,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
-import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, masquerDetailVoies } from './marqueurs.js';
+import { addMarker, ouvrirPopupFalaise, ouvrirPanneauFalaise, fermerPanneauFalaise, cablerFermetureManuellePanneau, masquerDetailVoies, definirSelectionVoies, rafraichirDetailVoies } from './marqueurs.js';
 import { ajouterLabelsSites, ajouterLabelsSecteurs, ZOOM_LABELS_SECTEUR } from './labels.js';
 import { margeAvantPopup, margeToutVoir, creerControleToutVoir, reinitialiserPadding, limiterZoneCarte, estDesktop, dureeAnimation, dureeReduite } from './carte-utils.js';
 import { monterPreparationHorsLigne } from './hors-ligne.js';
@@ -348,7 +348,20 @@ export function initCarte(dataUrl) {
     appliquerAntiCollisionSecteurs();
     appliquerAntiCollisionSites();
     rafraichirResumeResultats();
+    rafraichirDetailVoies();
   }
+
+  // Voies que le détail d'une fiche liste : celles qui répondent à Pratique et
+  // Type de voie (tous styles), comme la taille des cercles (valeurSelection).
+  // La fourchette de cotation ne porte que sur les sportives, seules comptées
+  // dans entree.cotations (voir compterDansFourchette).
+  definirSelectionVoies((voie, groupe) => {
+    if (filtres.pratique !== 'tous' && groupe !== filtres.pratique) return false;
+    if (modeFigureActuel !== 'aucun' && (voie.type_voie === 'couenne' ? 'couenne' : 'gv') !== modeFigureActuel) return false;
+    if (groupe !== 'sportive' || !filtreCotationActif()) return true;
+    const valeur = valeurCotationApprochee(voie.cotation);
+    return valeur != null && valeur >= filtres.cotationMin && valeur <= filtres.cotationMax;
+  });
 
   // Résumé vivant en tête du panneau "Filtres" mobile (voir style-carte.css,
   // #legende-resultat) : falaisesVisibles est déjà tenue à jour par

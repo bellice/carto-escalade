@@ -98,7 +98,7 @@ export function afficherDetailVoies(popupEl, falaiseId) {
   if (!placeholder.querySelector('.fiche-voies-detail')) {
     const detail = cacheVoiesParFalaise.get(falaiseId);
     if (!detail) return;
-    placeholder.insertAdjacentHTML('beforeend', construireDetailVoies(detail));
+    placeholder.insertAdjacentHTML('beforeend', construireDetailVoies(detail, 'cotation', selectionVoies));
   }
   popupEl.classList.add('mode-detail-voies');
   // .maplibregl-popup-content n'existe que côté mobile : distinction fiable
@@ -122,7 +122,24 @@ export function basculerTriDetailVoies(popupEl, falaiseId, mode) {
   const ancien = popupEl.querySelector('.fiche-voies-detail');
   const detail = cacheVoiesParFalaise.get(falaiseId);
   if (!ancien || !detail) return;
-  ancien.outerHTML = construireDetailVoies(detail, mode);
+  ancien.outerHTML = construireDetailVoies(detail, mode, selectionVoies);
+}
+
+// Filtres de voie de la carte (Pratique, Type de voie, Cotation), posés par
+// carte.js : le détail ne liste que les voies qui y répondent.
+let selectionVoies = null;
+export function definirSelectionVoies(selection) {
+  selectionVoies = selection;
+}
+
+// Un filtre a changé : refait le détail ouvert, dans son tri courant.
+export function rafraichirDetailVoies() {
+  const ancien = document.querySelector('.fiche-voies-detail');
+  const popupEl = ancien && ancien.closest('.popup');
+  const placeholder = ancien && ancien.closest('.voies-histo-placeholder');
+  if (!popupEl || !placeholder) return;
+  const actif = ancien.querySelector('.detail-voies-tri .btn-tri-voies.actif');
+  basculerTriDetailVoies(popupEl, placeholder.dataset.routeFalaise, actif ? actif.dataset.tri : 'cotation');
 }
 
 // ficheReduite vient de l'appelant (carte.js en est seul propriétaire) :
