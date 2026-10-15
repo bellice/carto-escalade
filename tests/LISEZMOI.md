@@ -5,7 +5,7 @@ n'y a aucune raison de s'en priver avant un commit.
 
 ```sh
 npm run test:statique   # ~0,1 s, aucun navigateur, aucune dépendance
-npm run test:parcours   # ~40 s, Chromium, connexion requise
+npm run test:parcours   # ~3 min, Chromium, connexion requise
 npm test                # les deux
 ```
 

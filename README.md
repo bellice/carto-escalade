@@ -55,7 +55,7 @@ voir « Hors-ligne » pour la raison) mais **pré-caché par le service worker**
 ```sh
 npm install             # une fois (Playwright, dépendance de TEST uniquement)
 npm run test:statique   # ~0,1 s, sans navigateur
-npm test                # + parcours navigateur (~40 s, connexion requise)
+npm test                # + parcours navigateur (~3 min, connexion requise)
 ```
 
 Chaque test correspond à une régression réellement survenue, pas à une

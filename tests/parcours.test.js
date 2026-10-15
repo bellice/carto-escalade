@@ -334,8 +334,9 @@ describe('Nom du lieu selon la largeur', () => {
 // Test NAVIGATEUR et non statique : construireLegendeFalaises (symboles.js)
 // réécrit ce bloc à chaque changement de mode. Corriger le libellé dans le HTML
 // des pages ne changeait rien — piège vérifié en le faisant.
+// Code partagé par tous les lieux (symboles.js) : la Drôme suffit.
 describe('Vocabulaire de la légende', () => {
-  for (const lieu of LIEUX) {
+  for (const lieu of ['vallee-drome-diois']) {
     test(`${lieu} : la légende dit « Secteurs », dans tous les modes`, { timeout: 90000 }, async () => {
       const { contexte, page } = await nouveauContexte(navigateur, { viewport: { width: 390, height: 844 } });
       try {
@@ -882,8 +883,9 @@ describe('Filtre « Type de voie »', () => {
 // perdre les libellés de secteur). Indépendant de "Type de voie", pas un 4e
 // bouton du même groupe — d'où le test de composition avec un mode actif
 // ci-dessous.
+// Code partagé par tous les lieux (carte.js) : la Drôme suffit.
 describe('Bouton Épurer', () => {
-  for (const lieu of LIEUX) {
+  for (const lieu of ['vallee-drome-diois']) {
     test(`${lieu} : cercles uniformes, légende sans taille, filtre conservé`, { timeout: 90000 }, async () => {
       const { contexte, page } = await nouveauContexte(navigateur);
       try {
@@ -1218,6 +1220,53 @@ describe('Fiche falaise', () => {
       await page.waitForTimeout(300);
       const retour = await page.evaluate(() => Boolean(document.querySelector('.voies-histo')));
       assert.equal(retour, true, 'Le retour doit ramener à l\'histogramme');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('le détail des voies ne liste que les voies des filtres actifs', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      await ouvrirFalaise(page, REPERES.laTour); // mixte couennes + grandes voies
+
+      await page.click('.btn-voir-detail-voies');
+      await page.waitForSelector('.detail-voies-liste', { timeout: 10000 });
+      const lire = () => page.evaluate(() => ({
+        titre: document.querySelector('.detail-voies-titre')?.textContent,
+        lignes: document.querySelectorAll('.detail-voies-liste .detail-voie:not(.detail-voie-entete-colonnes)').length,
+        couennes: document.querySelectorAll('.detail-voies-liste .histo-swatch.couenne').length,
+        gv: document.querySelectorAll('.detail-voies-liste .histo-swatch.gv').length,
+      }));
+      const toutes = await lire();
+      assert.ok(toutes.couennes > 0 && toutes.gv > 0, 'jeu de données inadapté : La Tour doit être mixte');
+      assert.match(toutes.titre, /^\d+ voies?$/, 'sans filtre, pas de « sur N »');
+
+      // Le filtre change pendant que le détail est ouvert : la liste suit.
+      await page.check('#legende-type-voie [data-type-voie="gv"]');
+      await page.waitForTimeout(600);
+      const gv = await lire();
+      assert.equal(gv.couennes, 0);
+      assert.equal(gv.gv, toutes.gv);
+      // Les carrés ne marquent que les sportives : trad et artif en grande voie
+      // s'ajoutent aux lignes sans carré.
+      assert.equal(gv.titre, `${gv.lignes} voie${gv.lignes > 1 ? 's' : ''} sur ${toutes.lignes}`);
+      assert.ok(gv.lignes >= gv.gv && gv.lignes < toutes.lignes);
+
+      // Couenne : l'autre moitié.
+      await page.check('#legende-type-voie [data-type-voie="couenne"]');
+      await page.waitForTimeout(600);
+      const couenne = await lire();
+      assert.equal(couenne.gv, 0);
+      assert.equal(couenne.couennes, toutes.couennes);
+
+      // Retour à Tous : la liste complète revient.
+      await page.check('#legende-type-voie [data-type-voie="aucun"]');
+      await page.waitForTimeout(600);
+      assert.deepEqual(await lire(), toutes);
     } finally {
       await contexte.close();
     }

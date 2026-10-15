@@ -15,9 +15,10 @@ protègent, pas ici.
 - **Site sans dépendance, sans étape de build.** Ce qui est dans le dépôt est
   ce qui est servi à l'octet près (voir `_config.yml`). Pas de bundler, pas
   de transpileur, pas de `node_modules` en production.
-- **`npm test` (97 tests) avant tout push.** Deux suites : `test:statique`
-  (structure du dépôt, `_config.yml`, service worker) et `test:parcours`
-  (Playwright, bout en bout).
+- **Tests avant tout push.** `test:statique` (structure du dépôt,
+  `_config.yml`, service worker, ~2 s) à chaque push. `test:parcours`
+  (Playwright, bout en bout, ~3 min) dès que le push touche `assets/`, un
+  `index.html` ou un `data.geojson` ; inutile pour un changement de doc seul.
 
 ## Écriture
 
