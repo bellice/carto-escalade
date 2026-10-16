@@ -151,9 +151,34 @@ export function cotationVersValeur(cotation) {
 // Remontée ici quand le filtre par fourchette a eu besoin exactement de la
 // même règle : deux copies auraient signifié deux vérités à maintenir, et un
 // écart possible entre ce que le filtre compte et ce que la fiche affiche.
+// Grades d'artif ("A0" à "A5", "B1", "C1") isolés dans une cotation composée.
+const ARTIF_ISOLE = /(^|[/-])[ABC]\d(?=$|[/-])/g;
+
+// Équivalence UIAA (chiffres romains, voies trad) -> française, table courante
+// à ±1 demi-cran près selon les sources. Sert au positionnement dans le
+// filtre, la fiche garde la cotation telle que saisie.
+const UIAA_VERS_FRANCAISE = {
+  'V-': '4c', V: '5a', 'V+': '5b',
+  'VI-': '5c', VI: '6a', 'VI+': '6a+',
+  'VII-': '6b', VII: '6b+', 'VII+': '6c',
+};
+
 export function approximerCotation(cotation) {
   if (!cotation) return null;
-  const texte = String(cotation).trim();
+  let texte = String(cotation).trim();
+  if (UIAA_VERS_FRANCAISE[texte]) return { label: UIAA_VERS_FRANCAISE[texte] };
+  // Cotation composée avec un grade d'artif ("5c/A1", "A1/6c", "C1-5b") : on
+  // se fie à la cotation française écrite sur la même voie. Sans partie
+  // française ("A1", "A1/A2"), rien à placer.
+  const sansArtif = texte.replace(ARTIF_ISOLE, '$1');
+  if (sansArtif !== texte) {
+    texte = sansArtif.replace(/^[/-]+|[/-]+$/g, '');
+    if (!texte) return null;
+    return cotationVersValeur(texte) != null ? { label: texte } : approximerCotation(texte);
+  }
+  // Fourchette abrégée ("6a/b" pour 6a/6b) : borne haute.
+  const abregee = /^(\d)[abc]\/([abc]\+?)$/.exec(texte);
+  if (abregee) return { label: `${abregee[1]}${abregee[2]}` };
   // Lettrée + "-" (ex. "6a-") : le "-" est ignoré plutôt que de basculer vers
   // le cran précédent (6a- rejoint 6a, pas 5c+ — reste dans SA lettre, pas
   // dans une colonne qui semblerait être une autre cotation réelle).

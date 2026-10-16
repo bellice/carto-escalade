@@ -540,9 +540,11 @@ describe('Filtre par fourchette de cotation', () => {
     const secteurs = geo.features.map((f) => f.properties).filter((p) => p.categorie === 'falaise');
     const parCle = (p) => (p.secteur && p.secteur !== p.nom ? `${p.nom}::${p.secteur}` : p.nom);
     // Grandes voies cotées 6a à 6b, tous styles : somme écrite à la main, sans
-    // passer par le code du site.
+    // passer par le code du site. "6a/C1" et "6b/A0" se lisent sur leur partie
+    // française, "VI+" vaut 6a+.
+    const EN_6A_6B = ['6a', '6a+', '6b', '6a/C1', '6b/A0', 'VI+'];
     const attendu = (p) => Object.values(p.cotations_par_type || {}).reduce((total, parType) =>
-      total + ['6a', '6a+', '6b'].reduce((t, c) => t + (parType.gv?.[c] ?? 0), 0), 0);
+      total + EN_6A_6B.reduce((t, c) => t + (parType.gv?.[c] ?? 0), 0), 0);
     const concernes = secteurs.filter((p) => attendu(p) > 0);
     assert.ok(concernes.length > 0 && concernes.length < secteurs.length, 'jeu de données inadapté');
 

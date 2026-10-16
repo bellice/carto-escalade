@@ -645,6 +645,8 @@ function valeurCotationPourTri(v) {
 // cotation ni standard ni approximable reste affichée telle quelle.
 function libelleCotationAffichee(cotation) {
   if (cotationVersValeur(cotation) != null) return cotation;
+  // "6c+/A0" garde son passage d'artif : seul le positionnement l'ignore.
+  if (/[ABC]\d/.test(cotation)) return cotation;
   const estimee = approximerCotation(cotation);
   return estimee ? estimee.label : cotation;
 }

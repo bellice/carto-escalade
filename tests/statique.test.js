@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import {
   STYLES, deriverStyles, estDuStyle, valeurSelection, estFalaiseVideDansMode, statsSelection,
-  compterCroiseDansFourchette, cotationVersValeur,
+  compterCroiseDansFourchette, cotationVersValeur, approximerCotation,
 } from '../assets/js/donnees.js';
 import { construireHistogramme, construireDetailVoies, popupFalaise } from '../assets/js/popups.js';
 
@@ -392,6 +392,17 @@ describe('Filtre Style', () => {
     assert.equal(valeurSelection(secteur, 'couenne', 'artificielle'), 0);
     // Export ancien, sans nb_par_type : seules les sportives sont connues.
     assert.equal(valeurSelection({ nbVoies: 3, nbStyle: {}, nbParType: { sportive: { couenne: 3 } } }, 'couenne', 'tous'), 3);
+  });
+
+  test('approximerCotation : artif composé, fourchette abrégée, chiffres romains', () => {
+    const label = (c) => approximerCotation(c)?.label ?? null;
+    for (const [saisi, attendu] of [
+      ['5c/A1', '5c'], ['6c+/A0', '6c+'], ['A1/6c', '6c'], ['C1-5b', '5b'], ['6a/C1', '6a'],
+      ['A1', null], ['A1/A2', null],
+      ['6a/b', '6b'], ['6b/c', '6c'], ['6c+/7a', '7a'],
+      ['V+', '5b'], ['VI-', '5c'], ['VI+', '6a+'],
+      ['4-', '4a'], ['6a-', '6a'],
+    ]) assert.equal(label(saisi), attendu, saisi);
   });
 
   test('la fourchette de cotation se croise avec la pratique et le type de voie', () => {
