@@ -354,14 +354,17 @@ export function initCarte(dataUrl) {
 
   // Voies que le détail d'une fiche liste : celles que compte la taille des
   // cercles (valeurSelection), donc Pratique, Type de voie et fourchette de
-  // cotation à la fois. Une cotation que le site ne sait pas placer (artif
-  // "A1", trad "V+") sort de la liste dès que la fourchette est resserrée.
+  // cotation à la fois. Une voie dont la cotation ne se place pas sur l'échelle
+  // française (artif pur "A1") n'est ni dans ni hors de la fourchette : elle
+  // reste listée, signalée à part dans le titre, et ne compte pas dans les
+  // cercles.
   definirSelectionVoies((voie, groupe) => {
     if (filtres.pratique !== 'tous' && groupe !== filtres.pratique) return false;
     if (modeFigureActuel !== 'aucun' && (voie.type_voie === 'couenne' ? 'couenne' : 'gv') !== modeFigureActuel) return false;
     if (!filtreCotationActif()) return true;
     const valeur = valeurCotationApprochee(voie.cotation ?? voie.cotation_artif);
-    return valeur != null && valeur >= filtres.cotationMin && valeur <= filtres.cotationMax;
+    if (valeur == null) return 'sans-cote';
+    return valeur >= filtres.cotationMin && valeur <= filtres.cotationMax;
   });
 
   // Résumé vivant en tête du panneau "Filtres" mobile (voir style-carte.css,

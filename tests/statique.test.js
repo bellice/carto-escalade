@@ -394,6 +394,18 @@ describe('Filtre Style', () => {
     assert.equal(valeurSelection({ nbVoies: 3, nbStyle: {}, nbParType: { sportive: { couenne: 3 } } }, 'couenne', 'tous'), 3);
   });
 
+  test('detail des voies : une voie sans cotation comparable reste listée, comptée à part', () => {
+    const detail = {
+      sportives: [{ nom: 'A', cotation: '6a', type_voie: 'couenne' }, { nom: 'B', cotation: '7c', type_voie: 'couenne' }],
+      artificielles: [{ nom: 'C', cotation_artif: 'A1', type_voie: 'grande voie' }],
+    };
+    const selection = (v) => (v.cotation_artif ? 'sans-cote' : v.cotation === '6a');
+    const html = construireDetailVoies(detail, 'cotation', selection);
+    assert.match(html, /1 voie sur 3 · 1 sans cotation comparable/);
+    assert.match(html, />C</, 'la voie sans cotation comparable est listée');
+    assert.doesNotMatch(html, />B</, 'une voie hors fourchette est retirée');
+  });
+
   test('approximerCotation : artif composé, fourchette abrégée, chiffres romains', () => {
     const label = (c) => approximerCotation(c)?.label ?? null;
     for (const [saisi, attendu] of [

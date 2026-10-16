@@ -688,15 +688,25 @@ const GROUPES_DETAIL = [
 
 // detail : { sportives, trad, artificielles }, trois tableaux (éventuellement
 // vides), voir detailDepuisEntree dans marqueurs.js.
-// selection : (voie, groupe) => booléen, les filtres de voie actifs sur la
-// carte (voir definirSelectionVoies, marqueurs.js). Absente = toutes les voies.
+// selection : (voie, groupe) => true | false | 'sans-cote', les filtres de voie
+// actifs sur la carte (voir definirSelectionVoies, marqueurs.js). 'sans-cote' :
+// la voie n'a pas de cotation comparable à la fourchette (artif pur "A1"),
+// elle reste listée mais ne compte pas dans le titre. Absente = toutes les voies.
 export function construireDetailVoies(detail, mode = 'cotation', selection = null) {
   const compte = (gs) => gs.reduce((total, g) => total + g.voies.length, 0);
   const tous = GROUPES_DETAIL.map((g) => ({ ...g, voies: (detail && detail[g.cle]) || [] }));
+  let sansCote = 0;
   const groupes = tous
-    .map((g) => (selection ? { ...g, voies: g.voies.filter((v) => selection(v, g.groupe)) } : g))
+    .map((g) => (selection ? {
+      ...g,
+      voies: g.voies.filter((v) => {
+        const retenue = selection(v, g.groupe);
+        if (retenue === 'sans-cote') sansCote += 1;
+        return retenue !== false;
+      }),
+    } : g))
     .filter((g) => g.voies.length);
-  const n = compte(groupes);
+  const n = compte(groupes) - sansCote;
   const nTotal = compte(tous);
   // Juste le compte (utile pour se repérer avant de faire défiler la liste),
   // sans répéter "(hors trad et artificielle)" : cette précision vient déjà
@@ -704,7 +714,9 @@ export function construireDetailVoies(detail, mode = 'cotation', selection = nul
   // voir construireHistogramme) — la redire ici alourdit sans rien apporter
   // de nouveau, contrairement à sa 1ère apparition où elle évite une
   // confusion avec le total "Voies" de la fiche compacte.
-  const titre = `${n} voie${n > 1 ? 's' : ''}` + (n < nTotal ? ` sur ${nTotal}` : '');
+  const titre = `${n} voie${n > 1 ? 's' : ''}`
+    + (n + sansCote < nTotal ? ` sur ${nTotal}` : '')
+    + (sansCote ? ` · ${sansCote} sans cotation comparable` : '');
   // En-tête TEXTE (pas d'icône) pour "Points"/"Hauteur" : ce site a déjà une
   // règle posée ailleurs (le "P" du marqueur parking) — texte plutôt
   // qu'icône, aucun pictogramme nulle part sur ce site, justement parce
