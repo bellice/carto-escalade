@@ -134,8 +134,8 @@ export function construireSourceFalaises(entries, mode, maxima, epuree, pratique
         recherche: entree.recherche,
         tempsGite: entree.tempsGite ?? null,
         // Lus par les filtres "Ensoleillement" et "Cotation des voies"
-        // (map.setFilter dans carte.js), pas par ce fichier : ni l'un ni
-        // l'autre ne touche la taille ou la couleur des cercles.
+        // (map.setFilter dans carte.js), pas par ce fichier. La cotation
+        // agit aussi sur "valeur" (voir valeurSelection).
         // nbDansFourchette est recalculé par majFourchette (carte.js) à chaque
         // changement de bornes ; la source est reconstruite dans la foulée.
         ensoleillement: entree.ensoleillement,

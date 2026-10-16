@@ -7,7 +7,7 @@ import { escapeHtml } from './utils.js';
 import {
   indexerParkingInfos, calculerMaxima, calculerTempsDepuisGite, indexerSources,
   estFalaiseVideDansMode, libelleFalaise, estDuStyle, STYLES, valeurSelection,
-  compterDansFourchette, valeurCotationApprochee,
+  compterDansFourchette, compterCroiseDansFourchette, valeurCotationApprochee,
   cotationVersValeur, approximerCotation,
 } from './donnees.js';
 import { construireSourceFalaises, couleurFalaisePourMode, infosLegendePourMode, construireLegendeFalaises } from './symboles.js';
@@ -127,9 +127,9 @@ export function initCarte(dataUrl) {
     // taille aux cercles (voir valeurSelection).
     pratique: 'tous',
     // Fourchette de cotation : filtre à part entière, au même titre
-    // qu'Ensoleillement ou "Depuis le gîte" — il n'agit ni sur la taille ni
-    // sur la couleur des cercles, seulement sur qui reste affiché, et se
-    // combine avec "Type de voie" (ce n'est pas un mode de definirModeFigure).
+    // qu'Ensoleillement ou "Depuis le gîte". Elle se combine avec Pratique et
+    // "Type de voie" (ce n'est pas un mode de definirModeFigure) et réduit la
+    // taille des cercles aux voies dans les bornes (voir valeurSelection).
     // min/max : bornes choisies ; plancher/plafond : amplitude réelle des
     // cotations de cette sortie (posés par preparerFourchette). Inactif tant
     // que les deux bornes sont à leurs extrêmes — même logique que le curseur
@@ -253,6 +253,7 @@ export function initCarte(dataUrl) {
     majFourchette();
     const source = map.getSource('falaises');
     if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle, filtres.pratique));
+    rafraichirLegendeFalaises();
     rafraichirBoutonReinitialiserFiltres();
   }
 
@@ -351,15 +352,15 @@ export function initCarte(dataUrl) {
     rafraichirDetailVoies();
   }
 
-  // Voies que le détail d'une fiche liste : celles qui répondent à Pratique et
-  // Type de voie (tous styles), comme la taille des cercles (valeurSelection).
-  // La fourchette de cotation ne porte que sur les sportives, seules comptées
-  // dans entree.cotations (voir compterDansFourchette).
+  // Voies que le détail d'une fiche liste : celles que compte la taille des
+  // cercles (valeurSelection), donc Pratique, Type de voie et fourchette de
+  // cotation à la fois. Une cotation que le site ne sait pas placer (artif
+  // "A1", trad "V+") sort de la liste dès que la fourchette est resserrée.
   definirSelectionVoies((voie, groupe) => {
     if (filtres.pratique !== 'tous' && groupe !== filtres.pratique) return false;
     if (modeFigureActuel !== 'aucun' && (voie.type_voie === 'couenne' ? 'couenne' : 'gv') !== modeFigureActuel) return false;
-    if (groupe !== 'sportive' || !filtreCotationActif()) return true;
-    const valeur = valeurCotationApprochee(voie.cotation);
+    if (!filtreCotationActif()) return true;
+    const valeur = valeurCotationApprochee(voie.cotation ?? voie.cotation_artif);
     return valeur != null && valeur >= filtres.cotationMin && valeur <= filtres.cotationMax;
   });
 
@@ -1531,22 +1532,33 @@ export function initCarte(dataUrl) {
     const max = Number(selectCotationMax.value);
     filtres.cotationMin = min;
     filtres.cotationMax = max;
+    const actif = filtreCotationActif();
     entries.forEach((entree) => {
       if (entree.cat !== 'falaise') return;
-      entree.nbDansFourchette = compterDansFourchette(entree.cotations, min, max);
+      if (!entree.cotationsParType) {
+        entree.nbDansFourchette = compterDansFourchette(entree.cotations, min, max);
+        return;
+      }
+      // Croisement exact : une voie compte si elle a la pratique, le type ET la
+      // cotation choisis (voir valeurSelection).
+      const dansBornes = compterCroiseDansFourchette(entree.cotationsParType, min, max);
+      entree.nbParTypeFourchette = actif ? dansBornes : null;
+      entree.nbDansFourchette = Object.values(dansBornes)
+        .reduce((total, parType) => total + Object.values(parType).reduce((a, b) => a + b, 0), 0);
     });
   }
 
-  // Applique la fourchette de cotation courante : filtre indépendant (ne
-  // touche ni taille ni couleur des cercles, donc pas un mode via
-  // definirModeFigure) qui se combine avec "Type de voie". Reconstruit la
-  // source pour que nbDansFourchette, à jour, atteigne le filtre natif de la
-  // couche (voir construireSourceFalaises / appliquerFiltres), puis relance
-  // la cascade de visibilité et le décompte du bouton "Réinitialiser".
+  // Applique la fourchette de cotation courante : filtre indépendant (pas un
+  // mode via definirModeFigure) qui se combine avec Pratique et "Type de
+  // voie". Reconstruit la source pour que les valeurs et nbDansFourchette, à
+  // jour, atteignent la couche (voir construireSourceFalaises /
+  // appliquerFiltres), puis relance la légende, la cascade de visibilité et le
+  // décompte du bouton "Réinitialiser".
   function appliquerFiltreCotation() {
     majFourchette();
     const source = map.getSource('falaises');
     if (source) source.setData(construireSourceFalaises(entries, modeFigureActuel, maxima, epureeActuelle, filtres.pratique));
+    rafraichirLegendeFalaises();
     appliquerFiltresEtSecteurs();
     rafraichirBoutonReinitialiserFiltres();
   }
@@ -1716,8 +1728,9 @@ export function initCarte(dataUrl) {
   // Fourchette de cotation resserrée : ne garde que les falaises avec au
   // moins une voie dans les bornes (nbDansFourchette, propriété posée par
   // construireSourceFalaises et rafraîchie à chaque changement de bornes via
-  // appliquerFiltreCotation qui reconstruit la source). Indépendant du mode
-  // "Type de voie" ci-dessus : les deux conditions se cumulent dans le 'all'.
+  // appliquerFiltreCotation qui reconstruit la source). Condition large (tous
+  // styles et types) : la combinaison exacte avec Pratique et "Type de voie"
+  // est posée dans la SOURCE (estFalaiseVideDansMode).
   if (filtreCotationActif()) {
     conditions.push(['>', ['coalesce', ['get', 'nbDansFourchette'], 0], 0]);
   }

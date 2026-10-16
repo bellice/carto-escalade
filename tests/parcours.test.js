@@ -534,6 +534,47 @@ describe('Filtre par fourchette de cotation', () => {
       await contexte.close();
     }
   });
+
+  test('la taille des cercles compte les voies de la fourchette, type de voie compris', { timeout: 90000 }, async () => {
+    const geo = await (await fetch(`${serveur.base}/vallee-drome-diois/data.geojson`)).json();
+    const secteurs = geo.features.map((f) => f.properties).filter((p) => p.categorie === 'falaise');
+    const parCle = (p) => (p.secteur && p.secteur !== p.nom ? `${p.nom}::${p.secteur}` : p.nom);
+    // Grandes voies cotées 6a à 6b, tous styles : somme écrite à la main, sans
+    // passer par le code du site.
+    const attendu = (p) => Object.values(p.cotations_par_type || {}).reduce((total, parType) =>
+      total + ['6a', '6a+', '6b'].reduce((t, c) => t + (parType.gv?.[c] ?? 0), 0), 0);
+    const concernes = secteurs.filter((p) => attendu(p) > 0);
+    assert.ok(concernes.length > 0 && concernes.length < secteurs.length, 'jeu de données inadapté');
+
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      await page.check('#legende-type-voie [data-type-voie="gv"]');
+      await page.selectOption('#cotation-min', { label: '6a' });
+      await page.selectOption('#cotation-max', { label: '6b' });
+      await page.waitForTimeout(800);
+
+      const etat = await page.evaluate(() => {
+        const peintes = window.__carteTest.queryRenderedFeatures({ layers: ['falaises'] });
+        return { valeurs: Object.fromEntries(peintes.map((f) => [f.properties.cle, f.properties.valeur])) };
+      });
+      assert.equal(Object.keys(etat.valeurs).length, concernes.length,
+        'seuls les secteurs avec une grande voie en 6a-6b restent affichés');
+      for (const p of concernes) {
+        assert.equal(etat.valeurs[parCle(p)], attendu(p), `${p.nom} : taille = grandes voies en 6a-6b`);
+      }
+      // Les repères de taille de la légende n'existent qu'à fort zoom.
+      await page.evaluate((co) => window.__carteTest.jumpTo({ center: co, zoom: 15 }), REPERES.lesRoches.coord);
+      await page.waitForTimeout(800);
+      const legende = await page.evaluate(() => document.getElementById('legende-falaises').textContent);
+      const maxAttendu = Math.max(...concernes.map(attendu));
+      assert.equal(Math.max(...legende.match(/\d+/g).map(Number)), maxAttendu, 'la légende suit le maximum de la sélection');
+    } finally {
+      await contexte.close();
+    }
+  });
 });
 
 // Itinéraire : le schéma geo: ouvre les applis de navigation sur Android mais

@@ -10,7 +10,10 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { STYLES, deriverStyles, estDuStyle, valeurSelection, estFalaiseVideDansMode, statsSelection } from '../assets/js/donnees.js';
+import {
+  STYLES, deriverStyles, estDuStyle, valeurSelection, estFalaiseVideDansMode, statsSelection,
+  compterCroiseDansFourchette, cotationVersValeur,
+} from '../assets/js/donnees.js';
 import { construireHistogramme, construireDetailVoies, popupFalaise } from '../assets/js/popups.js';
 
 const RACINE = fileURLToPath(new URL('..', import.meta.url));
@@ -389,6 +392,25 @@ describe('Filtre Style', () => {
     assert.equal(valeurSelection(secteur, 'couenne', 'artificielle'), 0);
     // Export ancien, sans nb_par_type : seules les sportives sont connues.
     assert.equal(valeurSelection({ nbVoies: 3, nbStyle: {}, nbParType: { sportive: { couenne: 3 } } }, 'couenne', 'tous'), 3);
+  });
+
+  test('la fourchette de cotation se croise avec la pratique et le type de voie', () => {
+    const cotationsParType = {
+      sportive: { couenne: { '5c': 10, '6a': 4, '7a': 3 }, gv: { '6a': 1, '6b': 2 } },
+      trad: { gv: { '6a': 1, 'V+': 2 } },
+      artificielle: { gv: { A1: 2 } },
+    };
+    const dans = compterCroiseDansFourchette(cotationsParType, cotationVersValeur('6a'), cotationVersValeur('6b'));
+    assert.deepEqual(dans, { sportive: { couenne: 4, gv: 3 }, trad: { gv: 1 } },
+      'cotation illisible (V+, A1) jamais comptée');
+    const avec = { ...secteur, nbParTypeFourchette: dans };
+    assert.equal(valeurSelection(avec, 'aucun', 'tous'), 8);
+    assert.equal(valeurSelection(avec, 'gv', 'tous'), 4, 'grande voie dans le 6a-6b');
+    assert.equal(valeurSelection(avec, 'gv', 'sportive'), 3);
+    assert.equal(valeurSelection(avec, 'gv', 'trad'), 1);
+    assert.equal(valeurSelection(avec, 'couenne', 'trad'), 0);
+    // Sans voie dans les bornes, le secteur disparaît même sans autre filtre.
+    assert.equal(estFalaiseVideDansMode({ ...secteur, nbParTypeFourchette: {} }, 'aucun', 'tous'), true);
   });
 
   test('estFalaiseVideDansMode : masque seulement quand un filtre est actif', () => {

@@ -203,6 +203,11 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
       // routes/*.json.
       cotations: p.cotations || null,
       nbDansFourchette: 0, // recalculé par majFourchette (carte.js)
+      // Croisement style x type x cotation de l'export ; nbParTypeFourchette en
+      // est la part dans les bornes choisies (null tant que la fourchette n'est
+      // pas resserrée), voir majFourchette.
+      cotationsParType: p.cotations_par_type || null,
+      nbParTypeFourchette: null,
       nbGrandeVoie: p.nb_gv ?? 0,
       nbCouenne: p.nb_couenne ?? 0,
       // Voies par pratique, et croisement pratique x type de voie

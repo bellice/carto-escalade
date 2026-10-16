@@ -219,9 +219,9 @@ export function compterDansFourchette(cotations, min, max) {
 // parkings (appliquerFiltres, carte.js) — sinon un parking reste affiché
 // seul, sans qu'aucune falaise visible ne justifie sa présence sur ce thème.
 export function estFalaiseVideDansMode(entree, mode, pratique = 'tous') {
-  // Aucun filtre de figuré actif (toutes les voies, toutes les pratiques) :
-  // un secteur sans voie saisie reste affiché.
-  if (mode === 'aucun' && pratique === 'tous') return false;
+  // Aucun filtre de voie actif (ni pratique, ni type, ni fourchette de
+  // cotation) : un secteur sans voie saisie reste affiché.
+  if (mode === 'aucun' && pratique === 'tous' && !entree.nbParTypeFourchette) return false;
   return !valeurSelection(entree, mode, pratique);
 }
 
@@ -234,13 +234,39 @@ export function estFalaiseVideDansMode(entree, mode, pratique = 'tous') {
 //  - un type de voie : ses voies, toutes pratiques confondues ;
 //  - les deux : les voies qui sont à la fois de cette pratique ET de ce type
 //    (une voie trad peut être en couenne ou en grande voie) — lu dans
-//    nb_par_type, le croisement précalculé à l'export.
+//    nb_par_type, le croisement précalculé à l'export ;
+//  - une fourchette de cotation active (entree.nbParTypeFourchette, posé par
+//    carte.js) : seules comptent les voies dont la cotation est dans les
+//    bornes, en plus de la pratique et du type choisis.
 export function valeurSelection(entree, mode, pratique = 'tous') {
-  if (mode === 'aucun') {
+  const croise = entree.nbParTypeFourchette;
+  if (!croise && mode === 'aucun') {
     return pratique === 'tous' ? entree.nbVoies : (entree.nbStyle[pratique] ?? 0);
   }
   const styles = pratique === 'tous' ? STYLES : [pratique];
-  return styles.reduce((total, s) => total + (entree.nbParType[s]?.[mode] ?? 0), 0);
+  const types = mode === 'aucun' ? ['couenne', 'gv'] : [mode];
+  const table = croise || entree.nbParType;
+  return styles.reduce((total, s) => total + types.reduce((t, type) => t + (table[s]?.[type] ?? 0), 0), 0);
+}
+
+// Voies d'un secteur dans la fourchette de cotation [min, max], sous la même
+// forme que nb_par_type ({style: {couenne|gv: n}}). cotationsParType est le
+// croisement style x type x cotation de l'export ({style: {type: {cotation:
+// n}}}). Une cotation que le site ne sait pas placer (artif "A1", trad "V+")
+// n'est jamais comptée, comme dans compterDansFourchette.
+export function compterCroiseDansFourchette(cotationsParType, min, max) {
+  const resultat = {};
+  for (const [style, parType] of Object.entries(cotationsParType || {})) {
+    for (const [type, parCotation] of Object.entries(parType)) {
+      for (const [cotation, nombre] of Object.entries(parCotation)) {
+        const valeur = valeurCotationApprochee(cotation);
+        if (valeur == null || valeur < min || valeur > max) continue;
+        resultat[style] ??= {};
+        resultat[style][type] = (resultat[style][type] ?? 0) + nombre;
+      }
+    }
+  }
+  return resultat;
 }
 
 // Max et médiane de la grandeur ci-dessus sur les secteurs qui en ont (ceux
