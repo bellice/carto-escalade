@@ -437,9 +437,13 @@
 
 .recherche-champ .btn-effacer {
   position: absolute;
-  top: 50%;
+  /* Centré sans transform : le retour d'appui (translateY(1px) sur :active,
+     plus bas) écraserait translateY(-50%), le bouton sauterait de 12px sous le
+     doigt et le clic n'aboutirait jamais. */
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
   right: 3px;
-  transform: translateY(-50%);
   width: 24px;
   height: 24px;
   padding: 0;

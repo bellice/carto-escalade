@@ -426,6 +426,26 @@ describe('Hauteur sur la fiche', () => {
 });
 
 describe('Recherche', () => {
+  // Régression : le retour d'appui du bouton « × » le déplaçait sous le
+  // pointeur (transform écrasé), le clic ne l'atteignait jamais. Un vrai clic
+  // souris (page.click) le détecte, pas un .click() JavaScript.
+  test('la croix efface le champ, même après « Voir »', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur);
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      await page.fill('.recherche input', 'La Tour');
+      await page.click('.btn-centrer');
+      await page.waitForTimeout(1200);
+      await page.click('.btn-effacer');
+      assert.equal(await page.inputValue('.recherche input'), '');
+      assert.equal(await page.evaluate(() => document.querySelector('.btn-effacer').hidden), true);
+    } finally {
+      await contexte.close();
+    }
+  });
+
   // Le champ ne cherchait que dans « nom · secteur » : taper « Saoû » ne
   // renvoyait RIEN, alors que 40 des 111 secteurs en dépendent et que c'est le
   // nom que tout le monde emploie. Le site s'appelle Saoû, la falaise porte un
