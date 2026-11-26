@@ -1201,6 +1201,63 @@ describe('En-tête sur écran étroit', () => {
   });
 });
 
+describe('Cibles tactiles', () => {
+  // Règle de CLAUDE.md : 44px sur pointeur grossier. On mesure la zone qui
+  // répond au doigt (elementFromPoint, du centre vers les bords), pas la boîte :
+  // plusieurs cibles s'étendent par pseudo-élément sans changer la mise en page.
+  // Mesure au pixel entier : une zone de 44px sort à 43 ou 44.
+  // Exceptions documentées dans style-carte.css (WCAG 2.5.8) : étiquettes de
+  // sites et de secteurs, champ de recherche et « Voir ».
+  const MIN = 43;
+  const zone = (page, sel) => page.evaluate((s) => {
+    const el = document.querySelector(s);
+    if (!el) return null;
+    el.scrollIntoView({ block: 'center' });
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const dans = (x, y) => { const t = document.elementFromPoint(x, y); return !!t && (t === el || el.contains(t)); };
+    const etendre = (dx, dy) => { let n = 0; while (n < 60 && dans(cx + dx * (n + 1), cy + dy * (n + 1))) n++; return n; };
+    return { l: etendre(1, 0) + etendre(-1, 0) + 1, h: etendre(0, 1) + etendre(0, -1) + 1 };
+  }, sel);
+
+  test('la carte et la fiche respectent 44px au doigt', { timeout: 90000 }, async () => {
+    const { contexte, page } = await nouveauContexte(navigateur, {
+      viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+    });
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+
+      const trop = [];
+      const verifier = async (sels, optionnels = []) => {
+        for (const sel of [...sels, ...optionnels]) {
+          const z = await zone(page, sel);
+          if (!z) {
+            if (sels.includes(sel)) trop.push(`${sel} : introuvable`);
+            continue;
+          }
+          if (z.h < MIN || z.l < MIN) trop.push(`${sel} : ${z.l}x${z.h}`);
+        }
+      };
+      await verifier(
+        ['.map-header a', '.btn-preparer', '.maplibregl-ctrl-zoom-in', '.maplibregl-ctrl-zoom-out',
+          '.maplibregl-ctrl-compass', '.btn-tout-voir', '.maplibregl-ctrl-attrib-button'],
+        ['.btn-epuree']
+      );
+
+      await ouvrirFalaise(page, REPERES.lesRoches);
+      await verifier(['.popup .poignee-fiche', '.maplibregl-popup-close-button', '.popup .parking-ligne',
+        '.popup a.btn-primary', '.popup .gps-copie']);
+
+      assert.deepEqual(trop, [], 'Cibles sous 44px sur pointeur grossier');
+    } finally {
+      await contexte.close();
+    }
+  });
+});
+
 describe('Fiche falaise', () => {
   test('affiche les métadonnées, l\'histogramme et la référence topo', { timeout: 90000 }, async () => {
     const { contexte, page } = await nouveauContexte(navigateur);

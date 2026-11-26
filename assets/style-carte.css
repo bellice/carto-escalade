@@ -2390,6 +2390,64 @@
   }
 }
 
+/* Fiche : cibles de 44px. Après le bloc mobile ci-dessus, dont il reprend
+   la poignée et la croix (même cascade, même spécificité). Les lignes
+   empilées grandissent pour de vrai : une zone invisible déborderait sur la
+   voisine. La poignée garde sa position visuelle (top 0 + padding 10px = top
+   4px + padding 6px d'avant), la croix s'étend par pseudo-élément. */
+@media (pointer: coarse) {
+  .popup .parking-ligne,
+  .popup .gps-copie { min-height: 44px; }
+  .popup .parkings-list { gap: 0; }
+  .popup a.btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .popup .poignee-fiche {
+    top: 0;
+    height: 44px;
+    padding-top: 10px;
+  }
+  .maplibregl-popup-close-button::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
+
+  /* « Épurer » et « Tout voir » : zone étendue par pseudo-élément, comme
+     .btn-preparer plus haut. Rien d'interactif au-dessus ni en dessous. */
+  .btn-epuree,
+  .btn-tout-voir { position: relative; }
+  .btn-epuree::after,
+  .btn-tout-voir::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+
+  /* Zoom et boussole : boutons collés les uns aux autres, ils grandissent
+     pour de vrai. La recherche cède 12px de largeur à 320px pour ne pas
+     toucher la colonne de contrôles (44px au lieu de 29px). Le sélecteur
+     monte en spécificité : la feuille MapLibre arrive après la nôtre (preload
+     puis application), elle gagnerait à égalité. */
+  .maplibregl-ctrl-top-right .maplibregl-ctrl-group button {
+    width: 44px;
+    height: 44px;
+  }
+  .recherche { width: min(260px, calc(100vw - 72px)); }
+  .maplibregl-ctrl-attrib-button::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+}
+
 /* ===== Impression ===== */
 @media print {
   .map-header, .recherche, .legende, .btn-tout-voir, .etat-chargement, .maplibregl-control-container { display: none !important; }
