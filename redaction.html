@@ -240,20 +240,16 @@
   étroit testé sur ce site) : 107px, sans troncature.
 </p>
 
-<h3>La ligne d'accueil : l'état, pas un chiffre</h3>
+<h3>La ligne d'accueil : les chiffres, puis l'état</h3>
 <p class="decision">
-  Les trois autres lieux affichent secteurs/voies/roche, recalculés depuis
-  leurs data.geojson (voir plus haut, « La liste des lieux »). Ce fichier
-  existe désormais pour Cassis et La Ciotat, mais aucune de ses 100 falaises
-  ne porte de <code>type_roche</code> — faute de voies, de parkings et de
-  type de roche saisis, un décompte automatique afficherait « 0 voies » et
-  une roche manquante, une régression déguisée en donnée réelle. La ligne
-  dit donc l'avancement en mots (<span class="valeur">Recensement en
-  cours</span>), jamais en nombre — et <code>statique.test.js</code> le sait :
-  le test qui recalcule ces chiffres saute un lieu sans roche renseignée
-  plutôt que d'exiger un décompte qui n'aurait aucun sens, voir son
-  commentaire. Le jour où une roche est saisie, le lieu sort de lui-même de
-  cette exception.
+  Comme les trois autres lieux, Cassis et La Ciotat affiche secteurs, voies et
+  roche, recalculés depuis son data.geojson (voir plus haut, « La liste des
+  lieux »). Sa saisie n'est pas finie : une partie des secteurs n'a pas encore
+  de voies. Une seconde ligne, <span class="valeur">Recensement en
+  cours</span>, le dit sous les chiffres, pour qu'un décompte de voies ne se
+  lise pas comme un lieu complet. Cette ligne est hors de
+  <code>statique.test.js</code>, qui ne lit que les chiffres : elle se retire
+  à la main quand la saisie est terminée.
   <span class="ecarte">Recensement en cours · topoguide FFME 13</span> a été
   raccourci : la mention du topoguide est déjà celle de <code>sources.html</code>,
   qui existe pour ça — la répéter ici alourdissait une ligne censée rester

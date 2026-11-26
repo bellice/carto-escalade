@@ -169,14 +169,11 @@ describe('Lieux publiés', () => {
       }
       const roche = [...roches.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
 
-      // Un lieu encore en cours de saisie (aucune roche, ou aucune voie, voir
-      // lieuEncoreEnCoursDeSaisie) peut dire son avancement en mots plutôt
-      // qu'un décompte qui montrerait "0 voies" — voir "Cassis et La Ciotat"
-      // et redaction.html. Rien à comparer dans ce cas : l'assertion juste
-      // au-dessus a déjà vérifié que la ligne existe, son contenu exact n'est
-      // pas de la responsabilité de ce test tant que la donnée est ce
-      // creuse. Le jour où roche ET voies sont saisies, le lieu quitte cette
-      // branche et le décompte strict s'applique de lui-même.
+      // Un lieu sans roche ou sans aucune voie (voir lieuEncoreEnCoursDeSaisie)
+      // peut dire son avancement en mots plutôt qu'un décompte à "0 voies".
+      // Rien à comparer alors : l'assertion au-dessus a vérifié que la ligne
+      // existe. Dès que roche ET voies sont saisies, le décompte strict
+      // s'applique.
       if (lieuEncoreEnCoursDeSaisie(geo) || roche === undefined) continue;
 
       const attendu = `${secteurs} secteurs · ${voies} voies · ${roche}`;
@@ -191,7 +188,7 @@ describe('Lieux publiés', () => {
 // « Ajouter un lieu ») dès que ses falaises sont positionnées, sans attendre
 // voies ni parkings — repéré par l'absence totale de type_roche (la première
 // donnée de falaise.csv à manquer tant que le recensement n'est pas fini) OU
-// par l'absence de toute voie : Cassis et La Ciotat a reçu sa roche, ses
+// par l'absence de toute voie : un lieu peut recevoir sa roche, ses
 // orientations et ses parkings avant ses voies, et reste en cours tant que
 // voie.csv n'est pas saisi. Même repère que le test des chiffres de l'accueil
 // ci-dessus : les tests qui suivent s'en servent pour ne pas exiger un parking

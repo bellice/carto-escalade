@@ -45,13 +45,10 @@
          depuis les data.geojson et échoue s'ils divergent.
          En mono : c'est la voix « donnée » du site, la même que les cotations
          et les compteurs de la carte.
-         Cassis et La Ciotat a un data.geojson mais aucune roche renseignée
-         (recensement des secteurs en cours, voies/parkings/roche pas encore
-         saisis) : un décompte automatique afficherait "0 voies" et une roche
-         manquante, donc sa ligne dit l'état d'avancement plutôt qu'un chiffre.
-         statique.test.js le sait : son test saute un lieu sans roche
-         renseignée plutôt que d'exiger un décompte vide de sens, voir son
-         commentaire. Détail complet dans redaction.html. -->
+         Un lieu dont la saisie n'est pas finie ajoute une ligne .sortie-etat
+         sous ses chiffres. Le test ne lit que .sortie-chiffres : la ligne
+         d'état se retire à la main une fois la saisie terminée. Détail dans
+         redaction.html. -->
     <ul class="sortie-list">
       <li>
         <a href="vallee-drome-diois/">
@@ -74,7 +71,8 @@
       <li>
         <a href="cassis-ciotat/">
           <span class="nom">Cassis et La Ciotat</span>
-          <span class="sortie-chiffres">Recensement en cours</span>
+          <span class="sortie-chiffres">101 secteurs · 281 voies · grès</span>
+          <span class="sortie-etat">Recensement en cours</span>
         </a>
       </li>
     </ul>
