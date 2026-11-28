@@ -33,6 +33,7 @@
   " />
 
   <title>Vallée de la Drôme et Diois - Tokelau</title>
+  <meta name="description" content="Topo d’escalade de la vallée de la Drôme et du Diois : calcaire, parkings, détail des voies et cotations. Utilisable hors ligne une fois la carte préparée." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
   <link rel="manifest" href="../manifest.webmanifest" />
   <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
@@ -91,9 +92,14 @@
   <link rel="stylesheet" href="../assets/css/fiche-actions.css" />
   <link rel="stylesheet" href="../assets/css/fiche-mobile.css" />
   <link rel="stylesheet" href="../assets/css/adaptations.css" />
+  <!-- Repli sans JavaScript : feuille chargée seulement quand les scripts sont
+       désactivés (une balise <style> serait refusée par la CSP). -->
+  <noscript>
+    <link rel="stylesheet" href="../assets/css/noscript.css" />
+  </noscript>
 </head>
 <body>
-  <a class="lien-evitement" href="#map">Aller à la carte</a>
+  <a class="lien-evitement" href="#map">Aller au contenu</a>
 
   <header class="map-header">
     <a href="../">← Accueil</a>
@@ -288,7 +294,188 @@
 
   <!-- data-donnees est lu par demarrer-sortie.js ; le chemin reste relatif à
        CETTE page, chaque lieu ayant son propre data.geojson. -->
-  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises"></main>
+  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises">
+    <noscript>
+      <div class="repli-sans-js">
+        <h2>La carte nécessite JavaScript</h2>
+        <p>La carte nécessite JavaScript, qui est désactivé dans votre navigateur. Voici les secteurs recensés, par site. Activez JavaScript pour la carte, les filtres et le détail des voies.</p>
+        <h3>Col des Aiguilles</h3>
+        <ul>
+          <li>Col des Aiguilles</li>
+        </ul>
+        <h3>Crest</h3>
+        <ul>
+          <li>Les Roches</li>
+        </ul>
+        <h3>Dèvers à Mauk</h3>
+        <ul>
+          <li>Dèvers à Mauk</li>
+        </ul>
+        <h3>Gorges de Saint-Moirans</h3>
+        <ul>
+          <li>Gorges de Saint-Moirans · Bado</li>
+          <li>Gorges de Saint-Moirans · Cirque</li>
+          <li>Gorges de Saint-Moirans · Dalle de la Baume</li>
+          <li>Gorges de Saint-Moirans · Dent du Cafiste</li>
+          <li>Gorges de Saint-Moirans · Grande Aiguille</li>
+          <li>Gorges de Saint-Moirans · Initiation</li>
+          <li>Gorges de Saint-Moirans · Millenium</li>
+          <li>Gorges de Saint-Moirans · Souvenir</li>
+          <li>Gorges de Saint-Moirans · Tilleul</li>
+          <li>Gorges de Saint-Moirans · Voile lactée</li>
+        </ul>
+        <h3>La Berche</h3>
+        <ul>
+          <li>La Berche</li>
+        </ul>
+        <h3>Le Devès</h3>
+        <ul>
+          <li>Le Devès · Principal</li>
+          <li>Le Devès · Sylvèstre</li>
+        </ul>
+        <h3>Les Auberts</h3>
+        <ul>
+          <li>Les Auberts · Bas</li>
+          <li>Les Auberts · Haut</li>
+          <li>Les Auberts · L'Arbre</li>
+          <li>Les Auberts · Mascarade</li>
+          <li>Les Auberts · Tapis Volant</li>
+        </ul>
+        <h3>Les Sucettes de Borne</h3>
+        <ul>
+          <li>Les Sucettes de Borne · Beausapin</li>
+          <li>Les Sucettes de Borne · Kusmendko</li>
+          <li>Les Sucettes de Borne · La Barbe de Papy</li>
+          <li>Les Sucettes de Borne · La Brèche</li>
+          <li>Les Sucettes de Borne · Le Pavé</li>
+          <li>Les Sucettes de Borne · Le Rasoir</li>
+          <li>Les Sucettes de Borne · Marteau de Dieu</li>
+          <li>Les Sucettes de Borne · Moaï Est</li>
+          <li>Les Sucettes de Borne · Moaï Nord</li>
+          <li>Les Sucettes de Borne · Moaï Sud</li>
+          <li>Les Sucettes de Borne · Notilus</li>
+        </ul>
+        <h3>Omblèze Les Gorges</h3>
+        <ul>
+          <li>Omblèze Les Gorges · Aqualand</li>
+        </ul>
+        <h3>Pennes-le-Sec</h3>
+        <ul>
+          <li>Pennes-le-Sec · L’Initiation</li>
+          <li>Pennes-le-Sec · La Tour</li>
+          <li>Pennes-le-Sec · Lame inférieure</li>
+          <li>Pennes-le-Sec · Lame supérieure</li>
+          <li>Pennes-le-Sec · Le Château</li>
+          <li>Pennes-le-Sec · Les Barnavois</li>
+          <li>Pennes-le-Sec · Rochers des Blaches</li>
+          <li>Pennes-le-Sec · Saint Michel</li>
+        </ul>
+        <h3>Pont-de-Barret</h3>
+        <ul>
+          <li>Eson · Face Ouest</li>
+          <li>Eson · Grande face Sud</li>
+          <li>Le Bec qui se Tend</li>
+          <li>Les Appories</li>
+          <li>Les Corybantes</li>
+          <li>Les Rangs de Mars</li>
+          <li>Suzette flipo et Ricky banlieue</li>
+        </ul>
+        <h3>Rocher de Chironne</h3>
+        <ul>
+          <li>Rocher de Chironne</li>
+        </ul>
+        <h3>Rocher des Amayères</h3>
+        <ul>
+          <li>Rocher des Amayères · Les Amayères</li>
+        </ul>
+        <h3>Romeyer</h3>
+        <ul>
+          <li>Romeyer · Fou 1</li>
+          <li>Romeyer · Fous 2</li>
+          <li>Romeyer · Grand Duc</li>
+          <li>Romeyer · Jardin</li>
+          <li>Romeyer · L’Observatoire</li>
+          <li>Romeyer · Matuvu</li>
+          <li>Romeyer · Meyrosse</li>
+          <li>Romeyer · Small Crack</li>
+          <li>Romeyer · Usine à gaz</li>
+        </ul>
+        <h3>Saoû I</h3>
+        <ul>
+          <li>La Poupoune · Attentat au Picodon</li>
+          <li>La Poupoune · Champagne pour tout le monde</li>
+          <li>La Poupoune · Choucas</li>
+          <li>Mur des Étoiles</li>
+          <li>Mur du Son</li>
+          <li>Mur du Vent</li>
+          <li>Roche Colombe · Échafaudage volant</li>
+          <li>Roche Colombe · Lézard qui danse</li>
+          <li>Roche Colombe · Opéra</li>
+          <li>Roche Colombe · Pyramania</li>
+        </ul>
+        <h3>Saoû II</h3>
+        <ul>
+          <li>Grand Regardé · Drayas</li>
+          <li>Grand Regardé · Histoire sans fin</li>
+          <li>Grand Regardé · Mur des Primates</li>
+          <li>Grand Regardé · Nuages</li>
+          <li>Grand Regardé · Photo Souvenir</li>
+          <li>Grand Regardé · Pixote</li>
+          <li>La Ceyte · Grand Roux</li>
+          <li>La Ceyte · Pantomime</li>
+          <li>La Ceyte · Rêve orange</li>
+          <li>La Ceyte · Soleil</li>
+          <li>La Ceyte · Tête en l'air</li>
+          <li>La Graville · La Graville Est 1</li>
+          <li>La Graville · La Graville Est 2</li>
+          <li>La Graville · La Graville Est 3</li>
+          <li>La Graville · La Graville Est 4</li>
+          <li>La Graville · La Graville Nord</li>
+          <li>La Graville · La Graville Ouest</li>
+          <li>La Tour · Arête</li>
+          <li>La Tour · Cathy</li>
+          <li>La Tour · Guet Apens</li>
+          <li>La Tour · Voyage et du Vent</li>
+          <li>Le Palloir · Bousodrome</li>
+          <li>Le Palloir · La Vire du suicide</li>
+          <li>Pas de Lauzun</li>
+        </ul>
+        <h3>Saoû III</h3>
+        <ul>
+          <li>Les Trois Becs · Le Signal 1</li>
+          <li>Les Trois Becs · Le Signal 2</li>
+          <li>Les Trois Becs · Le Veyou</li>
+          <li>Les Trois Becs · Roche Courbe 1 (La Pelle 1)</li>
+          <li>Les Trois Becs · Roche Courbe 2 (La Pelle 2)</li>
+          <li>Les Trois Becs · Roche Rousse</li>
+        </ul>
+        <h3>Soyans</h3>
+        <ul>
+          <li>La Borne de Jeanne</li>
+          <li>Le Petit Cirque</li>
+          <li>Rocher des Abeilles · Chasseur de Miel</li>
+          <li>Rocher des Abeilles · Demi Lune</li>
+        </ul>
+        <h3>Valcroissant</h3>
+        <ul>
+          <li>Valcroissant · L’Éperon</li>
+          <li>Valcroissant · Principal</li>
+        </ul>
+        <h3>Vallon de Baïn</h3>
+        <ul>
+          <li>Vallon de Baïn</li>
+        </ul>
+        <h3>Vercheny</h3>
+        <ul>
+          <li>Vercheny · Dieux du stade</li>
+          <li>Vercheny · La Pagode</li>
+          <li>Vercheny · La Vire</li>
+          <li>Vercheny · Le Temple</li>
+          <li>Vercheny · Short Cut</li>
+        </ul>
+      </div>
+    </noscript>
+  </main>
 
   <div id="etat-chargement" class="etat-chargement" role="status">Chargement de la carte…</div>
 

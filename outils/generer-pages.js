@@ -4,6 +4,10 @@
 //   node outils/generer-pages.js --ecrire     écrit les pages
 //   node outils/generer-pages.js --verifier   sort en erreur si une page diffère
 //
+// Le <noscript> de chaque page (repli sans JavaScript) liste les secteurs du
+// lieu : il est dérivé de <lieu>/data.geojson. Après une régénération des
+// données, il faut donc relancer --ecrire, sans quoi --verifier échoue.
+//
 // Les pages générées restent dans le dépôt : un simple serveur statique suffit
 // pour développer. Le test statique appelle --verifier, qui échoue dès qu'une
 // page a été modifiée à la main ou qu'un gabarit n'a pas été régénéré.
@@ -13,10 +17,54 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { libelleFalaise } from '../assets/js/donnees.js';
 
 const RACINE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const echapper = (texte) => texte.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const echapperAttribut = (texte) => echapper(texte).replace(/"/g, '&quot;');
+const collation = new Intl.Collator('fr');
+
+// Secteurs du lieu groupés par site : [[site, [libellé, ...]], ...], triés en
+// collation française. Un libellé par falaise de data.geojson, le même que
+// celui de la carte (libelleFalaise), donc autant d'entrées que le décompte de
+// l'accueil. Une donnée incomplète fait échouer la génération plutôt que de
+// laisser disparaître un secteur de la liste.
+function secteursParSite(racine, slug) {
+  const donnees = JSON.parse(readFileSync(join(racine, slug, 'data.geojson'), 'utf8'));
+  const groupes = new Map();
+  for (const { properties: p } of donnees.features) {
+    if (p.categorie !== 'falaise') continue;
+    if (!p.site || !p.nom) throw new Error(`${slug}/data.geojson : secteur sans site ou sans nom (${JSON.stringify(p.nom ?? p.site ?? '?')})`);
+    if (!groupes.has(p.site)) groupes.set(p.site, []);
+    groupes.get(p.site).push(libelleFalaise(p));
+  }
+  if (!groupes.size) throw new Error(`${slug}/data.geojson : aucun secteur`);
+  return [...groupes]
+    .sort(([a], [b]) => collation.compare(a, b))
+    .map(([site, libelles]) => [site, libelles.sort(collation.compare)]);
+}
+
+// <noscript> du <main> : un message, puis les secteurs par site. Aligné sous le marqueur.
+function formaterRepli(groupes, indentation) {
+  const ligne = (niveau, texte) => `${indentation}${'  '.repeat(niveau)}${texte}`;
+  const lignes = [
+    ligne(0, '<noscript>'),
+    ligne(1, '<div class="repli-sans-js">'),
+    ligne(2, '<h2>La carte nécessite JavaScript</h2>'),
+    ligne(2, '<p>La carte nécessite JavaScript, qui est désactivé dans votre navigateur. Voici les secteurs recensés, par site. Activez JavaScript pour la carte, les filtres et le détail des voies.</p>'),
+  ];
+  for (const [site, libelles] of groupes) {
+    lignes.push(
+      ligne(2, `<h3>${echapper(site)}</h3>`),
+      ligne(2, '<ul>'),
+      ...libelles.map((libelle) => ligne(3, `<li>${echapper(libelle)}</li>`)),
+      ligne(2, '</ul>'),
+    );
+  }
+  lignes.push(ligne(1, '</div>'), ligne(0, '</noscript>'));
+  return lignes.join('\n');
+}
 
 // Commentaire HTML sur plusieurs lignes, aligné sous le marqueur : la première
 // ligne suit "<!-- ", les suivantes s'alignent sur elle.
@@ -30,7 +78,7 @@ function formaterCommentaire(lignes, indentation) {
 function verifierLieu(lieu, i) {
   const nom = `lieux.json[${i}]`;
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(lieu.slug ?? '')) throw new Error(`${nom} : slug invalide (« ${lieu.slug} »), il sert de nom de dossier`);
-  for (const champ of ['titreLong', 'titreCourt']) {
+  for (const champ of ['titreLong', 'titreCourt', 'description']) {
     if (typeof lieu[champ] !== 'string' || !lieu[champ].trim()) throw new Error(`${nom} (${lieu.slug}) : ${champ} manquant`);
   }
   const commentaire = lieu.commentaire;
@@ -60,8 +108,10 @@ export function genererPages(racine = RACINE) {
     const html = gabarit
       .replace(/^( *)\{\{commentaire\}\}\n/m, (_, indentation) => (
         lieu.commentaire ? formaterCommentaire(lieu.commentaire, indentation) + '\n' : ''))
+      .replace(/^( *)\{\{repli\}\}\n/m, (_, indentation) => formaterRepli(secteursParSite(racine, lieu.slug), indentation) + '\n')
       .replaceAll('{{titreLong}}', echapper(lieu.titreLong))
-      .replaceAll('{{titreCourt}}', echapper(lieu.titreCourt));
+      .replaceAll('{{titreCourt}}', echapper(lieu.titreCourt))
+      .replaceAll('{{description}}', echapperAttribut(lieu.description));
     const reste = /\{\{[^}]*\}\}/.exec(html);
     if (reste) throw new Error(`gabarit-carte.html : marqueur inconnu ${reste[0]}`);
     return { slug: lieu.slug, chemin: `${lieu.slug}/index.html`, html };

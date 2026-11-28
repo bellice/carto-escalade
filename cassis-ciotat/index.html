@@ -33,6 +33,7 @@
   " />
 
   <title>Cassis et La Ciotat - Tokelau</title>
+  <meta name="description" content="Topo d’escalade de Cassis et La Ciotat : calcaire, grès et poudingue, parkings, détail des voies et cotations. Utilisable hors ligne une fois la carte préparée." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
   <link rel="manifest" href="../manifest.webmanifest" />
   <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
@@ -91,9 +92,14 @@
   <link rel="stylesheet" href="../assets/css/fiche-actions.css" />
   <link rel="stylesheet" href="../assets/css/fiche-mobile.css" />
   <link rel="stylesheet" href="../assets/css/adaptations.css" />
+  <!-- Repli sans JavaScript : feuille chargée seulement quand les scripts sont
+       désactivés (une balise <style> serait refusée par la CSP). -->
+  <noscript>
+    <link rel="stylesheet" href="../assets/css/noscript.css" />
+  </noscript>
 </head>
 <body>
-  <a class="lien-evitement" href="#map">Aller à la carte</a>
+  <a class="lien-evitement" href="#map">Aller au contenu</a>
 
   <header class="map-header">
     <a href="../">← Accueil</a>
@@ -295,7 +301,139 @@
 
   <!-- data-donnees est lu par demarrer-sortie.js ; le chemin reste relatif à
        CETTE page, chaque lieu ayant son propre data.geojson. -->
-  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises"></main>
+  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises">
+    <noscript>
+      <div class="repli-sans-js">
+        <h2>La carte nécessite JavaScript</h2>
+        <p>La carte nécessite JavaScript, qui est désactivé dans votre navigateur. Voici les secteurs recensés, par site. Activez JavaScript pour la carte, les filtres et le détail des voies.</p>
+        <h3>Bec de l’Aigle</h3>
+        <ul>
+          <li>Calanques de Figuerolles · La Plage</li>
+          <li>Calanques de Figuerolles · Le Capucin</li>
+          <li>Le Mugel</li>
+          <li>Les Secs</li>
+        </ul>
+        <h3>Carnoux en Provence</h3>
+        <ul>
+          <li>Fenestrelle d’Aubagne</li>
+          <li>Légionnaire</li>
+        </ul>
+        <h3>Ceyreste</h3>
+        <ul>
+          <li>Ceyreste · La Forteresse</li>
+          <li>Oppidum · Face Ouest et Sud-Ouest</li>
+        </ul>
+        <h3>Falaises Soubeyranes</h3>
+        <ul>
+          <li>Albert</li>
+          <li>Belvédère</li>
+          <li>Belvédère des Calanques · Canailloux</li>
+          <li>Belvédère des Calanques · La Tour Carrée</li>
+          <li>Belvédère des Calanques · Le bonheur est dans le grès</li>
+          <li>Belvédère des Calanques · Ouvreur de bouse</li>
+          <li>Belvédère des Calanques · Ouvreur de bouse gauche</li>
+          <li>Cap Canaille · Cathédrale droite</li>
+          <li>Cap Canaille · Cathédrale gauche</li>
+          <li>Cap Canaille · Ciao Bella</li>
+          <li>Cap Canaille · Ombre du Néant</li>
+          <li>Cirque du 14 juillet</li>
+          <li>Damoclès</li>
+          <li>Damoclès · Notre Dame des Falaises</li>
+          <li>Effet Papillon</li>
+          <li>Grand Draïoun</li>
+          <li>Grande Bleue</li>
+          <li>Jas de la Penna</li>
+          <li>Le Pendule</li>
+          <li>Le Sémaphore · Classious</li>
+          <li>Le Sémaphore · Le Petit Pou Dingue</li>
+          <li>Le Sémaphore · Nabacuc</li>
+          <li>Le Sémaphore · Piou Piou</li>
+          <li>Les Émigrés · Grotte des Émigrés</li>
+          <li>Les Émigrés · La boule des Émigrés (droite)</li>
+          <li>Les Émigrés · La boule des Émigrés (gauche)</li>
+          <li>Les Grands Ducs</li>
+          <li>Pas de la Chèvre · Cap Canaveral</li>
+          <li>Pas de la Chèvre · Le Pas de la Chèvre</li>
+          <li>Pas de la Chèvre · Les Favouilles</li>
+          <li>Pas de la Chèvre · Sun Ami</li>
+          <li>Saphira</li>
+        </ul>
+        <h3>L’Étoile Noire</h3>
+        <ul>
+          <li>Carrière du Loin · Artistes</li>
+          <li>Carrière du Loin · Carrière du Loin Face Nord</li>
+          <li>Carrière du Loin · Carrière du Loin Face Ouest</li>
+          <li>Carrière du Loin · So British</li>
+          <li>Frigo · Frigo Nord</li>
+          <li>Frigo · Frigo Ouest</li>
+          <li>Hunger Games</li>
+          <li>Ilôt Central · Alien</li>
+          <li>Ilôt Central · Avec Vue sur la Mer</li>
+          <li>Ilôt Central · Avec Vue sur la Mer (droite)</li>
+          <li>Ilôt Central · Blade</li>
+          <li>Ilôt Central · Carotte</li>
+          <li>Ilôt Central · Dièdre</li>
+          <li>Ilôt Central · Ecorider</li>
+          <li>Ilôt Central · Face Nord</li>
+          <li>Ilôt Central · Fissures</li>
+          <li>Ilôt Central · Grisbi</li>
+          <li>Ilôt Central · Le Côté Obscur</li>
+          <li>Ilôt Central · Les Deux Fissures</li>
+          <li>Ilôt Central · Mini</li>
+          <li>Ilôt Central · Trompe Oreille</li>
+          <li>Ilôt Central · Yaka</li>
+          <li>Jeux de Boules · Jeux de Boules 1</li>
+          <li>Jeux de Boules · Jeux de Boules 2</li>
+          <li>Kick Ass</li>
+          <li>Le Portail</li>
+          <li>Le Puits Ciotaden · Central</li>
+          <li>Le Puits Ciotaden · Mur de Droite</li>
+          <li>Le Puits Ciotaden · Mur et Pilier Gauche</li>
+          <li>Pilier Deux Versants</li>
+          <li>Pin Pon</li>
+          <li>Pin Pon · Pin Pon (gauche)</li>
+          <li>SDF · Grand Mur</li>
+          <li>SDF · Loisir</li>
+          <li>Sonic · Bleau</li>
+          <li>Sonic · Jacquadi</li>
+          <li>Sonic · Papillons</li>
+          <li>Sonic · Super Sonic</li>
+        </ul>
+        <h3>Mallombre</h3>
+        <ul>
+          <li>Face Nord-Est · Alvéole</li>
+          <li>Face Nord-Est · Basraf’</li>
+          <li>Face Nord-Est · Cool Raoul</li>
+          <li>Face Nord-Est · Minor</li>
+          <li>Face Nord-Est · Solstice</li>
+          <li>Face Nord-Est · Sylvebarde</li>
+          <li>Face Nord-Est · Zone Rouge</li>
+          <li>Grotte du Graal</li>
+          <li>L’Abri du Renard</li>
+          <li>La Vanoise</li>
+          <li>Les Lierres</li>
+        </ul>
+        <h3>Port Miou</h3>
+        <ul>
+          <li>Brise de Mer</li>
+          <li>Calendal</li>
+          <li>Initiation</li>
+          <li>La Plage</li>
+          <li>La Vie des Méduses</li>
+          <li>Le Vallon</li>
+        </ul>
+        <h3>Roumagoua</h3>
+        <ul>
+          <li>Cirque des Fours à Chaux</li>
+          <li>Cirque droite</li>
+          <li>Cirque gauche</li>
+          <li>Gébobola</li>
+          <li>Le Pilastre</li>
+          <li>Panic</li>
+        </ul>
+      </div>
+    </noscript>
+  </main>
 
   <div id="etat-chargement" class="etat-chargement" role="status">Chargement de la carte…</div>
 

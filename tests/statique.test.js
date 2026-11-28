@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { construire, retirerCommentairesJS } from '../outils/construire-site.js';
 import {
   STYLES, deriverStyles, estDuStyle, valeurSelection, estFalaiseVideDansMode, statsSelection,
-  compterCroiseDansFourchette, cotationVersValeur, approximerCotation,
+  compterCroiseDansFourchette, cotationVersValeur, approximerCotation, libelleFalaise,
 } from '../assets/js/donnees.js';
 import { popupFalaise } from '../assets/js/popups.js';
 import { construireHistogramme } from '../assets/js/histogramme.js';
@@ -137,7 +137,10 @@ describe('Service worker : pré-cache', () => {
     for (const lieu of LIEUX) {
       assert.deepEqual(await liste(`${lieu}/index.html`), reference, `${lieu} : feuilles différentes ou dans un autre ordre (la cascade en dépend).`);
     }
-    const manquantes = reference.filter((f) => !sw.includes(`'./assets/css/${f}'`));
+    // noscript.css est exemptée du pré-cache : elle ne sert que quand JavaScript
+    // est désactivé, et le service worker, qui est du JavaScript, n'existe alors
+    // pas. La pré-cacher ne profiterait à personne (voir le test dédié plus bas).
+    const manquantes = reference.filter((f) => f !== 'noscript.css' && !sw.includes(`'./assets/css/${f}'`));
     assert.deepEqual(manquantes, [], `Feuilles absentes du PRECACHE de sw.js : ${manquantes.join(', ')}.`);
   });
 
@@ -1074,14 +1077,17 @@ describe('Pages HTML', () => {
     }
   });
 
-  // Les pages carte sont des copies les unes des autres : seuls le <title> et le
-  // <h1> portent le nom du lieu. Toute autre différence est une modification
-  // faite dans une page et oubliée dans les autres.
-  test('les pages carte ne diffèrent que par le titre et le <h1>', async () => {
+  // Les pages carte sont des copies les unes des autres : seuls le <title>, la
+  // description, le <h1> et le repli sans JavaScript (la liste des secteurs)
+  // portent le lieu. Toute autre différence est une modification faite dans une
+  // page et oubliée dans les autres.
+  test('les pages carte ne diffèrent que par le titre, la description, le <h1> et le repli', async () => {
     const normalise = async (lieu) => (await lire(`${lieu}/index.html`))
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/<title>[^<]*<\/title>/, '<title></title>')
+      .replace(/<meta name="description" content="[^"]*" \/>/, '<meta name="description" />')
       .replace(/<h1 class="titre">.*<\/h1>/, '<h1></h1>')
+      .replace(/<noscript>\s*<div class="repli-sans-js">[\s\S]*?<\/noscript>/, '<noscript></noscript>')
       .replace(/\s+/g, ' ');
     const [reference, ...autres] = LIEUX;
     const attendu = await normalise(reference);
@@ -1108,6 +1114,75 @@ describe('Pages HTML', () => {
     const slugs = JSON.parse(await lire('outils/lieux.json')).map((lieu) => lieu.slug).sort();
     assert.deepEqual(slugs, LIEUX,
       'Lieu publié sans entrée dans outils/lieux.json, ou entrée sans data.geojson : sa page ne serait pas générée.');
+  });
+
+  // Repli sans JavaScript (README, « Fonctionne sans JavaScript ») : chaque page
+  // carte porte sa description et un <noscript> qui liste les secteurs du lieu.
+  const decoderHtml = (texte) => texte.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
+  test('chaque page carte a une description de 150 à 160 caractères, propre à son lieu', async () => {
+    const vues = new Set();
+    for (const lieu of LIEUX) {
+      const html = await lire(`${lieu}/index.html`);
+      const balise = /<meta name="description" content="([^"]*)" \/>/.exec(html);
+      assert.ok(balise, `${lieu} : <meta name="description"> absente`);
+      const description = decoderHtml(balise[1]);
+      assert.ok(description.length >= 150 && description.length <= 160,
+        `${lieu} : description de ${description.length} caractères (attendu 150 à 160)`);
+      assert.ok(!vues.has(description), `${lieu} : description identique à celle d'un autre lieu`);
+      vues.add(description);
+    }
+  });
+
+  test('le <noscript> de chaque page carte liste les secteurs, autant que l\'accueil en annonce', async () => {
+    const accueil = await lire('index.html');
+    for (const lieu of LIEUX) {
+      const html = await lire(`${lieu}/index.html`);
+      const bloc = /<main id="map"[^>]*>\s*<noscript>([\s\S]*?)<\/noscript>\s*<\/main>/.exec(html);
+      assert.ok(bloc, `${lieu} : <noscript> absent de <main id="map">`);
+      const repli = bloc[1];
+      assert.match(repli, /<h2>La carte nécessite JavaScript<\/h2>/, `${lieu} : titre du repli absent`);
+      assert.match(repli, /nécessite JavaScript, qui est désactivé dans votre navigateur/, `${lieu} : message du repli absent`);
+      assert.match(repli, /<ul>/, `${lieu} : liste des secteurs absente`);
+
+      const falaises = (await geojsonDe(lieu)).features.map((f) => f.properties).filter((p) => p.categorie === 'falaise');
+      const entrees = [...repli.matchAll(/<li>([^<]*)<\/li>/g)].map((m) => decoderHtml(m[1]));
+      assert.deepEqual([...entrees].sort(), falaises.map(libelleFalaise).sort(),
+        `${lieu} : la liste du repli ne correspond plus à data.geojson (lancer : npm run generer)`);
+      const sites = new Set(falaises.map((p) => p.site));
+      assert.equal([...repli.matchAll(/<h3>/g)].length, sites.size, `${lieu} : un <h3> par site attendu`);
+
+      // Le chiffre « N secteurs » de l'accueil compte les mêmes falaises.
+      const chiffre = new RegExp(`<a href="${lieu}/">[\\s\\S]*?<span class="sortie-chiffres">(\\d+) secteurs`).exec(accueil);
+      assert.ok(chiffre, `${lieu} : décompte de secteurs introuvable sur l'accueil`);
+      assert.equal(entrees.length, Number(chiffre[1]),
+        `${lieu} : ${entrees.length} secteurs listés dans le repli, l'accueil en annonce ${chiffre[1]}`);
+    }
+  });
+
+  test('chaque page carte charge la feuille de repli dans un <noscript> de l\'en-tête', async () => {
+    for (const lieu of LIEUX) {
+      const entete = (await lire(`${lieu}/index.html`)).split('</head>')[0];
+      assert.match(entete, /<noscript>\s*<link rel="stylesheet" href="\.\.\/assets\/css\/noscript\.css" \/>\s*<\/noscript>/,
+        `${lieu} : feuille de repli absente de l'en-tête, ou hors <noscript> (une balise <style> serait refusée par la CSP)`);
+    }
+  });
+
+  // Garde-fou contre une réintroduction accidentelle de la mention d'attente.
+  test('le README ne dit plus que le repli sans JavaScript reste à écrire', async () => {
+    assert.doesNotMatch(await lire('README.md'), /repli reste à écrire/);
+  });
+
+  // noscript.css ne sert que quand JavaScript est désactivé, cas où le service
+  // worker (du JavaScript) n'existe pas : la pré-cacher ne profiterait à
+  // personne. Le test qui exige le pré-cache de chaque feuille de assets/css
+  // l'exempte (voir plus haut) ; celui-ci vérifie que l'exemption est dite
+  // dans sw.js et qu'aucune entrée de PRECACHE ne la contient.
+  test('noscript.css est exemptée du pré-cache, et sw.js le dit', async () => {
+    const sw = await lire('sw.js');
+    assert.doesNotMatch(sw, /'[^'\n]*noscript\.css[^'\n]*'/, 'noscript.css ne doit pas figurer dans PRECACHE');
+    assert.match(sw, /noscript\.css n'est pas pré-cachée/, 'sw.js doit expliquer pourquoi noscript.css n\'est pas pré-cachée');
+    assert.ok((await readdir(join(RACINE, 'assets/css'))).includes('noscript.css'), 'assets/css/noscript.css absent');
   });
 
   // Sur CHAQUE page carte : un lieu dupliqué dont on aurait rogné la CSP en la

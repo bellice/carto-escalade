@@ -19,13 +19,19 @@ L'accueil reste utilisable sans JavaScript. Il l'est déjà.
 
 Les pages carte font exception : la carte WebGL de MapLibre a besoin de
 JavaScript, et on ne cherche pas à la faire fonctionner sans. Elles offrent
-en revanche un repli minimal :
+en revanche un repli minimal, écrit en HTML et non par du JavaScript :
 
-- un `<noscript>` avec un message clair ;
-- la liste statique des secteurs du lieu, écrite en HTML à la génération des
-  pages (pas par du JavaScript) et visible dans ce repli.
-
-À ce jour, ce repli reste à écrire.
+- un `<noscript>` dans `<main id="map">`, avec un message clair ;
+- la liste des secteurs du lieu, groupés par site, un `<li>` par secteur (le
+  décompte « N secteurs » de l'accueil). `outils/generer-pages.js` la dérive de
+  `<lieu>/data.geojson`, avec les libellés de la carte (`libelleFalaise`) et un
+  tri en collation française. Après une régénération des données, lancer
+  `npm run generer`, sans quoi un test échoue ;
+- une feuille `assets/css/noscript.css`, chargée par un `<link>` dans un
+  `<noscript>` de l'en-tête (une balise `<style>` serait refusée par la CSP).
+  Elle masque les contrôles inertes (filtres, bascule mobile, message de
+  chargement). Le service worker ne la pré-cache pas : il n'existe pas sans
+  JavaScript.
 
 ### Composants (Custom Elements)
 
@@ -299,6 +305,7 @@ cartes, et `--lieu` ne nommait que le dossier de destination.
    | `slug` | nom du dossier du lieu | `presquile-crozon` |
    | `titreLong` | nom complet, repris dans `<title>` et `<h1>` | `Presqu’île de Crozon` |
    | `titreCourt` | forme courte, dans le `<h1>` | `Crozon` |
+   | `description` | `<meta name="description">`, 150 à 160 caractères, écrite à la main (un test vérifie la longueur) | |
    | `commentaire` | facultatif : tableau de lignes, commentaire HTML posé avant le `<h1>` | |
 
    **Pourquoi deux libellés.** L'en-tête de la carte affiche le nom complet à
@@ -322,6 +329,10 @@ cartes, et `--lieu` ne nommait que le dossier de destination.
    export puis copie. La liste des lieux vient des données
    (`SELECT DISTINCT lieu FROM falaise`), jamais d'une énumération à tenir à
    jour. `--lieu <x>` restreint à un seul.
+
+   Les pages carte listent les secteurs de `data.geojson` dans leur repli sans
+   JavaScript : après chaque régénération des données, lancer
+   `npm run generer` (un test statique échoue sinon).
 
    > Ne pas lancer les scripts un par un. `build_db.py` **vide** le cache des
    > temps de trajet (alimenté par l'API IGN, jamais par les CSV) : enchaîner

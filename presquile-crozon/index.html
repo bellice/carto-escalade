@@ -33,6 +33,7 @@
   " />
 
   <title>Presqu’île de Crozon - Tokelau</title>
+  <meta name="description" content="Topo d’escalade de la presqu’île de Crozon : grès à Pen-Hir et Argol, parkings, détail des voies et cotations. Utilisable hors ligne une fois la carte préparée." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
   <link rel="manifest" href="../manifest.webmanifest" />
   <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
@@ -91,9 +92,14 @@
   <link rel="stylesheet" href="../assets/css/fiche-actions.css" />
   <link rel="stylesheet" href="../assets/css/fiche-mobile.css" />
   <link rel="stylesheet" href="../assets/css/adaptations.css" />
+  <!-- Repli sans JavaScript : feuille chargée seulement quand les scripts sont
+       désactivés (une balise <style> serait refusée par la CSP). -->
+  <noscript>
+    <link rel="stylesheet" href="../assets/css/noscript.css" />
+  </noscript>
 </head>
 <body>
-  <a class="lien-evitement" href="#map">Aller à la carte</a>
+  <a class="lien-evitement" href="#map">Aller au contenu</a>
 
   <header class="map-header">
     <a href="../">← Accueil</a>
@@ -288,7 +294,80 @@
 
   <!-- data-donnees est lu par demarrer-sortie.js ; le chemin reste relatif à
        CETTE page, chaque lieu ayant son propre data.geojson. -->
-  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises"></main>
+  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises">
+    <noscript>
+      <div class="repli-sans-js">
+        <h2>La carte nécessite JavaScript</h2>
+        <p>La carte nécessite JavaScript, qui est désactivé dans votre navigateur. Voici les secteurs recensés, par site. Activez JavaScript pour la carte, les filtres et le détail des voies.</p>
+        <h3>Argol</h3>
+        <ul>
+          <li>Blocadom</li>
+          <li>La grande face</li>
+          <li>La grande face · Bâbord</li>
+          <li>La grande face · La grande face côté droit</li>
+          <li>La grande face · La grande face côté gauche</li>
+          <li>Le lierre · Le lierre face est</li>
+          <li>Le lierre · Le lierre face nord</li>
+          <li>Le mur englouti</li>
+          <li>Le Pierrier - Le Balcon</li>
+          <li>Minos - Dalle du Kangourou</li>
+        </ul>
+        <h3>Pen-Hir</h3>
+        <ul>
+          <li>Banquise · Banquise Face Nord Ouest</li>
+          <li>Banquise · Banquise Face Ouest</li>
+          <li>Cirque des courants d’air · In Vino Veritas</li>
+          <li>Cirque des courants d’air · Le Fond du Cirque secteur du bas</li>
+          <li>Cirque des courants d’air · Le Fond du Cirque secteur du haut</li>
+          <li>Cirque des courants d’air · Les Bâtardes</li>
+          <li>La Grande Falaise · Antiseptique</li>
+          <li>La Grande Falaise · As de carreau</li>
+          <li>La Grande Falaise · Bocal</li>
+          <li>La Grande Falaise · Dalle triangulaire</li>
+          <li>La Grande Falaise · Diabolo</li>
+          <li>La Grande Falaise · Fissure verte</li>
+          <li>La Grande Falaise · La Grotte</li>
+          <li>La Grande Falaise · Le Mur Noir</li>
+          <li>La Grande Falaise · Les Cristaux</li>
+          <li>La Grande Falaise · Minigalithe</li>
+          <li>La Grande Falaise · Monolithe Face Nord</li>
+          <li>La Grande Falaise · Monolithe Face Nord Ouest</li>
+          <li>La Grande Falaise · Monolithe, 3ème type</li>
+          <li>La Grande Falaise · Soleil rouge</li>
+          <li>Pen-Hir · Arche de Noé</li>
+          <li>Pen-Hir · Château de cartes</li>
+          <li>Pen-Hir · Dalle aux enfants</li>
+          <li>Pen-Hir · Dalle de Paul</li>
+          <li>Pen-Hir · Dalle de verre</li>
+          <li>Pen-Hir · Dalle des débutants</li>
+          <li>Pen-Hir · Dalle des pêcheurs</li>
+          <li>Pen-Hir · Dalle grise</li>
+          <li>Pen-Hir · Douar nevez</li>
+          <li>Pen-Hir · Face Nord</li>
+          <li>Pen-Hir · Germaine</li>
+          <li>Pen-Hir · Grand Daouët</li>
+          <li>Pen-Hir · Grande brèche</li>
+          <li>Pen-Hir · Gwen ha du</li>
+          <li>Pen-Hir · La Brèche</li>
+          <li>Pen-Hir · La Crique</li>
+          <li>Pen-Hir · La Dalle aux obus</li>
+          <li>Pen-Hir · La Dalle Noire - Ys</li>
+          <li>Pen-Hir · La Fève</li>
+          <li>Pen-Hir · La Grande faille</li>
+          <li>Pen-Hir · La Tourette</li>
+          <li>Pen-Hir · Le Comptoir</li>
+          <li>Pen-Hir · Le Haut du Cirque</li>
+          <li>Pen-Hir · Le Menhir</li>
+          <li>Pen-Hir · Les Strates</li>
+          <li>Pen-Hir · Quai des brumes</li>
+          <li>Pen-Hir · Rappel</li>
+          <li>Pen-Hir · Rez-de-chaussée</li>
+          <li>Pen-Hir · Secteur du Parking</li>
+          <li>Pen-Hir · Toon’s land</li>
+        </ul>
+      </div>
+    </noscript>
+  </main>
 
   <div id="etat-chargement" class="etat-chargement" role="status">Chargement de la carte…</div>
 

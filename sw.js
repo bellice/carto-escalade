@@ -38,6 +38,8 @@ const PRECACHE = [
   './assets/css/fiche-actions.css',
   './assets/css/fiche-mobile.css',
   './assets/css/adaptations.css',
+  // assets/css/noscript.css n'est pas pré-cachée : elle ne sert que quand
+  // JavaScript est désactivé, cas où ce service worker n'existe pas.
   './assets/js/carte.js',
   './assets/js/actions-fiche.js',
   './assets/js/carte-utils.js',

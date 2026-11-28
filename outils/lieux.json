@@ -3,6 +3,7 @@
     "slug": "cassis-ciotat",
     "titreLong": "Cassis et La Ciotat",
     "titreCourt": "Cassis-La Ciotat",
+    "description": "Topo d’escalade de Cassis et La Ciotat : calcaire, grès et poudingue, parkings, détail des voies et cotations. Utilisable hors ligne une fois la carte préparée.",
     "commentaire": [
       "Court : \"Cassis-La Ciotat\", pas une seule des deux communes — Port",
       "Miou (Cassis) est un vrai secteur au même titre que les 94 autres",
@@ -17,6 +18,7 @@
     "slug": "dentelles-montmirail",
     "titreLong": "Dentelles de Montmirail",
     "titreCourt": "Les Dentelles",
+    "description": "Topo d’escalade des Dentelles de Montmirail : calcaire à Gigondas, parkings, détail des voies et cotations. Utilisable hors ligne une fois la carte préparée.",
     "commentaire": [
       "Court : \"Les Dentelles\", pas \"Montmirail\" — ce dernier existe aussi",
       "comme toponyme dans la Marne et la Sarthe, \"Les Dentelles\" ne prête",
@@ -26,11 +28,13 @@
   {
     "slug": "presquile-crozon",
     "titreLong": "Presqu’île de Crozon",
-    "titreCourt": "Crozon"
+    "titreCourt": "Crozon",
+    "description": "Topo d’escalade de la presqu’île de Crozon : grès à Pen-Hir et Argol, parkings, détail des voies et cotations. Utilisable hors ligne une fois la carte préparée."
   },
   {
     "slug": "vallee-drome-diois",
     "titreLong": "Vallée de la Drôme et Diois",
-    "titreCourt": "Drôme et Diois"
+    "titreCourt": "Drôme et Diois",
+    "description": "Topo d’escalade de la vallée de la Drôme et du Diois : calcaire, parkings, détail des voies et cotations. Utilisable hors ligne une fois la carte préparée."
   }
 ]

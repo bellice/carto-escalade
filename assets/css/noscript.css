@@ -1,0 +1,55 @@
+/* noscript.css — repli des pages carte quand JavaScript est désactivé.
+   Chargée par un <link> dans un <noscript> de l'en-tête : une balise <style>
+   serait refusée par la CSP. Elle vient après toutes les autres feuilles, donc
+   à spécificité égale elle l'emporte. Dépend des jetons de style.css. Pas
+   pré-cachée par le service worker, qui n'existe pas sans JavaScript. */
+
+/* Ce qui ne sert qu'avec JavaScript : panneau de filtres, bascule mobile,
+   message de chargement, zone du bouton « Préparer ». */
+#panneau-lateral,
+.bascule-vue,
+#etat-chargement,
+#preparation-hors-ligne {
+  display: none;
+}
+
+/* Sans carte, la page défile comme un document : un conteneur à défilement
+   propre ne se parcourt pas au clavier dans tous les navigateurs. L'en-tête
+   garde sa place en haut, la liste commence juste dessous. */
+html,
+body {
+  height: auto;
+}
+#map {
+  position: static;
+  box-sizing: border-box;
+  padding: calc(var(--hauteur-entete) + 20px) 16px 32px;
+}
+
+.repli-sans-js {
+  max-width: 40rem;
+  margin: 0 auto;
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  color: var(--ink);
+}
+.repli-sans-js h2 {
+  margin: 0 0 8px;
+  font-size: var(--fs-lg);
+  color: var(--forest);
+}
+.repli-sans-js p {
+  margin: 0;
+  color: var(--muted);
+}
+.repli-sans-js h3 {
+  margin: 24px 0 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--forest);
+}
+.repli-sans-js ul {
+  margin: 0;
+  padding-left: 20px;
+}

@@ -17,6 +17,11 @@
     {{commentaire}}  seul sur sa ligne : commentaire HTML facultatif du lieu
                      (tableau de lignes dans lieux.json). La ligne disparaît
                      quand le lieu n'en a pas.
+    {{description}}  description du lieu (lieux.json) ; échappée en attribut
+    {{repli}}        seul sur sa ligne : le <noscript> qui liste les secteurs du
+                     lieu, écrit à partir de <lieu>/data.geojson (voir
+                     generer-pages.js). Il faut régénérer après chaque
+                     changement des données.
 -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -53,6 +58,7 @@
   " />
 
   <title>{{titreLong}} - Tokelau</title>
+  <meta name="description" content="{{description}}" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
   <link rel="manifest" href="../manifest.webmanifest" />
   <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
@@ -111,9 +117,14 @@
   <link rel="stylesheet" href="../assets/css/fiche-actions.css" />
   <link rel="stylesheet" href="../assets/css/fiche-mobile.css" />
   <link rel="stylesheet" href="../assets/css/adaptations.css" />
+  <!-- Repli sans JavaScript : feuille chargée seulement quand les scripts sont
+       désactivés (une balise <style> serait refusée par la CSP). -->
+  <noscript>
+    <link rel="stylesheet" href="../assets/css/noscript.css" />
+  </noscript>
 </head>
 <body>
-  <a class="lien-evitement" href="#map">Aller à la carte</a>
+  <a class="lien-evitement" href="#map">Aller au contenu</a>
 
   <header class="map-header">
     <a href="../">← Accueil</a>
@@ -309,7 +320,9 @@
 
   <!-- data-donnees est lu par demarrer-sortie.js ; le chemin reste relatif à
        CETTE page, chaque lieu ayant son propre data.geojson. -->
-  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises"></main>
+  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises">
+    {{repli}}
+  </main>
 
   <div id="etat-chargement" class="etat-chargement" role="status">Chargement de la carte…</div>
 

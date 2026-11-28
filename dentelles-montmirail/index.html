@@ -33,6 +33,7 @@
   " />
 
   <title>Dentelles de Montmirail - Tokelau</title>
+  <meta name="description" content="Topo d’escalade des Dentelles de Montmirail : calcaire à Gigondas, parkings, détail des voies et cotations. Utilisable hors ligne une fois la carte préparée." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='42' fill='%23a8452f'/></svg>" />
   <link rel="manifest" href="../manifest.webmanifest" />
   <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
@@ -91,9 +92,14 @@
   <link rel="stylesheet" href="../assets/css/fiche-actions.css" />
   <link rel="stylesheet" href="../assets/css/fiche-mobile.css" />
   <link rel="stylesheet" href="../assets/css/adaptations.css" />
+  <!-- Repli sans JavaScript : feuille chargée seulement quand les scripts sont
+       désactivés (une balise <style> serait refusée par la CSP). -->
+  <noscript>
+    <link rel="stylesheet" href="../assets/css/noscript.css" />
+  </noscript>
 </head>
 <body>
-  <a class="lien-evitement" href="#map">Aller à la carte</a>
+  <a class="lien-evitement" href="#map">Aller au contenu</a>
 
   <header class="map-header">
     <a href="../">← Accueil</a>
@@ -291,7 +297,80 @@
 
   <!-- data-donnees est lu par demarrer-sortie.js ; le chemin reste relatif à
        CETTE page, chaque lieu ayant son propre data.geojson. -->
-  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises"></main>
+  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises">
+    <noscript>
+      <div class="repli-sans-js">
+        <h2>La carte nécessite JavaScript</h2>
+        <p>La carte nécessite JavaScript, qui est désactivé dans votre navigateur. Voici les secteurs recensés, par site. Activez JavaScript pour la carte, les filtres et le détail des voies.</p>
+        <h3>Cascade de Lafare</h3>
+        <ul>
+          <li>Cascade de Lafare · Couloir de la glisse</li>
+          <li>Cascade de Lafare · Dièdre des cascades</li>
+          <li>Cascade de Lafare · Dièdre jaune</li>
+          <li>Cascade de Lafare · Grand toit (droit)</li>
+          <li>Cascade de Lafare · Grand toit (gauche)</li>
+          <li>Cascade de Lafare · La tyrolienne (droit)</li>
+          <li>Cascade de Lafare · La tyrolienne (gauche)</li>
+          <li>Cascade de Lafare · Les canards de Cholon</li>
+          <li>Cascade de Lafare · Vire câblée</li>
+        </ul>
+        <h3>Clapis</h3>
+        <ul>
+          <li>Clapis Nord · Brèche de la salle à manger</li>
+          <li>Clapis Nord · Hadamard nord</li>
+          <li>Clapis Sud · Bleu pétrole</li>
+          <li>Clapis Sud · Blocus</li>
+          <li>Clapis Sud · Gillou</li>
+          <li>Clapis Sud · Hadamard est</li>
+          <li>Clapis Sud · Hadamard ouest</li>
+          <li>Clapis Sud · L'enfer des roudoudous</li>
+          <li>Clapis Sud · Lune de miel</li>
+          <li>Clapis Sud · Mandragore</li>
+          <li>Clapis Sud · Maryline</li>
+          <li>Clapis Sud · Nébuleuse</li>
+          <li>Clapis Sud · Petit vérin</li>
+          <li>Clapis Sud · Piste cyclable</li>
+          <li>Clapis Sud · Santémerga</li>
+          <li>Clapis Sud · Vires rouges</li>
+          <li>Clapis Sud · Vistemboir</li>
+          <li>Clapis Sud · Zone piétonne</li>
+        </ul>
+        <h3>Gigondas</h3>
+        <ul>
+          <li>Gigondas Nord · Aiguillette lagarde</li>
+          <li>Gigondas Nord · Arête lagarde</li>
+          <li>Gigondas Nord · Dièdre de Provence</li>
+          <li>Gigondas Nord · Dièdre des parisiens</li>
+          <li>Gigondas Nord · Fissure en S</li>
+          <li>Gigondas Nord · Les florets</li>
+          <li>Gigondas Nord · Martinetti</li>
+          <li>Gigondas Nord · Mur du solitaire</li>
+          <li>Gigondas Nord · Petits moutons</li>
+          <li>Gigondas Nord · Trois plaques</li>
+          <li>Gigondas Nord · Voie du trou</li>
+          <li>Gigondas Sud · Brèche de la pousterle</li>
+          <li>Gigondas Sud · Pieds nickelés</li>
+          <li>Gigondas Sud · Vague d'étrave</li>
+          <li>Gigondas Sud · Vaisonnaise</li>
+          <li>Gigondas Sud · Voie de gigondas</li>
+        </ul>
+        <h3>Grand Travers</h3>
+        <ul>
+          <li>Grand Travers · Rocher du Cayron (droit)</li>
+          <li>Grand Travers · Rocher du Cayron (gauche)</li>
+          <li>Grand Travers · Rocher école (droit)</li>
+          <li>Grand Travers · Rocher école (gauche)</li>
+        </ul>
+        <h3>Rocher de Saint Christophe</h3>
+        <ul>
+          <li>Rocher de Saint Christophe · Face nord ouest</li>
+          <li>Rocher de Saint Christophe · Face ouest</li>
+          <li>Rocher de Saint Christophe · Face sud</li>
+          <li>Rocher de Saint Christophe · Secteur école</li>
+        </ul>
+      </div>
+    </noscript>
+  </main>
 
   <div id="etat-chargement" class="etat-chargement" role="status">Chargement de la carte…</div>
 
