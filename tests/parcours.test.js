@@ -2459,3 +2459,45 @@ describe('Composant <poignee-fiche>', () => {
     }
   });
 });
+
+// Le fond de carte vient d'OpenStreetMap (ODbL) : le crédit doit se lire sans
+// clic quand la carte apparaît. MapLibre le replie à la première interaction ;
+// un repli forcé au chargement le cachait derrière le bouton « i ».
+describe('Attribution OpenStreetMap', () => {
+  for (const vue of [
+    { nom: 'mobile', options: { viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true } },
+    { nom: 'bureau', options: { viewport: { width: 1280, height: 900 } } },
+  ]) {
+    test(`le crédit OpenStreetMap est lisible au chargement (${vue.nom}), puis se replie à la 1re interaction`,
+      { timeout: 90000 }, async () => {
+        const { contexte, page } = await nouveauContexte(navigateur, vue.options);
+        try {
+          await exposerCarte(page);
+          await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+          await attendreCarte(page);
+          const lire = () => page.evaluate(() => {
+            const inner = document.querySelector('.maplibregl-ctrl-attrib-inner');
+            const r = inner.getBoundingClientRect();
+            const lien = [...inner.querySelectorAll('a')].find((a) => /openstreetmap\.org\/copyright/.test(a.href));
+            return { largeur: r.width, texte: inner.textContent, lien: Boolean(lien) };
+          });
+          const arrivee = await lire();
+          assert.ok(arrivee.largeur > 0, 'Le crédit est masqué à l\'arrivée : il faut un clic pour le lire');
+          assert.match(arrivee.texte, /OpenStreetMap/);
+          assert.ok(arrivee.lien, 'Le crédit doit renvoyer vers openstreetmap.org/copyright (mention de la licence ODbL)');
+
+          const { width, height } = page.viewportSize();
+          await page.mouse.move(width / 2, height / 3);
+          await page.mouse.down();
+          await page.mouse.move(width / 2 + 60, height / 3 + 30, { steps: 6 });
+          await page.mouse.up();
+          await page.waitForTimeout(600);
+          assert.equal((await lire()).largeur, 0, 'MapLibre devrait replier le crédit à la 1re interaction');
+          await page.click('.maplibregl-ctrl-attrib-button');
+          assert.ok((await lire()).largeur > 0, 'Le bouton « i » doit rouvrir le crédit');
+        } finally {
+          await contexte.close();
+        }
+      });
+  }
+});

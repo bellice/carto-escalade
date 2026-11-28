@@ -136,14 +136,9 @@ function creerCarte(geojson) {
     appliquerFiltresEtSecteurs();
   }), 'top-right');
 
-  // Le contrôle d'attribution démarre parfois "déplié" (classe posée
-  // avant que notre config compact ne s'applique pleinement) — on force
-  // l'état replié une fois la carte chargée, sans empêcher l'utilisateur
-  // de le rouvrir ensuite.
-  etat.map.on('load', () => {
-    const attrib = document.querySelector('.maplibregl-ctrl-attrib');
-    if (attrib) attrib.classList.remove('maplibregl-compact-show');
-  });
+  // Le contrôle d'attribution reste déplié à l'arrivée : le crédit
+  // OpenStreetMap doit se lire sans clic. MapLibre le replie de lui-même à la
+  // première interaction avec la carte ; le bouton « i » le rouvre.
   etat.map.on('zoom', appliquerSimplificationZoom);
   // L'affichage des parkings dépend aussi du zoom (voir
   // appliquerVisibiliteParkings) — rafraîchi à chaque zoom, sans repasser

@@ -50,4 +50,9 @@ L'arborescence détaillée, fichier par fichier, est dans
 
 ## Licence
 
-À définir.
+- Code : [MIT](LICENSE). La copie de MapLibre GL JS (`assets/vendor/maplibre/`)
+  garde sa licence BSD-3-Clause.
+- Données : positions, temps d'approche et regroupement en sites et secteurs
+  sous [CC BY-NC-SA 4.0](LICENSE-donnees). Les noms de voies, cotations,
+  longueurs, types de roche et orientations issus des topos n'en font pas
+  partie : ils restent sous les droits de leurs éditeurs.

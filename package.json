@@ -1,6 +1,7 @@
 {
   "type": "module",
   "private": true,
+  "license": "MIT",
   "description": "Le SITE reste sans dépendance. Le déploiement ne fait que retirer les commentaires (outils/construire-site.js, Node seul). Playwright n'est utilisé QUE par les tests (devDependencies) et n'est jamais chargé par les pages.",
   "scripts": {
     "build": "node outils/construire-site.js",

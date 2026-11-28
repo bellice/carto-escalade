@@ -197,4 +197,19 @@
     position: absolute;
     inset: -10px;
   }
+  /* Le crédit s'affiche déplié à l'arrivée : ses liens (14px de haut)
+     reçoivent la même zone transparente que le bouton « i », jusqu'à 44px.
+     MapLibre place le bouton avant le texte dans le DOM : sans z-index, les
+     liens recouvriraient les 10px de zone tactile qu'il étend vers eux. */
+  .maplibregl-ctrl-attrib-button {
+    z-index: 1;
+  }
+  .maplibregl-ctrl-attrib-inner a {
+    position: relative;
+  }
+  .maplibregl-ctrl-attrib-inner a::after {
+    content: "";
+    position: absolute;
+    inset: -15px 0;
+  }
 }
