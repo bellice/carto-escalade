@@ -172,7 +172,7 @@ export function construireLegendeFalaises(max, median, remplissage, raisonSansTa
   // au global (ex. grande voie) — cohérent avec construireSourceFalaises().
   const repere = (valeur) => `
     <span class="repere-taille">
-      <span class="cercle-repere" style="width:${calculerRayon(valeur, echelle) * 2}px; height:${calculerRayon(valeur, echelle) * 2}px;"></span>
+      <span class="cercle-repere"></span>
       <span>${valeur}</span>
     </span>`;
   const valeurs = (median > 0 && median < max) ? [1, median, max] : [1, max];
@@ -180,4 +180,10 @@ export function construireLegendeFalaises(max, median, remplissage, raisonSansTa
     <div class="reperes-taille">
       ${valeurs.map(repere).join('')}
     </div>`;
+  // Taille posée en CSSOM, par variable CSS : un attribut style="…" ajouté par
+  // innerHTML serait refusé par la CSP (style-src sans 'unsafe-inline') et
+  // ramènerait les cercles à leur bordure.
+  conteneur.querySelectorAll('.cercle-repere').forEach((cercle, i) => {
+    cercle.style.setProperty('--taille-cercle', `${calculerRayon(valeurs[i], echelle) * 2}px`);
+  });
 }

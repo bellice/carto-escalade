@@ -38,15 +38,17 @@
        vide sans la moindre erreur en console.
        img-src garde blob: : MapLibre décode certaines images PNG par une URL
        blob:.
-       style-src garde 'unsafe-inline' (MapLibre pose des styles en ligne sur
-       ses marqueurs) ; script-src peut s'en passer, les scripts inline ayant
-       été externalisés. frame-ancestors est absent volontairement : cette
+       Ni script-src ni style-src n'autorisent 'unsafe-inline' : les scripts
+       inline sont externalisés, MapLibre écrit ses styles par CSSOM (autorisé)
+       et le site n'injecte aucun attribut style="…". Un style="…" ajouté par
+       innerHTML serait refusé en silence : poser la taille par
+       style.setProperty. frame-ancestors est absent volontairement : cette
        directive est ignorée en <meta>, l'anti-clickjacking reste hors de
        portée sur GitHub Pages. Rationnel complet : README.md. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self';
-    style-src 'self' 'unsafe-inline';
+    style-src 'self';
     img-src 'self' data: blob: https://tiles.openfreemap.org;
     font-src 'self' data:;
     connect-src 'self' https://tiles.openfreemap.org;

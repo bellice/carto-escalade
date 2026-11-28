@@ -2011,3 +2011,112 @@ describe('Accessibilité et sécurité', () => {
     }
   });
 });
+
+// style-src n'autorise plus 'unsafe-inline' : un style="…" fabriqué par le JS est
+// ignoré en silence (la légende proportionnelle passait de 18/30/52 px à 4 px sans
+// aucune erreur visible). Ce parcours écoute securitypolicyviolation sur tout ce
+// qu'un visiteur peut faire (légende, filtres, recherche, zooms, fiche, détail des
+// voies, GPS, popups parking et gîte, bascule Carte/Filtres, poignée) et échoue à la
+// première violation. Chaque étape lève une erreur si son élément manque : un
+// parcours qui s'arrête en route ne prouverait rien.
+describe('CSP : aucun style refusé sur un parcours complet', () => {
+  const VUES = [
+    ['bureau', {}],
+    ['mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }],
+  ];
+
+  for (const [vue, options] of VUES) {
+    test(`aucune violation CSP (${vue})`, { timeout: 180000 }, async () => {
+      const mobile = vue === 'mobile';
+      const { contexte, page, violationsCsp } = await nouveauContexte(navigateur, { ...options, serviceWorkers: 'block' });
+      try {
+        await page.addInitScript(() => {
+          window.__violationsCsp = [];
+          document.addEventListener('securitypolicyviolation', (e) => {
+            window.__violationsCsp.push(`${e.violatedDirective} ${e.blockedURI} ${e.sourceFile}:${e.lineNumber}`);
+          });
+        });
+        await exposerCarte(page);
+        await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+        await attendreCarte(page);
+
+        if (mobile) {
+          // Avant toute fiche : une fiche ouverte masque la bascule.
+          await page.locator('#btn-vue-filtres').click();
+          await page.locator('#btn-vue-carte').click();
+        } else {
+          await page.locator('.legende-toggle').click();
+          await page.locator('.legende-toggle').click();
+          await page.locator('.btn-epuree').click();
+          await page.locator('.btn-epuree').click();
+          for (const libelle of ['Couenne', 'Grande voie', 'Tous']) {
+            await page.locator('#legende-type-voie label', { hasText: libelle }).first().click();
+          }
+          for (const libelle of ['Trad', 'Tous']) {
+            await page.locator('#legende-style label', { hasText: libelle }).first().click();
+          }
+          const derniere = (await page.locator('#cotation-max option').count()) - 1;
+          await page.locator('#cotation-min').selectOption({ index: 4 });
+          await page.locator('#cotation-max').selectOption({ index: 12 });
+          await page.locator('#cotation-min').selectOption({ index: 0 });
+          await page.locator('#cotation-max').selectOption({ index: derniere });
+          await page.locator('#legende-ensoleillement button, #legende-ensoleillement label').first().click();
+          await page.evaluate(() => {
+            const curseur = document.querySelector('#legende-temps input[type="range"]');
+            curseur.value = curseur.min;
+            curseur.dispatchEvent(new Event('input', { bubbles: true }));
+          });
+          await page.locator('.recherche-champ input').fill('Saoû');
+          await page.keyboard.press('Enter');
+          await page.waitForTimeout(800);
+          // Remises à zéro : les filtres masqueraient la falaise ouverte plus bas.
+          await page.locator('.btn-effacer').click();
+          await page.locator('#reinitialiser-filtres').click();
+        }
+
+        // Au-delà du seuil de zoom, la légende remplace sa note par les cercles de repère.
+        for (const zoom of [9, 12, 14, 16]) {
+          await page.evaluate((z) => window.__carteTest.jumpTo({ zoom: z }), zoom);
+          await page.waitForTimeout(500);
+        }
+        await ouvrirFalaise(page, REPERES.lesRoches);
+        await page.locator('.btn-voir-detail-voies').first().click({ timeout: 8000 });
+        await page.waitForSelector('.fiche-voies-detail', { timeout: 5000 });
+        await page.locator('.btn-tri-voies[data-tri="position"]').click();
+        await page.locator('.btn-retour-fiche').click();
+        if (mobile) {
+          await page.locator('.poignee-fiche').first().click();
+          await page.waitForTimeout(400);
+          await page.locator('.poignee-fiche').first().click();
+        }
+        // Le presse-papiers peut être refusé : ce qui compte ici, c'est le style, pas la copie.
+        await page.locator('.gps-copie').first().click();
+        await page.locator('.btn-partager').first().click();
+
+        // Marqueurs focusables : Entrée ouvre la popup, quel que soit le cadrage.
+        await page.evaluate((c) => window.__carteTest.jumpTo({ center: c, zoom: 16 }), REPERES.lesRoches.coord);
+        await page.waitForTimeout(700);
+        await page.locator('.marqueur-parking:not(.masque)').first().focus();
+        await page.keyboard.press('Enter');
+        await page.waitForSelector('.popup .cat-tag.parking', { timeout: 5000 });
+        await page.locator('.marqueur-hebergement').first().focus();
+        await page.keyboard.press('Enter');
+        await page.waitForSelector('.popup .cat-tag.gite', { timeout: 5000 });
+        await page.keyboard.press('Escape');
+
+        const violations = await page.evaluate(() => window.__violationsCsp);
+        assert.deepEqual([...violations, ...violationsCsp], [],
+          `Violations CSP sur le parcours (${vue}) : un style="…" fabriqué par le JS est refusé, utiliser style.setProperty.`);
+
+        // Un style refusé ne se voit pas : ici les cercles de la légende perdraient leur taille.
+        const largeurs = await page.evaluate(() => [...document.querySelectorAll('.cercle-repere')]
+          .map((e) => Number.parseFloat(getComputedStyle(e).width)));
+        assert.ok(largeurs.length >= 2, 'les cercles de repère de la légende sont absents');
+        assert.ok(largeurs.every((w, i) => w >= 14 && (i === 0 || w > largeurs[i - 1])),
+          `Les cercles de repère doivent grandir (obtenu : ${largeurs.join(', ')} px) : leur taille n'est pas appliquée.`);
+      } finally {
+        await contexte.close();
+      }
+    });
+  }
+});

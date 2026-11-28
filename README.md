@@ -216,9 +216,15 @@ Directive par directive, ce qui n'est pas évident :
   n'apparaît en console. Un test statique verrouille la directive.
 - **`img-src` garde `blob:`.** MapLibre décode certaines images PNG par une
   URL `blob:`.
-- **`style-src` garde `'unsafe-inline'`.** MapLibre pose des styles en ligne
-  sur ses marqueurs et ses popups ; l'interdire casse la carte. L'injection de
-  style est par ailleurs sans commune mesure avec celle de script.
+- **`style-src` n'autorise pas `'unsafe-inline'`.** MapLibre 6.20.0 écrit ses
+  styles par CSSOM (`el.style.x = …`), que la CSP autorise toujours : un
+  parcours complet sur Chromium, Firefox et WebKit ne produit aucune
+  violation. Ce qui est refusé, c'est un attribut `style="…"` injecté par
+  `innerHTML` ou `setAttribute('style', …)` : il est ignoré en silence. Pour
+  fixer une taille ou une couleur depuis le JS, poser une variable CSS avec
+  `style.setProperty` (exemple : `--taille-cercle` dans `symboles.js`). Un test
+  statique interdit ces attributs dans le code, un test de parcours écoute les
+  violations.
 - **`script-src` s'en passe**, parce que les deux anciens scripts inline ont
   été externalisés (`demarrer-accueil.js`, `demarrer-sortie.js`).
 - **`frame-ancestors` est absent volontairement** : la directive est ignorée

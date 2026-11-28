@@ -1247,6 +1247,36 @@ describe('Pages HTML', () => {
       assert.doesNotMatch(html, /jsdelivr/, `${lieu} : référence encore jsDelivr`);
     }
   });
+
+  // Le retrait de 'unsafe-inline' sur style-src (README, « La CSP ») vaut pour
+  // toute page publiée. redaction.html, qui contient un <style>, n'a pas de CSP :
+  // elle n'est pas publiée, ce que « les fichiers internes sont exclus de la
+  // publication » verrouille.
+  test('aucune page publiée n\'autorise unsafe-inline dans style-src', async () => {
+    for (const page of pages) {
+      const html = await lire(page);
+      const balise = /<meta\s+http-equiv="Content-Security-Policy"\s+content="([\s\S]*?)"\s*\/?>/.exec(html);
+      if (!balise) continue;
+      assert.doesNotMatch(balise[1], /style-src[^;]*unsafe-inline/,
+        `${page} : style-src autorise unsafe-inline (un style="…" injecté par le JS doit passer par style.setProperty)`);
+    }
+  });
+
+  // Sans 'unsafe-inline', un attribut style="…" est ignoré en silence : la
+  // légende proportionnelle passait de 18/30/52 px à 4 px sans la moindre erreur
+  // visible. On interdit donc ces attributs là où ils seraient fabriqués.
+  test('aucun attribut style="…" fabriqué par le JS ni écrit dans une page publiée', async () => {
+    const motif = /(?<![\w-])style\s*=\s*["'\\$]|setAttribute\(\s*['"]style['"]/;
+    for (const fichier of await readdir(join(RACINE, 'assets/js'))) {
+      const code = retirerCommentairesJS(await lire(`assets/js/${fichier}`));
+      assert.doesNotMatch(code, motif,
+        `assets/js/${fichier} fabrique un attribut style="…", refusé par la CSP : utiliser style.setProperty ou une classe`);
+    }
+    for (const page of pages) {
+      const html = (await lire(page)).replace(/<!--[\s\S]*?-->/g, '');
+      assert.doesNotMatch(html, /\sstyle\s*=\s*["']/, `${page} : attribut style="…" en dur, refusé par la CSP`);
+    }
+  });
 });
 
 describe('Ce que le site publie', () => {

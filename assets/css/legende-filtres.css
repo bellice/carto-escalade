@@ -343,8 +343,12 @@
    (comparaison de valeurs) — la couleur, qui varie selon le mode "Cercles",
    est déjà portée par la pastille "Falaises" dans .legende-cats. Mélanger
    les deux dans le même repère suggérerait à tort que la couleur varie
-   aussi avec la valeur. */
+   aussi avec la valeur. La taille vient de --taille-cercle, posée en CSSOM par
+   construireLegendeFalaises (symboles.js) ; 14px, soit deux fois le rayon
+   minimal, ne sert que de repli. */
 .cercle-repere {
+  width: var(--taille-cercle, 14px);
+  height: var(--taille-cercle, 14px);
   border-radius: 50%;
   background: none;
   border: 2px solid var(--muted);
