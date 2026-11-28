@@ -11,10 +11,14 @@
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const RACINE = fileURLToPath(new URL('..', import.meta.url));
+// SITE_RACINE : sert le dossier construit (outils/construire-site.js) au lieu du
+// dépôt, pour lancer les tests de parcours sur les fichiers réellement publiés.
+const RACINE = process.env.SITE_RACINE
+  ? resolve(process.env.SITE_RACINE) + sep
+  : fileURLToPath(new URL('..', import.meta.url));
 
 // Le type MIME des modules ES doit être un type JavaScript, sinon le
 // navigateur refuse de les exécuter (« strict MIME type checking »).

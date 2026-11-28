@@ -5,11 +5,14 @@
 // dizaines de millisecondes — il doit rester le filet qu'on lance sans y
 // penser, avant même d'ouvrir un navigateur.
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { construire, retirerCommentairesJS } from '../outils/construire-site.js';
 import {
   STYLES, deriverStyles, estDuStyle, valeurSelection, estFalaiseVideDansMode, statsSelection,
   compterCroiseDansFourchette, cotationVersValeur, approximerCotation,
@@ -1041,6 +1044,31 @@ describe('Pages HTML', () => {
     }
   });
 
+  test('chaque page publiée a un seul repère <main>', async () => {
+    for (const page of pages) {
+      const html = await lire(page);
+      const n = [...html.matchAll(/<main[\s>]/g)].length;
+      assert.equal(n, 1, `${page} : ${n} <main> (attendu 1)`);
+    }
+  });
+
+  // Les pages carte sont des copies les unes des autres : seuls le <title> et le
+  // <h1> portent le nom du lieu. Toute autre différence est une modification
+  // faite dans une page et oubliée dans les autres.
+  test('les pages carte ne diffèrent que par le titre et le <h1>', async () => {
+    const normalise = async (lieu) => (await lire(`${lieu}/index.html`))
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<title>[^<]*<\/title>/, '<title></title>')
+      .replace(/<h1 class="titre">.*<\/h1>/, '<h1></h1>')
+      .replace(/\s+/g, ' ');
+    const [reference, ...autres] = LIEUX;
+    const attendu = await normalise(reference);
+    for (const lieu of autres) {
+      assert.equal(await normalise(lieu), attendu,
+        `${lieu}/index.html diffère de ${reference}/index.html au-delà du titre et du <h1>`);
+    }
+  });
+
   // Sur CHAQUE page carte : un lieu dupliqué dont on aurait rogné la CSP en la
   // recopiant repartirait avec une carte vide, sans erreur visible.
   test('la CSP de chaque page carte autorise le worker MapLibre depuis le CDN', async () => {
@@ -1088,6 +1116,86 @@ describe('Ce que le site publie', () => {
     const exclus = LIEUX.filter((l) => new RegExp(`^\s*-\s*${l}/?\s*$`, 'm').test(conf));
     assert.deepEqual(exclus, [],
       `_config.yml exclut ${exclus.join(', ')} — ces cartes ne seraient plus publiées.`);
+  });
+});
+
+describe('Site construit (outils/construire-site.js)', () => {
+  let dossier;
+
+  before(async () => {
+    dossier = await mkdtemp(join(tmpdir(), 'site-'));
+    construire(RACINE, dossier);
+  });
+  after(() => rm(dossier, { recursive: true, force: true }));
+
+  const existe = (rel) => stat(join(dossier, rel)).then(() => true, () => false);
+
+  test('les fichiers internes ne sont pas publiés, le site si', async () => {
+    for (const rel of ['tests', 'outils', 'README.md', 'CLAUDE.md', 'package.json', '.github', '.git']) {
+      assert.equal(await existe(rel), false, `${rel} ne doit pas être publié`);
+    }
+    for (const rel of ['index.html', 'sw.js', 'manifest.webmanifest', '404.html', 'assets/style.css',
+      ...LIEUX.map((l) => `${l}/index.html`), ...LIEUX.map((l) => `${l}/data.geojson`)]) {
+      assert.equal(await existe(rel), true, `${rel} doit être publié`);
+    }
+  });
+
+  test('les données sont copiées à l\'octet près', async () => {
+    for (const lieu of LIEUX) {
+      const [source, publie] = await Promise.all([lire(`${lieu}/data.geojson`), readFile(join(dossier, lieu, 'data.geojson'), 'utf8')]);
+      assert.equal(publie, source, `${lieu}/data.geojson a été modifié par la construction`);
+    }
+  });
+
+  test('plus aucun commentaire dans le JS, le CSS et le HTML publiés', async () => {
+    const fichiers = [];
+    const parcourir = async (rel) => {
+      for (const e of await readdir(join(dossier, rel), { withFileTypes: true })) {
+        const chemin = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory()) await parcourir(chemin);
+        else if (/\.(js|css|html)$/.test(e.name)) fichiers.push(chemin);
+      }
+    };
+    await parcourir('');
+    assert.ok(fichiers.length > 10, 'aucun fichier à contrôler : la découverte est-elle cassée ?');
+    for (const f of fichiers) {
+      const texte = await readFile(join(dossier, f), 'utf8');
+      const motif = f.endsWith('.html') ? /<!--/ : /^\s*(\/\/|\/\*)/m;
+      assert.doesNotMatch(texte, motif, `${f} contient encore un commentaire`);
+    }
+  });
+
+  test('chaque JS publié reste syntaxiquement valide', async () => {
+    const tmp = join(dossier, '..', `verif-${process.pid}.mjs`);
+    try {
+      for (const rel of [...(await readdir(join(dossier, 'assets/js'))).map((f) => `assets/js/${f}`), 'sw.js']) {
+        await writeFile(tmp, await readFile(join(dossier, rel), 'utf8'));
+        assert.doesNotThrow(() => execFileSync(process.execPath, ['--check', tmp], { stdio: 'pipe' }),
+          `${rel} ne se compile plus après retrait des commentaires`);
+      }
+    } finally {
+      await rm(tmp, { force: true });
+    }
+  });
+
+  test('tout ce que le service worker pré-cache existe dans le site publié', async () => {
+    const sw = await readFile(join(dossier, 'sw.js'), 'utf8');
+    const locaux = [...sw.matchAll(/'\.\/([^']+)'/g)].map((m) => m[1]).filter((p) => !p.endsWith('/'));
+    for (const rel of locaux) assert.equal(await existe(rel), true, `${rel} est pré-caché mais absent du site publié`);
+  });
+
+  // Pièges de la découpe : une regex qui contient des guillemets, un // dans une
+  // chaîne ou un gabarit, une division que l'on prendrait pour une regex.
+  test('le retrait des commentaires JS respecte chaînes, gabarits et regex', () => {
+    const cas = [
+      ["const a = 'x//y'; // c\n", "const a = 'x//y';\n"],
+      ['s.replace(/[&<>"\']/g, "") // c\n', 's.replace(/[&<>"\']/g, "")\n'],
+      ['const t = `a // ${b /* c */} /* d */`;\n', 'const t = `a // ${b } /* d */`;\n'],
+      ['const r = a / b; // c\n', 'const r = a / b;\n'],
+      ['x();\n  // seul sur sa ligne\ny();\n', 'x();\ny();\n'],
+      ['if (/^\\d+$/.test(s)) return /a\\/b/.exec(s);\n', 'if (/^\\d+$/.test(s)) return /a\\/b/.exec(s);\n'],
+    ];
+    for (const [entree, attendu] of cas) assert.equal(retirerCommentairesJS(entree), attendu);
   });
 });
 

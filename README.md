@@ -26,7 +26,17 @@ assets/
                        inline : sans code inline, la CSP peut refuser
                        'unsafe-inline' (voir la meta dans les pages)
     sw-client.js     → enregistrement du service worker (garde-fou Vite)
-    carte.js         → initCarte(dataUrl), orchestration
+    carte.js         → initCarte(dataUrl) : chargement des données, création
+                       de la carte, câblage des modules ci-dessous
+    etat.js          → état partagé de la page (objet `etat`), constantes de zoom
+    visibilite.js    → filtres appliqués à la couche et aux marqueurs, parkings,
+                       surbrillance, libellés de site/secteur (anti-collision)
+    couche-falaises.js → couche native des cercles : source, couleur, légende
+    filtres.js       → réglages de la légende (pratique, type de voie, cotation,
+                       ensoleillement, trajet depuis le gîte), remise à zéro
+    navigation.js    → allerVers, fiche falaise, clic sur la carte, libellés
+                       cliquables, touche Échap
+    panneau-lateral.js → recherche, repli des filtres, bascule mobile Carte/Filtres
     carte-utils.js   → cadrage caméra, contrôle "Tout voir"
     marqueurs.js     → marqueurs DOM parking/gîte + popup native des falaises
     popups.js        → HTML des popups (rose des vents, beeswarm des voies, GPS...)
@@ -87,8 +97,17 @@ clavier pour y naviguer.
 ## Déployer sur GitHub Pages
 
 1. Créer un repo GitHub, pousser ce dossier tel quel.
-2. Paramètres du repo → Pages → Source : branche `main`, dossier `/ (root)`.
-3. Le site est en ligne à `https://<utilisateur>.github.io/<repo>/`.
+2. Paramètres du repo → Pages → Source : **GitHub Actions**.
+3. Chaque push sur `main` lance `.github/workflows/pages.yml` : tests
+   statiques, puis `outils/construire-site.js`, puis publication de `_site/`.
+4. Le site est en ligne à `https://<utilisateur>.github.io/<repo>/`.
+
+`npm run build` produit le même `_site/` en local. Il copie le dépôt sans les
+fichiers de `_config.yml` (liste `exclude`) et retire les commentaires du JS,
+du CSS et du HTML (environ 92 Ko sur le fil par visite, pour 41 Ko de code).
+Rien d'autre n'est transformé, et les données sont copiées à l'octet près. Pour
+lancer les tests de parcours sur ce qui est réellement publié :
+`SITE_RACINE=_site npm run test:parcours`.
 
 ### Domaine `tokelau.fr`
                                                 

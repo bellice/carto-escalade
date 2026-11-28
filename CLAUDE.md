@@ -12,9 +12,13 @@ protègent, pas ici.
   pastilles de couleur), jamais en pictogrammes.
 - **Cibles tactiles 44px minimum** sur pointeur grossier (`@media
   (pointer: coarse)`), partout où une action est cliquable.
-- **Site sans dépendance, sans étape de build.** Ce qui est dans le dépôt est
-  ce qui est servi à l'octet près (voir `_config.yml`). Pas de bundler, pas
-  de transpileur, pas de `node_modules` en production.
+- **Site sans dépendance.** Le dépôt est la source commentée. Le déploiement
+  (`.github/workflows/pages.yml`) retire les commentaires du JS, du CSS et du
+  HTML avec `outils/construire-site.js` (Node seul), et rien d'autre : pas de
+  bundler, pas de transpileur, pas de renommage, pas de `node_modules` en
+  production. Les exclusions sont dans `_config.yml`. Les commentaires pèsent
+  plus que le code sur le fil, d'où cette étape ; ils restent la
+  documentation du dépôt, on n'y renonce pas pour gagner des octets.
 - **Tests avant tout push.** `test:statique` (structure du dépôt,
   `_config.yml`, service worker, ~2 s) à chaque push. `test:parcours`
   (Playwright, bout en bout, ~3 min) dès que le push touche `assets/`, un
