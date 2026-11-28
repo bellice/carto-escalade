@@ -65,11 +65,13 @@ export function construireActionsSecondaires(liens) {
 // moment où on en a le plus besoin (double-vérifier ce qu'on vient de copier).
 export function boutonGps(lat, lon) {
   const valeur = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  return `<button type="button" class="gps-copie" data-lat="${lat}" data-lon="${lon}" aria-label="Copier les coordonnées GPS">
+  // <bouton-gps> (bouton-gps.js) ajoute la copie à ce <button> natif, qui reste
+  // focusable et activable au clavier tant que le composant n'est pas défini.
+  return `<bouton-gps lat="${lat}" lon="${lon}"><button type="button" class="gps-copie" aria-label="Copier les coordonnées GPS">
     <span class="gps-info">
       <span class="gps-label">GPS</span>
       <span class="gps-valeur">${valeur}</span>
     </span>
     <span class="gps-action">Copier</span>
-  </button>`;
+  </button></bouton-gps>`;
 }

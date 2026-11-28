@@ -1,6 +1,7 @@
 // actions-fiche.js — toutes les actions déclenchées DEPUIS le contenu d'une
 // fiche (popup mobile ou panneau desktop) : poignée, détail des voies, tri,
-// réessai, copie GPS, partage, navigation vers un secteur ou un parking.
+// réessai, partage, navigation vers un secteur ou un parking. La copie des
+// coordonnées GPS est le Custom Element <bouton-gps> (bouton-gps.js).
 //
 // UN SEUL écouteur délégué, posé une fois, qui retrouve sa cible par closest()
 // à chaque clic — plutôt que ré-attacher des écouteurs sur des nœuds précis à
@@ -77,23 +78,6 @@ export function cablerActionsFiche({
       if (popupEl && placeholder) {
         basculerTriDetailVoies(popupEl, placeholder.dataset.routeFalaise, btnTri.dataset.tri);
       }
-      return;
-    }
-
-    const gpsBtn = e.target.closest('.gps-copie');
-    if (gpsBtn) {
-      // Bascule le mot d'action, jamais la valeur : la laisser affichée pendant
-      // la confirmation permet de relire ce qu'on vient de copier.
-      const action = gpsBtn.querySelector('.gps-action');
-      const coords = `${Number(gpsBtn.dataset.lat).toFixed(5)}, ${Number(gpsBtn.dataset.lon).toFixed(5)}`;
-      navigator.clipboard.writeText(coords).then(() => {
-        if (action) action.textContent = 'Copié !';
-        gpsBtn.classList.add('copied');
-        setTimeout(() => {
-          if (action) action.textContent = 'Copier';
-          gpsBtn.classList.remove('copied');
-        }, DUREE_CONFIRMATION);
-      });
       return;
     }
 

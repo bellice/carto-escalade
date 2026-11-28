@@ -12,7 +12,7 @@ const CACHE_PREFIXE = 'sorties-escalade-v';
 // À bumper quand un module est ajouté à la coquille : un module absent du
 // cache fait échouer l'import au premier chargement hors ligne, et toute la
 // carte tombe. Le rafraîchissement paresseux ne le rattrape pas.
-const CACHE_NAME = `${CACHE_PREFIXE}13`;
+const CACHE_NAME = `${CACHE_PREFIXE}14`;
 
 // Cache SÉPARÉ du fond de carte, à ne surtout pas fusionner avec la coquille :
 // il n'est pas versionné par CACHE_NAME, sans quoi bumper la coquille pour
@@ -60,6 +60,7 @@ const PRECACHE = [
   './assets/js/popups.js',
   './assets/js/rose-des-vents.js',
   './assets/js/liens-acces.js',
+  './assets/js/bouton-gps.js',
   './assets/js/champs-fiche.js',
   './assets/js/histogramme.js',
   './assets/js/detail-voies.js',

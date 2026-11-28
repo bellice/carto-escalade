@@ -138,6 +138,20 @@
    peut aussi vouloir lire/noter sans rien coller ensuite. Le mot "Copier" à
    droite est un texte réel, pas juste un aria-label — une case grisée seule
    ne suffit pas à dire "on peut taper ici" (même leçon que .poignee-fiche). */
+/* <bouton-gps> (assets/js/bouton-gps.js) enveloppe le bouton : display: contents
+   lui retire sa boîte, la mise en page reste celle du bouton seul. */
+bouton-gps { display: contents; }
+/* Annonce pour les lecteurs d'écran, jamais affichée. */
+.visuellement-cache {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .popup .gps-copie {
   display: flex;
   align-items: center;

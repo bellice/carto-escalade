@@ -2120,3 +2120,159 @@ describe('CSP : aucun style refusé sur un parcours complet', () => {
     });
   }
 });
+
+// <bouton-gps> (assets/js/bouton-gps.js) : copie des coordonnées GPS d'une fiche.
+describe('Composant <bouton-gps>', () => {
+  const COORDONNEES = `${REPERES.lesRoches.coord[1].toFixed(5)}, ${REPERES.lesRoches.coord[0].toFixed(5)}`;
+
+  test('copie les coordonnées au clic, à Entrée et à Espace, et l\'annonce', { timeout: 120000 }, async () => {
+    const contexte = await navigateur.newContext({
+      viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'],
+    });
+    const page = await contexte.newPage();
+    const erreurs = [];
+    page.on('pageerror', (e) => erreurs.push(e.message));
+    try {
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      await ouvrirFalaise(page, REPERES.lesRoches);
+
+      const composant = page.locator('.popup bouton-gps').first();
+      const bouton = composant.locator('button.gps-copie');
+      const structure = await composant.evaluate((el) => ({
+        defini: customElements.get('bouton-gps') !== undefined,
+        ombre: el.shadowRoot,
+        parent: el.querySelector('button')?.parentElement.tagName,
+        valeur: el.querySelector('.gps-valeur').textContent,
+      }));
+      assert.equal(structure.defini, true, '<bouton-gps> doit être défini à l\'ouverture de la première fiche');
+      assert.equal(structure.ombre, null, 'Pas de Shadow DOM');
+      assert.equal(structure.parent, 'BOUTON-GPS', 'Le <button> natif doit être dans <bouton-gps>');
+      assert.equal(structure.valeur, COORDONNEES, 'La valeur affichée doit être les coordonnées de la falaise');
+
+      const action = () => page.evaluate(() => document.querySelector('.popup .gps-action').textContent);
+      const modes = [
+        ['clic', () => bouton.click()],
+        ['Entrée', async () => { await bouton.focus(); await page.keyboard.press('Enter'); }],
+        ['Espace', async () => { await bouton.focus(); await page.keyboard.press('Space'); }],
+      ];
+      for (const [mode, activer] of modes) {
+        await page.evaluate(() => navigator.clipboard.writeText('vide'));
+        await activer();
+        await page.waitForFunction(() => document.querySelector('.popup .gps-action').textContent === 'Copié !', null, { timeout: 3000 });
+        assert.equal(await page.evaluate(() => navigator.clipboard.readText()), COORDONNEES, `${mode} : le presse-papiers doit contenir les coordonnées`);
+        assert.equal(await bouton.evaluate((el) => el.classList.contains('copied')), true, `${mode} : état « copied » attendu`);
+        assert.equal(await page.evaluate(() => document.querySelector('.popup .gps-valeur').textContent), COORDONNEES,
+          `${mode} : la valeur doit rester affichée pendant la confirmation`);
+        // Annonce : une région role="status", car le nom du bouton (aria-label) ne change pas.
+        await page.waitForFunction(() => /copiées/.test(document.querySelector('.popup bouton-gps [role="status"]').textContent), null, { timeout: 3000 });
+        assert.ok((await composant.locator('[role="status"]').textContent()).includes(COORDONNEES), `${mode} : l'annonce doit citer les coordonnées`);
+        await page.waitForFunction(() => document.querySelector('.popup .gps-action').textContent === 'Copier', null, { timeout: 4000 });
+        assert.equal(await action(), 'Copier', `${mode} : le mot d'action doit revenir à « Copier »`);
+      }
+
+      // Focus au clavier : le même contour de 2 px que les autres boutons.
+      await bouton.focus();
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      const focus = await page.evaluate(() => {
+        const el = document.activeElement;
+        const cs = getComputedStyle(el);
+        return { estBouton: el.matches('bouton-gps > button.gps-copie'), style: cs.outlineStyle, largeur: cs.outlineWidth };
+      });
+      assert.equal(focus.estBouton, true, 'Le focus clavier doit atteindre le <button>');
+      assert.notEqual(focus.style, 'none', 'Le bouton focalisé doit avoir un contour visible');
+      assert.equal(focus.largeur, '2px', 'Contour de 2 px, comme les autres boutons');
+      assert.deepEqual(erreurs, [], 'Aucune erreur de page pendant la copie');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  // Amélioration progressive : le module est chargé par import() sans bloquer la
+  // carte. S'il manque (réseau), la carte démarre et le bouton reste un <button>
+  // natif, focusable, qui ne copie simplement pas.
+  test('sans le module du composant, la carte démarre et le bouton reste un bouton natif', { timeout: 120000 }, async () => {
+    const contexte = await navigateur.newContext({
+      viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'],
+    });
+    const page = await contexte.newPage();
+    const erreurs = [];
+    page.on('pageerror', (e) => erreurs.push(e.message));
+    try {
+      await page.route('**/assets/js/bouton-gps.js', (route) => route.abort());
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      await ouvrirFalaise(page, REPERES.lesRoches);
+
+      const bouton = page.locator('.popup bouton-gps button.gps-copie').first();
+      const etat = await page.evaluate(() => ({
+        defini: customElements.get('bouton-gps') !== undefined,
+        tag: document.querySelector('.popup bouton-gps button.gps-copie')?.tagName ?? null,
+        annonce: document.querySelector('.popup bouton-gps [role="status"]'),
+      }));
+      assert.equal(etat.defini, false, 'Le composant ne doit pas être défini : son module est bloqué');
+      assert.equal(etat.tag, 'BUTTON', 'Le bouton natif doit être présent sans le composant');
+      assert.equal(etat.annonce, null, 'Sans composant, aucune région d\'annonce');
+
+      await bouton.focus();
+      assert.equal(await page.evaluate(() => document.activeElement.matches('button.gps-copie')), true, 'Le bouton natif doit rester focusable');
+      await page.evaluate(() => navigator.clipboard.writeText('vide'));
+      await page.keyboard.press('Enter');
+      await bouton.click();
+      await page.waitForTimeout(400);
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'vide', 'Sans le composant, rien n\'est copié');
+      assert.equal(await page.evaluate(() => document.querySelector('.popup .gps-action').textContent), 'Copier', 'Aucune confirmation sans le composant');
+      assert.deepEqual(erreurs, [], 'Un clic sur le bouton natif ne doit produire aucune erreur');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  // Le module est importé sans bloquer la carte : une fiche peut s'ouvrir avant que
+  // <bouton-gps> soit défini. Le navigateur la met alors à niveau à la définition,
+  // sans customElements.upgrade ni réouverture de la fiche.
+  test('une fiche ouverte avant la définition du composant est mise à niveau ensuite', { timeout: 120000 }, async () => {
+    const contexte = await navigateur.newContext({
+      viewport: { width: 1280, height: 900 }, permissions: ['clipboard-read', 'clipboard-write'],
+    });
+    const page = await contexte.newPage();
+    const erreurs = [];
+    page.on('pageerror', (e) => erreurs.push(e.message));
+    try {
+      // Retard supérieur au temps de démarrage de la carte, pour que la fiche s'ouvre d'abord.
+      await page.route('**/assets/js/bouton-gps.js', async (route) => {
+        await new Promise((resoudre) => setTimeout(resoudre, 12000));
+        await route.continue();
+      });
+      await exposerCarte(page);
+      await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+      await attendreCarte(page);
+      await ouvrirFalaise(page, REPERES.lesRoches);
+
+      const avant = await page.evaluate(() => ({
+        defini: customElements.get('bouton-gps') !== undefined,
+        annonce: document.querySelector('.popup bouton-gps [role="status"]') !== null,
+      }));
+      assert.equal(avant.defini, false, 'Le test suppose la fiche ouverte avant la définition (retard insuffisant ?)');
+      assert.equal(avant.annonce, false, "Avant la définition, le bouton est natif : pas de région d'annonce");
+
+      const bouton = page.locator('.popup bouton-gps button.gps-copie').first();
+      await page.evaluate(() => navigator.clipboard.writeText('vide'));
+      await bouton.click();
+      await page.waitForTimeout(300);
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'vide', "Avant la définition, rien n'est copié");
+
+      await page.waitForFunction(() => customElements.get('bouton-gps') !== undefined, null, { timeout: 30000 });
+      await page.waitForFunction(() => document.querySelector('.popup bouton-gps [role="status"]') !== null, null, { timeout: 3000 });
+      await bouton.click();
+      await page.waitForFunction(() => document.querySelector('.popup .gps-action').textContent === 'Copié !', null, { timeout: 3000 });
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), COORDONNEES, 'Après la mise à niveau, la même fiche doit copier');
+      assert.deepEqual(erreurs, [], 'Aucune erreur de page');
+    } finally {
+      await contexte.close();
+    }
+  });
+});

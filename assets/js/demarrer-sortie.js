@@ -22,6 +22,10 @@ feuille.rel = 'stylesheet';
 feuille.href = new URL('../vendor/maplibre/maplibre-gl.css', import.meta.url).href;
 document.head.appendChild(feuille);
 
+// Composants : importés sans bloquer la carte. Si le module manque, les
+// boutons restent des <button> natifs, focusables, sans la copie.
+import('./bouton-gps.js').catch((erreur) => console.warn('bouton-gps indisponible :', erreur.message));
+
 const conteneur = document.getElementById('map');
 initCarte((conteneur && conteneur.dataset.donnees) || 'data.geojson');
 

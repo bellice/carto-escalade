@@ -1279,6 +1279,43 @@ describe('Pages HTML', () => {
   });
 });
 
+// Règle 4 du README (« Composants ») : Custom Elements natifs sans Shadow DOM par défaut.
+describe('Composants (Custom Elements)', () => {
+  const code = async (rel) => retirerCommentairesJS(await lire(rel));
+
+  test('<bouton-gps> vit dans un fichier dédié, sans Shadow DOM, et enveloppe un <button>', async () => {
+    const composant = await code('assets/js/bouton-gps.js');
+    assert.match(composant, /customElements\.define\(\s*['"]bouton-gps['"]/, 'bouton-gps.js doit définir <bouton-gps>');
+    assert.doesNotMatch(composant, /attachShadow|shadowRoot/,
+      'Pas de Shadow DOM : le composant dépend des feuilles globales (README, « Composants »)');
+    assert.match(composant, /querySelector\(\s*['"]button['"]\s*\)/,
+      'Le composant doit enrober un <button> déjà présent dans le HTML, pas simuler un bouton');
+    assert.match(await code('assets/js/liens-acces.js'), /<bouton-gps lat="[^"]*" lon="[^"]*"><button type="button" class="gps-copie"/,
+      'boutonGps() doit écrire un vrai <button> dans <bouton-gps>');
+    // Le comportement a quitté le répartiteur de clics : un second câblage copierait deux fois.
+    assert.doesNotMatch(await code('assets/js/actions-fiche.js'), /gps-copie/,
+      'actions-fiche.js ne doit plus câbler la copie GPS');
+  });
+
+  test('aucun Custom Element n\'utilise le Shadow DOM', async () => {
+    for (const nom of await readdir(join(RACINE, 'assets/js'))) {
+      const source = await code(`assets/js/${nom}`);
+      if (!/customElements\.define/.test(source)) continue;
+      assert.doesNotMatch(source, /attachShadow/,
+        `assets/js/${nom} : Shadow DOM interdit sauf si les quatre conditions du README (« Composants ») sont réunies`);
+    }
+  });
+
+  test('le composant est chargé sans bloquer la carte et préchargé par les pages', async () => {
+    assert.match(await code('assets/js/demarrer-sortie.js'), /import\(\s*['"]\.\/bouton-gps\.js['"]\s*\)/,
+      'demarrer-sortie.js doit importer le composant par import() : un import statique ferait tomber la carte si le module manque');
+    for (const lieu of LIEUX) {
+      assert.match(await lire(`${lieu}/index.html`), /rel="modulepreload" href="\.\.\/assets\/js\/bouton-gps\.js"/,
+        `${lieu} : préchargement de bouton-gps.js absent`);
+    }
+  });
+});
+
 // Les variables de design vivent dans assets/css/tokens.css (docs/architecture.md).
 describe('Jetons de design et seuil mobile', () => {
   const sansCommentairesCss = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');

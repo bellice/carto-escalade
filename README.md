@@ -53,6 +53,11 @@ réunies :
 
 En cas de doute, pas de Shadow DOM.
 
+Le premier composant est `<bouton-gps>` (`assets/js/bouton-gps.js`) : il
+enveloppe un vrai `<button>` écrit dans le HTML et lui ajoute la copie. Un
+composant vit à plat dans `assets/js/`, comme les autres modules : plusieurs
+tests lisent ce dossier sans descendre dans les sous-dossiers.
+
 ### Conventions de commit
 
 - Un commit par étape logique.
@@ -100,6 +105,7 @@ assets/
     popups.js        → assemble le HTML des 3 popups (falaise, parking, gîte)
     rose-des-vents.js → rose des vents SVG de l'orientation
     liens-acces.js   → itinéraire, bouton GPS, liens secondaires
+    bouton-gps.js    → Custom Element <bouton-gps> : copie des coordonnées GPS
     champs-fiche.js  → colonnes et lignes d'information de la fiche
     histogramme.js   → histogramme « 1 case = 1 voie » des cotations
     detail-voies.js  → liste détaillée des voies (tri cotation / position)
