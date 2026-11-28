@@ -1,5 +1,5 @@
 /* fiche-actions.css — listes de liens, itinéraire et GPS, topo papier, partage.
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 /* Liste de boutons .lien-secteur en flux (flex-wrap) : réutilisée pour la

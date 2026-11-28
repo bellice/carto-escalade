@@ -1,5 +1,5 @@
 /* mise-en-page.css — page carte : en-tête, panneaux gauche et droit, recherche.
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 /* ===== Map page ===== */
@@ -104,7 +104,7 @@
     background: var(--paper);
     border: 1px solid var(--stone-dark);
     border-radius: var(--radius);
-    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--ombre-panneau);
   }
 
   /* .recherche et .legende redeviennent des enfants de flux normal (plus de
@@ -203,7 +203,7 @@
     z-index: 10;
     background: var(--paper);
     border-left: 1px solid var(--stone-dark);
-    box-shadow: -3px 0 14px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--ombre-panneau-droit);
     transition: width 0.2s ease; /* même langage d'animation que le reste du site (ex. .legende-contenu.fiche-reduite mobile) */
   }
   #panneau-falaise.ouvert { width: var(--largeur-panneau-droit); }

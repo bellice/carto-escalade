@@ -1,5 +1,5 @@
 /* fiche.css — popup MapLibre, fiche technique, histogramme.
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 /* Popup MapLibre */
@@ -7,7 +7,7 @@
   background: var(--paper) !important;
   border-radius: var(--radius) !important;
   padding: 14px 16px !important;
-  box-shadow: 0 3px 14px rgba(0,0,0,0.18) !important;
+  box-shadow: var(--ombre-popup) !important;
   font-family: var(--font-body);
   max-width: 260px;
 }
@@ -81,7 +81,7 @@
   stroke-width: 1.5;
 }
 .rose-vents-pointe {
-  fill: #d8d4ca;
+  fill: var(--rose-pointe);
   opacity: 0.55;
 }
 .rose-vents-pointe-actif {

@@ -1,7 +1,7 @@
 /* noscript.css — repli des pages carte quand JavaScript est désactivé.
    Chargée par un <link> dans un <noscript> de l'en-tête : une balise <style>
    serait refusée par la CSP. Elle vient après toutes les autres feuilles, donc
-   à spécificité égale elle l'emporte. Dépend des jetons de style.css. Pas
+   à spécificité égale elle l'emporte. Dépend des jetons de tokens.css. Pas
    pré-cachée par le service worker, qui n'existe pas sans JavaScript. */
 
 /* Ce qui ne sert qu'avec JavaScript : panneau de filtres, bascule mobile,

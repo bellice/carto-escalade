@@ -22,3 +22,4 @@ exclude:
   - CLAUDE.md
   - charte-graphique.html
   - redaction.html
+  - docs/

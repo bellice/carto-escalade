@@ -1,5 +1,5 @@
 /* fiche-mobile.css — fiche mobile : feuille du bas.
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 /* ===== Fiche mobile : feuille du bas ===== */
@@ -30,7 +30,7 @@
     max-height: min(45vh, 380px);
     overflow-y: auto;
     padding-top: 34px !important;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25) !important;
+    box-shadow: var(--ombre-feuille) !important;
     transition: max-height 0.2s ease;
   }
   .maplibregl-popup-content.fiche-reduite {

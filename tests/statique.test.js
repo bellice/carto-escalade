@@ -103,7 +103,7 @@ function contraste(a, b) {
 }
 
 async function jetons() {
-  const css = await lire('assets/style.css');
+  const css = await lire('assets/css/tokens.css');
   const table = {};
   for (const [, nom, valeur] of css.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {
     table[nom] = valeur.toLowerCase();
@@ -768,7 +768,7 @@ describe('Lisibilité : échelle typographique', () => {
   // mais des minima retenus pour ce contexte : les repasser sous ces valeurs
   // doit être un choix explicite, pas une dérive.
   test('aucun palier ne repasse sous les minima retenus', async () => {
-    const css = await lire('assets/style.css');
+    const css = await lire('assets/css/tokens.css');
     const rem = (nom) => {
       const m = new RegExp(`--fs-${nom}:\\s*([\\d.]+)rem`).exec(css);
       assert.ok(m, `Palier --fs-${nom} introuvable`);
@@ -826,7 +826,7 @@ describe('Lisibilité : échelle typographique', () => {
   // l'en-tête la rendait fausse en silence.
   test("la hauteur d'en-tête est un jeton, pas une constante répétée", async () => {
     const carte = await lireCarteCss();
-    const base = await lire('assets/style.css');
+    const base = await lire('assets/css/tokens.css');
     assert.match(base, /--hauteur-entete:\s*\d+px/, 'Jeton --hauteur-entete absent');
     assert.match(carte, /\.map-header\s*\{[^}]*height:\s*var\(--hauteur-entete\)/,
       "L'en-tête doit être CONTRAINT à ce jeton (height), sinon son contenu peut le faire grandir.");
@@ -1279,6 +1279,67 @@ describe('Pages HTML', () => {
   });
 });
 
+// Les variables de design vivent dans assets/css/tokens.css (docs/architecture.md).
+describe('Jetons de design et seuil mobile', () => {
+  const sansCommentairesCss = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const feuilles = async () => (await readdir(join(RACINE, 'assets/css'))).filter((f) => f.endsWith('.css')).map((f) => `assets/css/${f}`);
+
+  test('tokens.css ne contient que des variables, aucune règle de style', async () => {
+    const css = sansCommentairesCss(await lire('assets/css/tokens.css'));
+    assert.equal(css.replace(/:root\s*\{[^}]*\}/g, '').trim(), '',
+      'tokens.css ne doit contenir que des variables dans :root, pas de règle de style');
+    const declarations = [...css.matchAll(/:root\s*\{([^}]*)\}/g)].flatMap((m) => m[1].split(';')).map((d) => d.trim()).filter(Boolean);
+    assert.ok(declarations.length >= 29, `tokens.css ne porte que ${declarations.length} variables`);
+    assert.deepEqual(declarations.filter((d) => !d.startsWith('--')), [], 'Seules des variables (--nom) sont permises dans tokens.css');
+  });
+
+  test('style.css ne définit aucune variable : elles vivent dans tokens.css', async () => {
+    const css = sansCommentairesCss(await lire('assets/style.css'));
+    assert.deepEqual([...css.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((m) => m[1]), [],
+      'Variable définie dans style.css : la déplacer dans assets/css/tokens.css');
+  });
+
+  // Une couleur écrite en dur échappe à tokens.css : changer la palette ou une ombre
+  // obligerait à la chercher dans chaque feuille.
+  test('aucune couleur en dur hors de tokens.css (hex, rgb, hsl, white, black)', async () => {
+    const motif = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(|(?<![\w-])(?:white|black)(?![\w-])/;
+    const fichiers = ['assets/style.css', ...(await feuilles()).filter((f) => !f.endsWith('tokens.css'))];
+    for (const fichier of fichiers) {
+      const css = sansCommentairesCss(await lire(fichier));
+      for (const [, valeur] of css.matchAll(/(?:^|[;{\s])[\w-]+\s*:\s*([^;{}]+)(?=[;}])/g)) {
+        assert.doesNotMatch(valeur, motif, `${fichier} : « ${valeur.trim()} » est une couleur en dur, la déclarer dans tokens.css`);
+      }
+    }
+  });
+
+  // Une variable n'est pas utilisable dans une @media : le seuil est écrit en dur à
+  // chaque endroit (tokens.css, docs/architecture.md). 641 complète 640 : max-width
+  // 640 et min-width 641 se partagent toutes les largeurs. Un autre seuil doit être
+  // décidé, documenté, puis ajouté ici.
+  test('le seuil de bascule mobile reste à 640 px (max-width) et 641 px (min-width)', async () => {
+    const trouvees = [];
+    for (const fichier of ['assets/style.css', ...(await feuilles())]) {
+      const css = sansCommentairesCss(await lire(fichier));
+      for (const media of css.matchAll(/@media[^{]*/g)) {
+        for (const [, sens, px] of media[0].matchAll(/\(\s*(max|min)-width\s*:\s*([\d.]+)px\s*\)/g)) trouvees.push({ fichier, sens, px: Number(px) });
+      }
+    }
+    for (const nom of await readdir(join(RACINE, 'assets/js'))) {
+      const fichier = `assets/js/${nom}`;
+      const code = retirerCommentairesJS(await lire(fichier));
+      for (const [, sens, px] of code.matchAll(/\(\s*(max|min)-width\s*:\s*([\d.]+)px\s*\)/g)) trouvees.push({ fichier, sens, px: Number(px) });
+    }
+    const attendu = { max: 640, min: 641 };
+    assert.deepEqual(trouvees.filter((t) => t.px !== attendu[t.sens]).map((t) => `${t.fichier} : ${t.sens}-width ${t.px}px`), [],
+      'Seuil divergent : 640 px pour max-width, 641 px pour min-width (voir docs/architecture.md)');
+    assert.ok(trouvees.some((t) => t.sens === 'max' && t.fichier.endsWith('.css')) && trouvees.some((t) => t.sens === 'min' && t.fichier.endsWith('.css'))
+      && trouvees.some((t) => t.fichier.endsWith('.js')), 'Le test ne trouve plus le seuil dans le CSS et le JS : son motif est à revoir');
+    const doc = await lire('docs/architecture.md');
+    const absents = [...new Set(trouvees.map((t) => t.fichier))].filter((f) => !doc.includes(f));
+    assert.deepEqual(absents, [], `docs/architecture.md ne cite pas : ${absents.join(', ')}`);
+  });
+});
+
 describe('Ce que le site publie', () => {
   // GitHub Pages sert la racine du dépôt telle quelle : /tests/parcours.test.js,
   // /package.json et /README.md répondaient 200 sur le site en ligne. Rien de
@@ -1286,7 +1347,7 @@ describe('Ce que le site publie', () => {
   // le verrouille, parce qu'un fichier retiré de la liste ne se voit pas.
   test('les fichiers internes sont exclus de la publication', async () => {
     const conf = await lire('_config.yml');
-    const attendus = ['tests/', 'outils/', 'package.json', 'package-lock.json', 'README.md', 'charte-graphique.html', 'redaction.html'];
+    const attendus = ['tests/', 'outils/', 'docs/', 'package.json', 'package-lock.json', 'README.md', 'charte-graphique.html', 'redaction.html'];
     const manquants = attendus.filter((f) => !conf.includes(f));
     assert.deepEqual(manquants, [],
       `_config.yml ne les exclut plus : ${manquants.join(', ')} — ils redeviendraient publics.`);

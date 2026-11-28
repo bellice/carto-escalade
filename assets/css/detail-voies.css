@@ -1,5 +1,5 @@
 /* detail-voies.css — détail des voies (drill-down).
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 /* ===== Détail des voies (drill-down depuis "Voir le détail des voies") :
@@ -102,7 +102,7 @@
   min-height: 44px;
   width: 100%;
   margin-top: 10px;
-  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--ombre-retour);
 }
 
 /* Grille (pas une simple liste flex) : chaque <li> passe en display:contents,
@@ -155,7 +155,7 @@
    listes (jusqu'à 40+ voies). Posé sur les cellules (pas .detail-voie-impaire
    directement, sans boîte propre en display:contents — un fond dessus
    n'aurait aucun effet visible). */
-.detail-voie-impaire > * { background: rgba(0, 0, 0, 0.03); }
+.detail-voie-impaire > * { background: var(--teinte-zebre); }
 .detail-voie-type { justify-content: center; }
 .detail-voie-nom { overflow-wrap: anywhere; }
 .detail-voie-cotation { font-family: var(--font-mono); color: var(--muted); }

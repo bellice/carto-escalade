@@ -67,13 +67,15 @@ sw.js                → service worker : pré-cache de la coquille + données,
                        stale-while-revalidate pour les deux + cache-first
                        pour les tuiles du fond (voir "Hors-ligne")
 assets/
-  style.css          → tokens (palette, polices) + page d'accueil uniquement
-  css/               → la page carte, en 10 feuilles par thème (marqueurs,
-                       légende et filtres, fiche, détail des voies, fiche
-                       mobile, impression...). L'ordre des <link> dans chaque
-                       page est l'ordre de la cascade : ne pas le changer.
-                       Séparées de style.css : la page d'accueil n'en a
-                       jamais besoin.
+  style.css          → styles de l'accueil et des pages simples (404, mentions
+                       légales, sources)
+  css/               → tokens.css (jetons de design, chargé en premier par toutes
+                       les pages), puis la page carte en 10 feuilles par thème
+                       (marqueurs, légende et filtres, fiche, détail des voies,
+                       fiche mobile, impression...) et noscript.css. L'ordre des
+                       <link> dans chaque page est l'ordre de la cascade : ne pas
+                       le changer. Séparées de style.css : la page d'accueil n'a
+                       pas besoin des feuilles de la carte.
   js/                → logique carte, en modules ES natifs (import/export,
                        aucun bundler) — chargés via <script type="module">
     demarrer-accueil.js → point d'entrée de la page d'accueil
@@ -109,6 +111,8 @@ assets/
                        de la zone (voir "Hors-ligne")
     utils.js         → escapeHtml (sûr en attribut) + urlSure (schémas
                        autorisés pour les href issus des données)
+docs/
+  architecture.md    → jetons de design, seuil de bascule mobile (640 px)
 vallee-drome-diois/          → un dossier par LIEU, pas par sortie : les falaises
                        ne bougent pas, la date et le gîte si
     index.html       → page carte de ce lieu

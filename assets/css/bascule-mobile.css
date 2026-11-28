@@ -1,5 +1,5 @@
 /* bascule-mobile.css — bascule mobile Carte / Filtres.
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 /* ===== Bascule mobile Carte/Filtres =====
@@ -74,7 +74,7 @@
     border-radius: var(--radius);
     background: var(--paper);
     color: var(--ink);
-    box-shadow: 0 1px 3px rgba(35, 42, 35, 0.18);
+    box-shadow: var(--ombre-bascule);
     font-family: var(--font-mono);
     font-size: var(--fs-sm);
     cursor: pointer;

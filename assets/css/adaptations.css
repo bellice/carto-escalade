@@ -1,5 +1,5 @@
 /* adaptations.css — impression, mouvement réduit, champs 16 px, survol, retour d'appui.
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 /* ===== Impression ===== */
@@ -165,7 +165,7 @@
     background: var(--forest);
   }
   .popup .lien-secteur:hover { color: var(--clay); }
-  .popup .parking-ligne:hover { background: rgba(0, 0, 0, 0.045); }
+  .popup .parking-ligne:hover { background: var(--teinte-survol); }
   .popup .parking-ligne:hover .parking-libelle { color: var(--clay); }
   .popup a.btn-primary:hover {
     background: var(--teal-dark);

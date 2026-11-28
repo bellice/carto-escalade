@@ -1,5 +1,5 @@
 /* controles.css — boutons à filet, chargement et erreur, hors ligne.
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 /* ===== La recette « bouton à filet » =====

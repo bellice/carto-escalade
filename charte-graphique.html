@@ -11,11 +11,12 @@
   feuilles de style (liens ci-dessous) plutôt que sur des valeurs recopiées :
   les couleurs affichent leur valeur réelle lue en JS (getComputedStyle), les
   échantillons de composants réutilisent les vraies classes CSS. Si un token
-  change dans assets/style.css, cette page suit automatiquement — seule
+  change dans assets/css/tokens.css, cette page suit automatiquement — seule
   l'AUDIT des tailles de police (section 2) est une liste figée à la main
   (elle documente un état constaté à une date donnée, pas une valeur vivante).
   À rouvrir/mettre à jour après un futur passage d'harmonisation des tailles.
 -->
+<link rel="stylesheet" href="assets/css/tokens.css" />
 <link rel="stylesheet" href="assets/style.css" />
 <link rel="stylesheet" href="assets/css/marqueurs.css" />
 <link rel="stylesheet" href="assets/css/mise-en-page.css" />
@@ -156,7 +157,7 @@
 
 <h1>Charte graphique</h1>
 <p class="intro">
-  Référence visuelle des tokens et composants définis dans <code>assets/style.css</code>
+  Référence visuelle des tokens et composants définis dans <code>assets/css/tokens.css</code> et <code>assets/style.css</code>
   et <code>assets/assets/css/</code>. Les couleurs et échantillons de composants
   ci-dessous sont rendus avec les vraies feuilles de style du site (pas des copies) —
   cette page suit automatiquement tout changement de <code>:root</code>.
@@ -327,7 +328,7 @@
 
 <footer>
   Généré manuellement — à mettre à jour si de nouveaux tokens ou composants
-  apparaissent dans assets/style.css ou assets/assets/css/.
+  apparaissent dans assets/css/tokens.css, assets/style.css ou assets/css/.
 </footer>
 
 <script>

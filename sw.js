@@ -12,7 +12,7 @@ const CACHE_PREFIXE = 'sorties-escalade-v';
 // À bumper quand un module est ajouté à la coquille : un module absent du
 // cache fait échouer l'import au premier chargement hors ligne, et toute la
 // carte tombe. Le rafraîchissement paresseux ne le rattrape pas.
-const CACHE_NAME = `${CACHE_PREFIXE}12`;
+const CACHE_NAME = `${CACHE_PREFIXE}13`;
 
 // Cache SÉPARÉ du fond de carte, à ne surtout pas fusionner avec la coquille :
 // il n'est pas versionné par CACHE_NAME, sans quoi bumper la coquille pour
@@ -27,6 +27,7 @@ const PRECACHE = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './assets/css/tokens.css',
   './assets/style.css',
   './assets/css/marqueurs.css',
   './assets/css/mise-en-page.css',

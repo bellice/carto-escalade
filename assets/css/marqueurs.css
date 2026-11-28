@@ -1,5 +1,5 @@
 /* marqueurs.css — marqueurs DOM (falaise, parking, gîte) et libellés de site et de secteur.
-   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   Dépend des jetons de tokens.css. L'ordre de chargement est l'ordre de la
    cascade : voir la liste des <link> dans chaque page. */
 
 .marqueur {
@@ -27,8 +27,8 @@
 .marqueur-visuel {
   display: block;
   pointer-events: none;
-  border: 2px solid white;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  border: 2px solid var(--blanc);
+  box-shadow: var(--ombre-marqueur);
   width: var(--diametre);
   height: var(--diametre);
 }
@@ -91,7 +91,7 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
-  background: rgba(251, 250, 246, 0.85);
+  background: var(--fond-label-site);
   padding: 1px 5px;
   border-radius: var(--radius-sm);
   white-space: nowrap;
@@ -118,7 +118,7 @@
   font-size: var(--fs-2xs);
   font-weight: 500;
   color: var(--muted);
-  background: rgba(251, 250, 246, 0.65);
+  background: var(--fond-label-secteur);
   padding: 2px 5px;
   border-radius: var(--radius-sm);
   /* Pas de nowrap : certains noms de secteur sont longs ("Champagne pour
