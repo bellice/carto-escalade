@@ -1437,8 +1437,8 @@ describe('Licences', () => {
   const sansRetours = (t) => t.replace(/\s+/g, ' ');
   const CLAUSE = 'Les noms de voies, cotations, longueurs, types de roche et orientations issus des topos cités dans sources.html ne sont pas couverts par cette licence. Ils restent sous les droits de leurs éditeurs respectifs.';
 
-  test('LICENSE : texte MIT, avec le copyright de Tokelau', async () => {
-    const t = await lire('LICENSE');
+  test('LICENSE.txt : texte MIT, avec le copyright de Tokelau', async () => {
+    const t = await lire('LICENSE.txt');
     assert.match(t, /^MIT License/);
     assert.match(t, /Copyright \(c\) \d{4}(-\d{4})? Tokelau/);
   });
@@ -1446,8 +1446,8 @@ describe('Licences', () => {
   // Les données de topo viennent en partie de topos et de sites tiers : la
   // licence ne couvre que ce que l'éditeur détient. Sans la clause, elle
   // prétendrait licencier des contenus qui ne sont pas à lui.
-  test("LICENSE-donnees : texte CC BY-NC-SA 4.0 complet et clause d'exclusion des topos", async () => {
-    const t = await lire('LICENSE-donnees');
+  test("LICENSE-donnees.txt : texte CC BY-NC-SA 4.0 complet et clause d'exclusion des topos", async () => {
+    const t = await lire('LICENSE-donnees.txt');
     assert.ok(t.includes('Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International\nPublic License'),
       'le texte légal CC BY-NC-SA 4.0 manque');
     assert.ok(t.includes('Section 8 -- Interpretation.'), 'le texte légal CC est tronqué');
@@ -1456,14 +1456,14 @@ describe('Licences', () => {
 
   test('mentions-legales.html cite les deux licences, et ces fichiers sont publiés', async () => {
     const page = await lire('mentions-legales.html');
-    for (const fichier of ['LICENSE', 'LICENSE-donnees']) {
+    for (const fichier of ['LICENSE.txt', 'LICENSE-donnees.txt']) {
       assert.ok(page.includes(`href="${fichier}"`), `mentions-legales.html ne renvoie plus vers ${fichier}`);
     }
     assert.ok(sansRetours(page).includes('ne sont pas couverts par cette licence'),
       "mentions-legales.html ne rappelle plus l'exclusion des contenus issus des topos");
     const conf = await lire('_config.yml');
     const exclusions = conf.split('\n').map((l) => l.trim());
-    for (const fichier of ['LICENSE', 'LICENSE-donnees']) {
+    for (const fichier of ['LICENSE.txt', 'LICENSE-donnees.txt']) {
       assert.ok(!exclusions.includes(`- ${fichier}`),
         `_config.yml exclut ${fichier} : le lien des mentions légales serait mort`);
     }
@@ -1480,7 +1480,7 @@ describe('Licences', () => {
   test('package.json et README déclarent la licence', async () => {
     assert.equal(JSON.parse(await lire('package.json')).license, 'MIT');
     const readme = await lire('README.md');
-    for (const fichier of ['LICENSE', 'LICENSE-donnees']) {
+    for (const fichier of ['LICENSE.txt', 'LICENSE-donnees.txt']) {
       assert.ok(readme.includes(`](${fichier})`), `README.md ne renvoie plus vers ${fichier}`);
     }
   });
