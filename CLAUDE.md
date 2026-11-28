@@ -17,7 +17,7 @@ protègent, pas ici.
   HTML avec `outils/construire-site.js` (Node seul), et rien d'autre : pas de
   bundler, pas de transpileur, pas de renommage, pas de `node_modules` en
   production. MapLibre est copié dans `assets/vendor/maplibre/` (jamais chargé
-  depuis un CDN), publié tel quel ; mise à jour : README. Les exclusions sont
+  depuis un CDN), publié tel quel ; mise à jour : docs/maplibre.md. Les exclusions sont
   dans `_config.yml`. Les commentaires pèsent
   plus que le code sur le fil, d'où cette étape ; ils restent la
   documentation du dépôt, on n'y renonce pas pour gagner des octets.
@@ -28,10 +28,10 @@ protègent, pas ici.
 
 ## Composants et JavaScript
 
-Texte complet : [README.md](README.md), section « Règles du projet ».
+Texte complet : [docs/regles.md](docs/regles.md).
 
 - **Custom Elements sans Shadow DOM par défaut.** Le Shadow DOM n'est permis
-  que si les conditions a à d du README sont réunies.
+  que si les conditions a à d de docs/regles.md sont réunies.
 - **Accueil fonctionnel sans JS.** Les pages carte font exception, documentée :
   `<noscript>` et liste statique des secteurs.
 

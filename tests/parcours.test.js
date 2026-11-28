@@ -187,7 +187,7 @@ describe('Fiche parking chargée', () => {
           // Distingué de "marqueur introuvable" (aucun parking_associe DU
           // TOUT dans ce data.geojson, PAS juste le plus fourni des deux qui
           // manquerait) : un lieu publié avant la fin de sa saisie peut
-          // légitimement n'avoir encore aucun parking (voir README.md,
+          // légitimement n'avoir encore aucun parking (voir docs/contribuer.md,
           // « Ajouter un lieu ») — rien à tester ici tant que ce n'est pas le
           // cas, mais un marqueur manquant pour un nom qui EXISTE dans les
           // données reste le bug qu'était ce test.
@@ -959,7 +959,7 @@ describe('Bouton Épurer', () => {
         // Les boutons Couenne/Grande voie se retirent tout seuls quand
         // aucune falaise n'a l'une ou l'autre donnée (voir carte.js,
         // auMoinsUneAvecType) — cas légitime d'un lieu publié avant la fin de
-        // sa saisie (voir README.md, « Ajouter un lieu »). Rien à composer
+        // sa saisie (voir docs/contribuer.md, « Ajouter un lieu »). Rien à composer
         // avec Épurer dans ce cas, ce test n'a pas d'autre objet.
         const aTypeVoie = await page.evaluate(() => Boolean(document.querySelector('[data-type-voie="gv"]')));
         if (!aTypeVoie) return;

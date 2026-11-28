@@ -212,7 +212,7 @@ describe('Lieux publiés', () => {
   });
 });
 
-// Un lieu peut être publié avant la fin de sa saisie (voir README.md,
+// Un lieu peut être publié avant la fin de sa saisie (voir docs/contribuer.md,
 // « Ajouter un lieu ») dès que ses falaises sont positionnées, sans attendre
 // voies ni parkings — repéré par l'absence totale de type_roche (la première
 // donnée de falaise.csv à manquer tant que le recensement n'est pas fini) OU
@@ -1116,7 +1116,7 @@ describe('Pages HTML', () => {
       'Lieu publié sans entrée dans outils/lieux.json, ou entrée sans data.geojson : sa page ne serait pas générée.');
   });
 
-  // Repli sans JavaScript (README, « Fonctionne sans JavaScript ») : chaque page
+  // Repli sans JavaScript (docs/regles.md, « Fonctionne sans JavaScript ») : chaque page
   // carte porte sa description et un <noscript> qui liste les secteurs du lieu.
   const decoderHtml = (texte) => texte.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 
@@ -1169,8 +1169,8 @@ describe('Pages HTML', () => {
   });
 
   // Garde-fou contre une réintroduction accidentelle de la mention d'attente.
-  test('le README ne dit plus que le repli sans JavaScript reste à écrire', async () => {
-    assert.doesNotMatch(await lire('README.md'), /repli reste à écrire/);
+  test('la documentation ne dit plus que le repli sans JavaScript reste à écrire', async () => {
+    assert.doesNotMatch(await lire('docs/regles.md'), /repli reste à écrire/);
   });
 
   // noscript.css ne sert que quand JavaScript est désactivé, cas où le service
@@ -1248,7 +1248,7 @@ describe('Pages HTML', () => {
     }
   });
 
-  // Le retrait de 'unsafe-inline' sur style-src (README, « La CSP ») vaut pour
+  // Le retrait de 'unsafe-inline' sur style-src (docs/architecture.md, « La CSP ») vaut pour
   // toute page publiée. redaction.html, qui contient un <style>, n'a pas de CSP :
   // elle n'est pas publiée, ce que « les fichiers internes sont exclus de la
   // publication » verrouille.
@@ -1279,7 +1279,7 @@ describe('Pages HTML', () => {
   });
 });
 
-// Règle 4 du README (« Composants ») : Custom Elements natifs sans Shadow DOM par défaut.
+// Règle 4 (docs/regles.md, « Composants ») : Custom Elements natifs sans Shadow DOM par défaut.
 describe('Composants (Custom Elements)', () => {
   const code = async (rel) => retirerCommentairesJS(await lire(rel));
 
@@ -1287,7 +1287,7 @@ describe('Composants (Custom Elements)', () => {
     const composant = await code('assets/js/bouton-gps.js');
     assert.match(composant, /customElements\.define\(\s*['"]bouton-gps['"]/, 'bouton-gps.js doit définir <bouton-gps>');
     assert.doesNotMatch(composant, /attachShadow|shadowRoot/,
-      'Pas de Shadow DOM : le composant dépend des feuilles globales (README, « Composants »)');
+      'Pas de Shadow DOM : le composant dépend des feuilles globales (docs/regles.md, « Composants »)');
     assert.match(composant, /querySelector\(\s*['"]button['"]\s*\)/,
       'Le composant doit enrober un <button> déjà présent dans le HTML, pas simuler un bouton');
     assert.match(await code('assets/js/liens-acces.js'), /<bouton-gps lat="[^"]*" lon="[^"]*"><button type="button" class="gps-copie"/,
@@ -1301,7 +1301,7 @@ describe('Composants (Custom Elements)', () => {
     const composant = await code('assets/js/poignee-fiche.js');
     assert.match(composant, /customElements\.define\(\s*['"]poignee-fiche['"]/, 'poignee-fiche.js doit définir <poignee-fiche>');
     assert.doesNotMatch(composant, /attachShadow|shadowRoot/,
-      'Pas de Shadow DOM : le composant dépend des feuilles globales (README, « Composants »)');
+      'Pas de Shadow DOM : le composant dépend des feuilles globales (docs/regles.md, « Composants »)');
     assert.match(composant, /querySelector\(\s*['"]button['"]\s*\)/,
       'Le composant doit enrober un <button> déjà présent dans le HTML, pas simuler un bouton');
     // Il observe, il ne décide pas : ni l'état partagé ni la classe de la fiche ne sont de son ressort.
@@ -1330,7 +1330,7 @@ describe('Composants (Custom Elements)', () => {
       const source = await code(`assets/js/${nom}`);
       if (!/customElements\.define/.test(source)) continue;
       assert.doesNotMatch(source, /attachShadow/,
-        `assets/js/${nom} : Shadow DOM interdit sauf si les quatre conditions du README (« Composants ») sont réunies`);
+        `assets/js/${nom} : Shadow DOM interdit sauf si les quatre conditions de docs/regles.md (« Composants ») sont réunies`);
     }
   });
 

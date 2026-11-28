@@ -1,7 +1,139 @@
 # Architecture
 
 Notes de conception qui ne tiennent pas dans un commentaire de code. Les règles
-du projet sont dans [`CLAUDE.md`](../CLAUDE.md) et le [README](../README.md).
+du projet sont dans [`CLAUDE.md`](../CLAUDE.md) et [regles.md](regles.md).
+
+## Structure
+
+```
+index.html          → page d'accueil, liste des lieux
+sw.js                → service worker : pré-cache de la coquille + données,
+                       stale-while-revalidate pour les deux + cache-first
+                       pour les tuiles du fond (voir hors-ligne.md)
+assets/
+  style.css          → styles de l'accueil et des pages simples (404, mentions
+                       légales, sources)
+  css/               → tokens.css (jetons de design, chargé en premier par toutes
+                       les pages), puis la page carte en 10 feuilles par thème
+                       (marqueurs, légende et filtres, fiche, détail des voies,
+                       fiche mobile, impression...) et noscript.css. L'ordre des
+                       <link> dans chaque page est l'ordre de la cascade : ne pas
+                       le changer. Séparées de style.css : la page d'accueil n'a
+                       pas besoin des feuilles de la carte.
+  js/                → logique carte, en modules ES natifs (import/export,
+                       aucun bundler) — chargés via <script type="module">
+    demarrer-accueil.js → point d'entrée de la page d'accueil
+    demarrer-sortie.js  → point d'entrée d'une page sortie (initCarte + SW).
+                       Ces deux fichiers remplacent les anciens <script>
+                       inline : sans code inline, la CSP peut refuser
+                       'unsafe-inline' (voir la meta dans les pages)
+    sw-client.js     → enregistrement du service worker (garde-fou Vite)
+    carte.js         → initCarte(dataUrl) : chargement des données, création
+                       de la carte, câblage des modules ci-dessous
+    etat.js          → état partagé de la page (objet `etat`), constantes de zoom
+    visibilite.js    → filtres appliqués à la couche et aux marqueurs, parkings,
+                       surbrillance, libellés de site/secteur (anti-collision)
+    couche-falaises.js → couche native des cercles : source, couleur, légende
+    filtres.js       → réglages de la légende (pratique, type de voie, cotation,
+                       ensoleillement, trajet depuis le gîte), remise à zéro
+    navigation.js    → allerVers, fiche falaise, clic sur la carte, libellés
+                       cliquables, touche Échap
+    panneau-lateral.js → recherche, repli des filtres, bascule mobile Carte/Filtres
+    carte-utils.js   → cadrage caméra, contrôle "Tout voir"
+    marqueurs.js     → marqueurs DOM parking/gîte + popup native des falaises
+    popups.js        → assemble le HTML des 3 popups (falaise, parking, gîte)
+    rose-des-vents.js → rose des vents SVG de l'orientation
+    liens-acces.js   → itinéraire, bouton GPS, liens secondaires
+    bouton-gps.js    → Custom Element <bouton-gps> : copie des coordonnées GPS
+    poignee-fiche.js → Custom Element <poignee-fiche> : poignée de repli de la fiche mobile
+    champs-fiche.js  → colonnes et lignes d'information de la fiche
+    histogramme.js   → histogramme « 1 case = 1 voie » des cotations
+    detail-voies.js  → liste détaillée des voies (tri cotation / position)
+    symboles.js      → cercles proportionnels : construireSourceFalaises +
+                       couleurFalaisePourMode (couche native), légende
+    labels.js        → libellés de site/secteur sur la carte
+    donnees.js       → lecture GeoJSON, agrégats, prédicats de visibilité
+    hors-ligne.js    → « Préparer le hors-ligne » : pré-chargement des tuiles
+                       de la zone (voir hors-ligne.md)
+    utils.js         → escapeHtml (sûr en attribut) + urlSure (schémas
+                       autorisés pour les href issus des données)
+docs/
+  regles.md          → règles du projet : repli sans JavaScript, Custom Elements
+  contribuer.md      → conventions de commit, ajouter un lieu
+  maplibre.md        → mise à jour de MapLibre
+  architecture.md    → structure, rendu des falaises, CSP, jetons de design,
+                       seuil de bascule mobile (640 px), limites de mesure
+                       (cache, service worker, WebKit)
+  tests.md           → lancer les tests, ce qu'ils couvrent
+  deploiement.md     → GitHub Pages, domaine tokelau.fr
+  donnees.md         → schéma de data.geojson
+  hors-ligne.md      → service worker, « Préparer le hors-ligne », fond de carte
+vallee-drome-diois/          → un dossier par LIEU, pas par sortie : les falaises
+                       ne bougent pas, la date et le gîte si
+    index.html       → page carte de ce lieu
+    data.geojson     → falaises + parkings, version LÉGÈRE (sans le détail des
+                       voies, compteurs précalculés) — généré depuis une base DuckDB
+    routes/          → détail des voies, 1 fichier par SITE (chargé à la
+                       demande à l'ouverture de la popup d'une de ses falaises)
+```
+
+`maplibre-gl` 6.20.0 est copié dans `assets/vendor/maplibre/` (voir [Mise à
+jour de MapLibre](maplibre.md)), servi par le site et **pré-caché par le service worker**.
+
+## Rendu des falaises (couche native, phase 3)
+
+Les falaises ne sont **pas** des marqueurs DOM mais une **couche MapLibre**
+(`circle` data-driven, source geojson `falaises` avec `promoteId: 'cle'`) :
+rendu GPU, conçu pour passer à l'échelle (milliers de falaises). La source
+est reconstruite par `construireSourceFalaises()` (symboles.js) — tri par
+valeur décroissante, exclusion des falaises vidées par le mode « Cercles » —
+et les filtres recherche/gîte passent par `map.setFilter`. La surbrillance
+(estompage des autres falaises quand une popup est ouverte) utilise
+`setFeatureState` (`circle-opacity` data-driven). Parkings et gîte restent
+des marqueurs DOM ; les falaises se dessinent donc SOUS eux (même ordre de
+lecture qu'avant).
+
+Trade-off assumé : les falaises ne sont plus focusables au clavier (canvas
+MapLibre) — la recherche (champ « Rechercher une falaise ») reste le chemin
+clavier pour y naviguer.
+
+## La CSP, et pourquoi elle est en `<meta>`
+
+GitHub Pages n'autorise aucun en-tête HTTP personnalisé : la politique est
+donc déclarée en `<meta http-equiv>` dans chaque page. C'est de la défense en
+profondeur — le site construit du HTML à partir des données (`innerHTML` dans
+`popups.js`) ; si une valeur douteuse franchissait un jour `escapeHtml` /
+`urlSure` (`utils.js`), la CSP empêcherait encore l'exécution.
+
+Directive par directive, ce qui n'est pas évident :
+
+- **Aucune origine de CDN.** MapLibre est servi par le site
+  (`assets/vendor/maplibre/`), donc `script-src`, `style-src`, `connect-src`,
+  `worker-src` et `child-src` n'en citent aucune. La seule origine tierce
+  restante est `tiles.openfreemap.org` (tuiles et style du fond de carte).
+- **`worker-src` est `'self'` seul.** MapLibre charge
+  `maplibre-gl-worker.mjs` depuis son URL de même origine, sans blob. Une
+  directive trop stricte laisse la carte **vide et silencieuse** : une
+  violation CSP survenue dans un worker ne remonte pas au document, donc rien
+  n'apparaît en console. Un test statique verrouille la directive.
+- **`img-src` garde `blob:`.** MapLibre décode certaines images PNG par une
+  URL `blob:`.
+- **`style-src` n'autorise pas `'unsafe-inline'`.** MapLibre 6.20.0 écrit ses
+  styles par CSSOM (`el.style.x = …`), que la CSP autorise toujours : un
+  parcours complet sur Chromium, Firefox et WebKit ne produit aucune
+  violation. Ce qui est refusé, c'est un attribut `style="…"` injecté par
+  `innerHTML` ou `setAttribute('style', …)` : il est ignoré en silence. Pour
+  fixer une taille ou une couleur depuis le JS, poser une variable CSS avec
+  `style.setProperty` (exemple : `--taille-cercle` dans `symboles.js`). Un test
+  statique interdit ces attributs dans le code, un test de parcours écoute les
+  violations.
+- **`script-src` s'en passe**, parce que les deux anciens scripts inline ont
+  été externalisés (`demarrer-accueil.js`, `demarrer-sortie.js`).
+- **`frame-ancestors` est absent volontairement** : la directive est ignorée
+  en `<meta>` (elle exige un vrai en-tête). L'anti-clickjacking reste donc
+  hors de portée ici.
+- La page d'accueil, purement statique, applique une politique plus stricte
+  encore : aucune origine tierce.
 
 ## Jetons de design
 
