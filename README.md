@@ -15,9 +15,12 @@ sw.js                → service worker : pré-cache de la coquille + données,
                        pour les tuiles du fond (voir "Hors-ligne")
 assets/
   style.css          → tokens (palette, polices) + page d'accueil uniquement
-  style-carte.css    → marqueurs, popups, légende, feuille mobile, impression
-                       (séparé de style.css : la page d'accueil n'en a jamais
-                       besoin, pas de raison de le lui faire charger)
+  css/               → la page carte, en 10 feuilles par thème (marqueurs,
+                       légende et filtres, fiche, détail des voies, fiche
+                       mobile, impression...). L'ordre des <link> dans chaque
+                       page est l'ordre de la cascade : ne pas le changer.
+                       Séparées de style.css : la page d'accueil n'en a
+                       jamais besoin.
   js/                → logique carte, en modules ES natifs (import/export,
                        aucun bundler) — chargés via <script type="module">
     demarrer-accueil.js → point d'entrée de la page d'accueil
@@ -39,7 +42,12 @@ assets/
     panneau-lateral.js → recherche, repli des filtres, bascule mobile Carte/Filtres
     carte-utils.js   → cadrage caméra, contrôle "Tout voir"
     marqueurs.js     → marqueurs DOM parking/gîte + popup native des falaises
-    popups.js        → HTML des popups (rose des vents, beeswarm des voies, GPS...)
+    popups.js        → assemble le HTML des 3 popups (falaise, parking, gîte)
+    rose-des-vents.js → rose des vents SVG de l'orientation
+    liens-acces.js   → itinéraire, bouton GPS, liens secondaires
+    champs-fiche.js  → colonnes et lignes d'information de la fiche
+    histogramme.js   → histogramme « 1 case = 1 voie » des cotations
+    detail-voies.js  → liste détaillée des voies (tri cotation / position)
     symboles.js      → cercles proportionnels : construireSourceFalaises +
                        couleurFalaisePourMode (couche native), légende
     labels.js        → libellés de site/secteur sur la carte
@@ -208,7 +216,7 @@ cartes, et `--lieu` ne nommait que le dossier de destination.
 
    **Pourquoi deux libellés.** L'en-tête de la carte affiche le nom complet à
    partir de 641px et la forme courte en dessous (voir `.titre-long` dans
-   `style-carte.css`). Le titre y dispose de la largeur de l'écran moins 243px,
+   `assets/css/`). Le titre y dispose de la largeur de l'écran moins 243px,
    une fois retranchés le lien de retour et le bouton « Préparer » à son
    libellé le plus large — soit ~400px au seuil de bascule. Un nom qui n'y
    tient pas fait échouer un test navigateur, qui dit lequel raccourcir.
@@ -290,7 +298,7 @@ et `routes` (id_falaise si la falaise a des voies sportives, sinon `null`).
 > « Paroi 350 m » dès qu'une grande voie existe. Un libellé unique induirait en
 > erreur sur du matériel de sécurité ; deux tests statiques et un test
 > navigateur interdisent de les fusionner. Voir `colonneHauteur()` dans
-> `popups.js`.
+> `champs-fiche.js`.
 
 `cotations` est un résumé compact `{cotation: nombre de voies}` des voies
 **sportives** de la falaise, cotations laissées **brutes** (les formes non

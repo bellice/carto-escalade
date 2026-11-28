@@ -7,7 +7,7 @@
   /* Variante foncée de --forest, sur le modèle de --clay-dark / --teal-dark
      qui existaient déjà : --forest était le seul accent sans la sienne. Sert
      l'état pressé des boutons PLEINS (voir « Retour d'appui » dans
-     style-carte.css), qui doivent s'assombrir là où un bouton à filet
+     assets/css/), qui doivent s'assombrir là où un bouton à filet
      s'assombrit vers --stone-dark. Le texte posé dessus reste --paper. */
   --forest-dark: #233829;
   --clay: #a8452f;
@@ -26,7 +26,7 @@
      échangerait un critère contre l'autre. La distinction reste portée par
      la couleur seule (variable visuelle correcte pour une différence de
      nature) ; sa redondance est textuelle, dans l'aria-label de
-     l'histogramme (voir construireHistogramme, popups.js). */
+     l'histogramme (voir construireHistogramme, histogramme.js). */
   --couenne: #b8872b;
   /* Vert « c'est fait » : seul usage restant, le bouton Préparer une fois la
      sortie enregistrée hors ligne (.btn-preparer.pret). Servait auparavant au
@@ -114,7 +114,7 @@ a:visited { color: var(--forest); }
 /* Repli de focus clavier pour tout le site. Il n'y en avait aucun ici : les
    pages héritaient du contour par défaut du navigateur, 1px, qui se perd sur
    un fond de carte chargé. Reprend la convention déjà posée au cas par cas
-   dans style-carte.css (marqueurs, libellés de site, champ de recherche) :
+   dans assets/css/ (marqueurs, libellés de site, champ de recherche) :
    2px --forest. Les règles plus spécifiques de cette feuille continuent de
    primer, celle-ci ne fait que combler les trous. */
 :focus-visible {
@@ -367,7 +367,7 @@ a:visited { color: var(--forest); }
 }
 
 /* Réservé aux pointeurs qui survolent réellement — sur tactile, :hover ne se
-   "désenclenche" jamais après un tap (même raison que style-carte.css). */
+   "désenclenche" jamais après un tap (même raison que assets/css/). */
 @media (hover: hover) {
   /* Fond de ligne (pas de couleur de texte) : aide à suivre le titre jusqu'au
      lien d'achat qui s'en écarte en colonne large — ne doit pas se lire comme

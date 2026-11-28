@@ -37,7 +37,7 @@ export function enSurbrillance(cles) {
 function entreeVisible(entree) {
   if (entree.cat === 'falaise') return etat.falaisesVisibles.has(entree.cle);
   const el = entree.marker && entree.marker.getElement();
-  return Boolean(el && el.style.display !== 'none');
+  return Boolean(el && !el.classList.contains('masque'));
 }
 
 // Point de passage unique pour appliquerFiltres (recherche/mode/sélection) :
@@ -55,7 +55,7 @@ export function appliquerFiltresEtSecteurs() {
   rafraichirDetailVoies();
 }
 
-// Résumé vivant en tête du panneau "Filtres" mobile (voir style-carte.css,
+// Résumé vivant en tête du panneau "Filtres" mobile (voir assets/css/,
 // #legende-resultat) : falaisesVisibles est déjà tenue à jour par
 // appliquerFiltres juste au-dessus, aucun nouveau calcul nécessaire.
 function rafraichirResumeResultats() {
@@ -82,7 +82,7 @@ export function appliquerVisibiliteSecteurs() {
   if (visible === etat.secteursVisibles) return;
   etat.secteursVisibles = visible;
   if (!visible) {
-    etat.labelsSecteurs.forEach(({ el }) => { el.style.visibility = 'hidden'; });
+    etat.labelsSecteurs.forEach(({ el }) => el.classList.add('masque'));
   } else {
     appliquerAntiCollisionSecteurs();
   }
@@ -101,7 +101,7 @@ export function appliquerVisibiliteSites() {
   if (visible === etat.sitesVisibles) return;
   etat.sitesVisibles = visible;
   if (!visible) {
-    etat.labelsSites.forEach(({ el }) => { el.style.visibility = 'hidden'; });
+    etat.labelsSites.forEach(({ el }) => el.classList.add('masque'));
   } else {
     appliquerAntiCollisionSites();
   }
@@ -109,15 +109,15 @@ export function appliquerVisibiliteSites() {
 
 // Décollision au pixel, partagée entre libellés de secteur et de site. Les
 // labels arrivent déjà triés par priorité ; à conflit, le premier retenu
-// gagne. visibility et non display : garde le DOM mesurable, sinon le
-// calcul suivant serait faussé.
+// gagne. .masque pose visibility et non display : garde le DOM mesurable,
+// sinon le calcul suivant serait faussé.
 function appliquerAntiCollision(labels, entriesParGroupe, cleDe) {
   const retenus = [];
   labels.forEach((label) => {
     const { el, marker } = label;
     const entreesDuGroupe = entriesParGroupe.get(cleDe(label)) || [];
     if (!entreesDuGroupe.some(entreeVisible)) {
-      el.style.visibility = 'hidden';
+      el.classList.add('masque');
       return;
     }
     const point = etat.map.project(marker.getLngLat());
@@ -128,7 +128,7 @@ function appliquerAntiCollision(labels, entriesParGroupe, cleDe) {
       rect.left < r.right + 4 && rect.right > r.left - 4 &&
       rect.top < r.bottom + 2 && rect.bottom > r.top - 2
     );
-    el.style.visibility = chevauche ? 'hidden' : 'visible';
+    el.classList.toggle('masque', chevauche);
     if (!chevauche) retenus.push(rect);
   });
 }
@@ -174,7 +174,7 @@ export function appliquerVisibiliteParkings() {
 
   etat.entries.forEach((entree) => {
     if (entree.cat !== 'parking') return;
-    entree.marker.getElement().style.display = (montrerParkings && aMontrer.has(entree.nom)) ? '' : 'none';
+    entree.marker.getElement().classList.toggle('masque', !(montrerParkings && aMontrer.has(entree.nom)));
   });
 }
 

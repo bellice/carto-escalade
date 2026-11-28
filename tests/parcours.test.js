@@ -226,7 +226,7 @@ describe('Fiche parking chargée', () => {
 
 // WCAG 2.5.8 : 24px minimum pour une cible de pointage. Le site s'impose 44px
 // AU DOIGT — c'est une contrainte tactile, pas universelle (voir le
-// commentaire du bloc @media (pointer: coarse) dans style-carte.css), d'où la
+// commentaire du bloc @media (pointer: coarse) dans assets/css/), d'où la
 // mesure en contexte tactile.
 // Défaut réel : « ← Accueil », seule sortie de la carte, faisait 74x16 — la
 // plus petite cible de la page, à côté d'un bouton « Préparer » à 44px.
@@ -253,7 +253,7 @@ describe('Cibles tactiles', () => {
             // équivalent » de WCAG 2.5.8 : la recherche centre sur un site
             // aussi bien qu'eux, et elle est conforme. Les agrandir captait
             // les clics destinés aux falaises en dessous — mesuré, 8 points
-            // sur 20. Voir le commentaire de .label-site dans style-carte.css.
+            // sur 20. Voir le commentaire de .label-site dans assets/css/.
             // Idem pour les noms de secteur, cliquables comme .label-site
             // depuis peu : même exception « contrôle équivalent » — la
             // recherche trouve aussi un secteur par nom et son bouton
@@ -317,7 +317,7 @@ describe('Nom du lieu selon la largeur', () => {
           if (largeur === 641) {
             assert.equal(r.tronque, false,
               `${lieu} : « ${r.texte} » est tronqué à 641px, la largeur la plus étroite où le nom ` +
-              "complet s'affiche. Raccourcir ce nom, ou relever le seuil dans style-carte.css.");
+              "complet s'affiche. Raccourcir ce nom, ou relever le seuil dans assets/css/.");
           }
         } finally {
           await contexte.close();
@@ -1035,7 +1035,7 @@ describe('Légende sur mobile', () => {
         await page.waitForTimeout(2500);
 
         // Sur mobile, #legende-contenu n'existe visuellement que dans le
-        // panneau "Filtres" plein écran (voir style-carte.css) — l'atteindre
+        // panneau "Filtres" plein écran (voir assets/css/) — l'atteindre
         // avant de mesurer, sinon scrollWidth/clientWidth valent 0 tous les
         // deux (élément non rendu) et le test ne vérifie plus rien.
         if (vue.tactile) await page.click('#btn-vue-filtres');
@@ -1206,7 +1206,7 @@ describe('Cibles tactiles', () => {
   // répond au doigt (elementFromPoint, du centre vers les bords), pas la boîte :
   // plusieurs cibles s'étendent par pseudo-élément sans changer la mise en page.
   // Mesure au pixel entier : une zone de 44px sort à 43 ou 44.
-  // Exceptions documentées dans style-carte.css (WCAG 2.5.8) : étiquettes de
+  // Exceptions documentées dans assets/css/ (WCAG 2.5.8) : étiquettes de
   // sites et de secteurs, champ de recherche et « Voir ».
   const MIN = 43;
   const zone = (page, sel) => page.evaluate((s) => {
@@ -1312,7 +1312,7 @@ describe('Fiche falaise', () => {
       const cotation = await page.evaluate(() => ({
         // Scopé à .detail-voies-tri : .btn-tri-voies est aussi la classe des
         // boutons "Type de voie" de la légende (même grammaire visuelle,
-        // voir style-carte.css) — un querySelector non scopé risquerait de
+        // voir assets/css/) — un querySelector non scopé risquerait de
         // retomber sur eux plutôt que sur le tri de CETTE fiche.
         actif: document.querySelector('.detail-voies-tri .btn-tri-voies.actif')?.dataset.tri,
         sousLignes: document.querySelectorAll('.detail-voie-longueur').length,
@@ -1327,7 +1327,7 @@ describe('Fiche falaise', () => {
       const position = await page.evaluate(() => ({
         // Scopé à .detail-voies-tri : .btn-tri-voies est aussi la classe des
         // boutons "Type de voie" de la légende (même grammaire visuelle,
-        // voir style-carte.css) — un querySelector non scopé risquerait de
+        // voir assets/css/) — un querySelector non scopé risquerait de
         // retomber sur eux plutôt que sur le tri de CETTE fiche.
         actif: document.querySelector('.detail-voies-tri .btn-tri-voies.actif')?.dataset.tri,
         sousLignes: document.querySelectorAll('.detail-voie-longueur').length,
@@ -1476,7 +1476,7 @@ describe('Navigation directe', () => {
 
       const site = await page.evaluate(() => {
         const el = Array.from(document.querySelectorAll('.label-site'))
-          .find((e) => e.style.visibility !== 'hidden' && e.offsetWidth > 0);
+          .find((e) => !e.classList.contains('masque') && e.offsetWidth > 0);
         return el ? el.textContent : null;
       });
       assert.ok(site, 'Aucun nom de site visible en vue d ensemble');
@@ -1527,7 +1527,7 @@ describe('Navigation directe', () => {
 
       const trouve = await page.evaluate((nom) => {
         const el = Array.from(document.querySelectorAll('.label-secteur'))
-          .find((e) => e.textContent === nom && e.style.visibility !== 'hidden' && e.offsetWidth > 0);
+          .find((e) => e.textContent === nom && !e.classList.contains('masque') && e.offsetWidth > 0);
         return el ? el.getAttribute('role') : null;
       }, REPERES.lesRoches.nom);
       assert.equal(trouve, 'button', `Étiquette « ${REPERES.lesRoches.nom} » introuvable, masquée, ou sans role=button`);

@@ -1,0 +1,385 @@
+/* fiche.css — popup MapLibre, fiche technique, histogramme.
+   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   cascade : voir la liste des <link> dans chaque page. */
+
+/* Popup MapLibre */
+.maplibregl-popup-content {
+  background: var(--paper) !important;
+  border-radius: var(--radius) !important;
+  padding: 14px 16px !important;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.18) !important;
+  font-family: var(--font-body);
+  max-width: 260px;
+}
+
+/* Sur mobile, une règle plus large (32px) prend le dessus dans le bloc
+   @media (max-width:640px) ci-dessous, par ordre de cascade — sans elle,
+   rien ne cadrait ce bouton sur desktop, où il pouvait chevaucher le bloc
+   roche/orientation ajouté en haut à droite (voir .popup-entete). */
+.maplibregl-popup-close-button {
+  width: 22px;
+  height: 22px;
+  font-size: 16px;
+  line-height: 22px;
+  top: 2px !important;
+  right: 2px !important;
+}
+
+.popup h3 {
+  margin: 0 0 8px;
+  font-size: var(--fs-lg);
+  color: var(--forest);
+}
+
+/* En-tête falaise : bloc titre à gauche, orientation à droite (voir
+   construireCoinInfos dans app.js) — auparavant vide sur cette même ligne.
+   Le type de roche reste dans la fiche d'infos classique (popupFalaise) :
+   simple valeur texte, pas de widget dédié à caser ici. */
+.popup-entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding-right: 24px; /* réserve la place du bouton de fermeture */
+}
+.popup-titre-bloc {
+  min-width: 0;
+}
+.popup-coin {
+  flex-shrink: 0;
+  width: 56px; /* = largeur de .rose-vents (SVG) */
+  display: flex;
+  justify-content: center;
+  /* Petit décalage vers le bas (4px) pour que le N ne colle pas au haut de
+     l'en-tête sans pour autant descendre trop (10px testé = trop bas). */
+  padding-top: 4px;
+}
+
+/* Rose des vents miniature (voir roseDesVents dans app.js) : un anneau de
+   petites pastilles (une par direction), pas un disque plein — cohérent avec
+   le vocabulaire "dot" déjà utilisé dans la légende. Les pastilles ET les
+   libellés sont des <span> positionnés par un transform calculé en JS
+   (rotation + décalage + contre-rotation pour rester droit) ; top/left/margin
+   ci-dessous centrent chaque <span> sur l'anneau avant rotation, pour que le
+   pivot tombe bien au centre. Le conteneur (60px) est volontairement plus
+   grand que l'anneau visible (24px) : les libellés dépassent de l'anneau à
+   ~22px du centre, sans cette marge ils chevauchaient le texte "roche"
+   juste au-dessus (bug remonté après test).
+   */
+/* Rose des vents en SVG (voir roseDesVents) : une vraie rose à 8 pointes
+   (4 cardinales longues + 4 intercardinales courtes), pointes actives en
+   encre pleine, inactives en remplissage doux. Vectorielle donc nette (pas
+   de "pixelisation"), avec l'identité d'une rose des vents classique. */
+.rose-vents {
+  display: block;
+  width: 56px;
+  height: 56px;
+}
+.rose-vents-anneau {
+  fill: none;
+  stroke: var(--stone-dark);
+  stroke-width: 1.5;
+}
+.rose-vents-pointe {
+  fill: #d8d4ca;
+  opacity: 0.55;
+}
+.rose-vents-pointe-actif {
+  fill: var(--ink);
+  opacity: 1;
+}
+.rose-vents-centre {
+  fill: var(--ink);
+}
+.rose-vents-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--muted);
+}
+.rose-vents-label-actif {
+  font-weight: 700;
+  font-size: 11px;
+  fill: var(--ink);
+}
+
+/* Poignée de la feuille du bas mobile — sans objet hors de ce contexte
+   (voir le style interactif complet dans le bloc @media (max-width:640px)). */
+.popup .poignee-fiche {
+  display: none;
+}
+
+/* Sous-titre falaise (secteur, sous le nom du sommet) */
+.popup .sous-titre {
+  margin: -6px 0 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* Badge parking (site des falaises desservies, au-dessus de la description) */
+.popup .badge-site {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--teal-dark);
+  margin-bottom: 2px;
+}
+
+/* Contour et non aplat plein : en pastille pleine, ce tag pesait visuellement
+   autant que le nom juste en dessous — or il porte la CATÉGORIE, identique
+   sur toutes les fiches d'un même type, donc sans information, quand le nom
+   est l'identité de ce qu'on regarde. La hiérarchie était inversée au profit
+   du moins informatif. Le contour garde le codage couleur (clay falaise,
+   teal parking, ink gîte) en lui rendant son rang.
+   currentColor pour le filet : une seule déclaration de couleur par
+   catégorie ci-dessous, texte et bordure ne peuvent pas diverger. */
+.popup .cat-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  background: none;
+}
+/* --teal-dark et non --teal : en texte il faut viser 4.5:1 (WCAG 1.4.3) et
+   non les 3:1 d'un aplat. Même arbitrage que .parking-titre plus haut. */
+.cat-tag.falaise { color: var(--clay); }
+.cat-tag.parking { color: var(--teal-dark); }
+.cat-tag.gite { color: var(--ink); }
+
+/* Fiche technique : libellé à gauche, valeur à droite sur la même ligne
+   (plutôt qu'un <dl> terme/description empilé verticalement — bien moins
+   scannable pour une liste de faits courts). Les champs avec un visuel
+   supplémentaire (jauge de cotation, grille de voies, liste de falaises)
+   ajoutent ce contenu en pleine largeur sous la ligne label/valeur, comme un
+   élément frère plutôt que niché dans .info-valeur — un visuel comme une
+   jauge a besoin de toute la largeur pour rester lisible. */
+.popup .fiche-infos {
+  font-size: var(--fs-base);
+}
+.popup .info-ligne {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 6px;
+}
+.popup .info-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  /* Le libellé peut se replier sur deux lignes si nécessaire (ex. "Temps de
+     trajet depuis le gîte" dans une popup parking étroite, max-width 260px) :
+     sans min-width:0, un item flex avec flex-shrink:1 ne rétrécit jamais sous
+     son contenu texte (min-width:auto) et fait déborder la ligne au lieu de
+     couper — bug réel : la valeur "82 min en voiture" sortait de la fiche. */
+  min-width: 0;
+  flex-shrink: 1;
+}
+/* Sépare le groupe "à quoi ressemble l'escalade" (roche/cotation/voies) du
+   groupe "comment y aller" (parking/approche) dans popupFalaise — juste plus
+   d'espace qu'entre deux lignes du même groupe (6px, .info-ligne), rien
+   d'autre : le regroupement par proximité seul suffit à marquer "nouveau
+   sujet", pas besoin d'un trait ou d'un fond pour ça. */
+.popup .fiche-groupe-suivant {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--stone-dark);
+}
+/* Micro-titre de section (ex. "Accès" dans la fiche falaise) : en-tête mono
+   discret en majuscules — structure le groupe sans concurrencer le contenu. */
+.popup .fiche-groupe-titre {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+/* Même famille, même taille que le libellé (voir .info-label) : la valeur
+   est l'info qui compte, mais pas au prix d'un déséquilibre visuel sur une
+   ligne — la hiérarchie passe par la couleur (encre pleine vs gris muet), pas
+   par la taille. Sans cette règle, .info-valeur héritait du corps de texte
+   du popup (police système, 0.85rem, plus grosse et différente du libellé —
+   ça se voyait, notamment sur "Roche"/"Calcaire"). */
+.popup .info-valeur {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  /* La valeur garde sa largeur (reste lisible sur sa ligne, à droite) : c'est
+     le libellé qui se replie en cas d'étroitesse — pas elle qui se comprime
+     ou déborde. */
+  flex-shrink: 0;
+}
+
+/* Métadonnées clés de la fiche falaise (Roche / Voies, voir popupFalaise) en
+   colonnes étroites : 2 mini-colonnes sans bordure, label en petite majuscule
+   au-dessus de la valeur — plus léger que des tuiles, plus structuré que des
+   tags, et ça ne boxe pas la fiche. */
+.popup .fiche-infos-cols {
+  display: flex;
+  gap: 24px;
+  margin-top: 6px;
+}
+.popup .col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.popup .col-label {
+  /* Même taille que les micro-titres de section (ex. "Accès", .fiche-groupe-titre) :
+     les labels des colonnes partagent la même voix typographique que le reste
+     de la fiche, sans dominer les valeurs. */
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.popup .col-valeur {
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Le micro-titre de l'histogramme ("Cotation") : même voix typographique que
+   les libellés des colonnes Voies/Roche (.col-label) — un simple label au-
+   dessus du graphique, pas un titre concurrent. L'espace de 12px garde un
+   net respir entre les infos clés (et la mention de mix, le cas échéant) et
+   le graphique. */
+.popup .legende-titre {
+  display: block;
+  margin-top: 12px;
+  /* Même taille que les micro-titres de section (ex. "Accès") et les labels
+     de colonnes — tout le vocabulaire de titres de la fiche à l'identique. */
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+/* Variante "bloc" d'une ligne d'info (voir champBloc) : libellé au-dessus,
+   valeur en pleine largeur en dessous — la valeur, seule sur sa ligne,
+   ressort plus qu'alignée à droite d'un libellé, sans en faire trop (0.78rem,
+   légèrement au-dessus du libellé — un 0.9rem testé paraissait trop gros). */
+.popup .info-bloc {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.popup .info-bloc .info-valeur {
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+
+/* Histogramme "1 case = 1 voie" par cotation (voir construireHistogramme
+   dans histogramme.js — chargé à la demande à l'ouverture de la popup, voir
+   marqueurs.js ; remplace un 1er jet en nuage de points sur échelle
+   globale, trop dense dès qu'une falaise ne couvre qu'une petite plage de
+   cotations, confirmé illisible sur un rendu réel). Une colonne par
+   cotation présente, bas-alignées (align-items:flex-end) pour que toutes
+   les étiquettes restent sur une même ligne quel que soit le nombre de
+   cases empilées au-dessus. flex-wrap plutôt qu'un scroll horizontal :
+   cohérent avec le reste du site (aucun scroll latéral ailleurs), une
+   falaise très dense (ex. plus d'une douzaine de cotations distinctes)
+   passe simplement sur plusieurs lignes. */
+.voies-histo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px 10px;
+  margin-top: 10px;
+}
+/* Emplacement réservé à l'histogramme tant que routes/<id>.json n'est pas
+   chargé (voir popupFalaise) : invisible tant que vide, pour ne pas créer
+   un trou dans la fiche. */
+.voies-histo-placeholder:empty {
+  display: none;
+}
+.histo-colonne {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+/* Largeur fixée à 2 cases (10px + 2px de marge, x2) : au-delà de 2 voies à
+   la même cotation, la pile s'élargit plutôt que de s'empiler à l'infini —
+   sans ça, une dizaine de voies sur une même cotation (déjà vu jusqu'à 8
+   dans ce jeu de données) rendait la colonne bien plus haute que le reste
+   de la fiche. wrap-reverse : les nouvelles rangées s'ajoutent au-dessus
+   des précédentes (pas en dessous), pour garder la même lecture "empile
+   depuis la base" qu'une seule colonne verticale. */
+.histo-cases {
+  display: flex;
+  flex-flow: row wrap-reverse;
+  justify-content: center;
+  width: 26px; /* 2 cases de 12px + 2px de marge (voir .histo-case) */
+  gap: 2px;
+}
+.histo-case {
+  /* 12px sur desktop (au lieu de 10) : des cibles un peu plus grandes, déjà
+     prêtes si on rend les cases cliquables (détail de la voie) — le mobile
+     garde ses 13px via la media query ci-dessous. */
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+/* Couenne/grande voie : même forme (carré), couleur seule pour les
+   distinguer — corrigé après retour terrain : un fond blanc/papier avec
+   juste un contour (1er jet) se lit comme "vide"/absence de donnée sur un
+   popup, mauvaise lisibilité. Couleurs harmonisées avec les cercles
+   proportionnels de la carte (--gv/--couenne, symboles.js) — un seul
+   vocabulaire de couleurs pour "couenne"/"grande voie" sur tout le site.
+   "non-cote" (cotation absente/non standard, ex. anciennes cotations sans
+   lettre) : reste en contour creux, seul cas où "vide" est justement le bon
+   message (pas de type de voie à annoncer). */
+.histo-case.couenne { background: var(--couenne); }
+.histo-case.gv { background: var(--gv); }
+.histo-case.non-cote {
+  background: var(--paper);
+  border: 2px solid var(--stone-dark);
+  box-sizing: border-box;
+}
+/* --fs-xs (pas --fs-2xs comme le reste du vocabulaire de titres de la
+   fiche) : seul élément de ce groupe à porter une valeur à lire pour
+   grimper (la cotation, ex. "6a+"), pas juste le nom d'une section --
+   mérite un cran de confort de lecture en plus. */
+.histo-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.histo-legende {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.histo-cle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.histo-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+.histo-swatch.couenne { background: var(--couenne); }
+.histo-swatch.gv { background: var(--gv); }

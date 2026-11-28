@@ -1,160 +1,71 @@
-// popups.js — construction du HTML des 3 popups (falaise/parking/gîte) et de
-// leurs widgets internes (rose des vents, jauge de cotation, grille de voies,
-// bouton GPS, actions). Uniquement du templating : pas d'accès DOM en dehors
-// de escapeHtml, pas d'état — chaque fonction ne dépend que de ses paramètres.
-// Seuls popupFalaise/popupParking/popupGite sont utilisés hors de ce fichier
-// (par marqueurs.js) — tout le reste (champ*, jauge*, rose des vents...)
-// reste privé au module.
+// popups.js — assemble le HTML des 3 popups (falaise, parking, gîte) à partir
+// des briques de rose-des-vents.js, liens-acces.js et champs-fiche.js. Pur
+// templating : pas d'état, chaque fonction ne dépend que de ses paramètres.
+// Seuls popupFalaise, popupParking et popupGite servent hors de ce fichier
+// (marqueurs.js). L'histogramme et le détail des voies, chargés à la demande,
+// vivent dans histogramme.js et detail-voies.js.
 
 import { escapeHtml, urlSure } from './utils.js';
-import { secteurDistinct, cotationVersValeur, approximerCotation } from './donnees.js';
+import { secteurDistinct } from './donnees.js';
+import { construireCoinInfos } from './rose-des-vents.js';
+import { lienItineraire, boutonGps, construireActionsSecondaires } from './liens-acces.js';
+import { col, champBloc, colonneHauteur, champParkingAssocie, champLiensFalaises, libelleRoche, styleGrimpe } from './champs-fiche.js';
 
-// Rose des vents miniature pour l'orientation d'une falaise. Un point (pastille)
-// par direction cardinale/intercardinale sur un anneau, plutôt qu'un
-// conic-gradient plein (1er jet, retiré : ça ressemblait à un camembert coloré
-// et pas à une rose des vents — mauvaise lecture ET peu élégant). Reprend le
-// vocabulaire visuel déjà utilisé pour la légende (petits ronds "dot"), plus
-// cohérent avec le reste du site qu'un dégradé. Les directions actives
-// ressortent (pastille plus grosse + lettre) ; les autres restent de
-// discrètes pastilles muettes qui donnent le contexte de l'anneau complet
-// (donc plus besoin de traiter N à part : sa position — en haut — suffit).
-const POINTS_ROSE = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
-
-function roseDesVents(orientation) {
-  const actifs = new Set(orientation.map(s => s.trim()).filter(Boolean));
-  const indexDir = Object.fromEntries(POINTS_ROSE.map((d, i) => [d, i]));
-  const cx = 32, cy = 32;
-
-  // Une vraie rose des vents à 8 pointes (losanges) : 4 cardinales longues et
-  // larges, 4 intercardinales courtes — le vocabulaire classique d'une rose.
-  // Vectorielle (SVG) donc nette quel que soit l'affichage. Pointe active en
-  // encre pleine, inactives en remplissage doux.
-  const polygone = (i, rayon, base, demiL) => {
-    const a = (i * 45 * Math.PI) / 180;
-    const sin = Math.sin(a), cos = Math.cos(a);
-    const tipX = cx + rayon * sin, tipY = cy - rayon * cos;
-    const inX = cx + base * sin, inY = cy - base * cos;
-    const Rm = (rayon + base) / 2;
-    const gX = cx + Rm * sin + demiL * cos, gY = cy - Rm * cos + demiL * sin;
-    const dX = cx + Rm * sin - demiL * cos, dY = cy - Rm * cos - demiL * sin;
-    return `${tipX},${tipY} ${gX},${gY} ${inX},${inY} ${dX},${dY}`;
-  };
-
-  const pointes = POINTS_ROSE.map((d, i) => {
-    const cardinal = i % 2 === 0;
-    const actif = actifs.has(d);
-    // Pointes dimensionnées au juste milieu entre deux tests : à rayon 22,
-    // les cardinales chevauchaient les libellés (rayon 25) ; à rayon 17,
-    // la rose paraissait trop petite. 20/13 garde des pointes affirmées tout
-    // en laissant un net dégagement devant les lettres, bien à l'intérieur
-    // de l'anneau (r 24).
-    const rayon = cardinal ? 20 : 13;
-    const demiL = cardinal ? 4.8 : 3.2;
-    const classe = actif ? 'rose-vents-pointe rose-vents-pointe-actif' : 'rose-vents-pointe';
-    return `<polygon class="${classe}" points="${polygone(i, rayon, 6.5, demiL)}" />`;
-  }).join('');
-
-  // Libellés : direction(s) active(s) en évidence, repère N discret sinon.
-  const labels = POINTS_ROSE
-    .filter(d => actifs.has(d) || d === 'N')
-    .map(d => {
-      const i = indexDir[d];
-      const a = (i * 45 * Math.PI) / 180;
-      const x = cx + 25 * Math.sin(a);
-      const y = cy - 25 * Math.cos(a);
-      const actif = actifs.has(d);
-      return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" class="rose-vents-label${actif ? ' rose-vents-label-actif' : ''}">${escapeHtml(d)}</text>`;
-    }).join('');
-
-  return `
-    <svg class="rose-vents" viewBox="0 0 64 64" role="img" aria-label="Orientation : ${escapeHtml(Array.from(actifs).join(', '))}">
-      <circle class="rose-vents-anneau" cx="32" cy="32" r="24" />
-      ${pointes}
-      <circle class="rose-vents-centre" cx="32" cy="32" r="2.5" />
-      ${labels}
-    </svg>`;
-}
-
-// Orientation en haut à droite de l'en-tête falaise (voir popup-entete) : ce
-// champ sort de la fiche d'infos pour gagner de la place, donc doit rester
-// lisible par un lecteur d'écran via l'aria-label posé dans roseDesVents. Le
-// type de roche (lui, resté dans la fiche, voir popupFalaise) n'a pas ce
-// problème de place : pas de widget dédié à construire, juste une valeur texte.
-function construireCoinInfos(orientation) {
-  if (!orientation || !orientation.length) return '';
-  return `<div class="popup-coin">${roseDesVents(orientation)}</div>`;
-}
-
-// geo: n'ouvre une appli Maps/Plans que sur un appareil qui en a une — sur
-// desktop, en général aucun gestionnaire n'est enregistré et le lien ne fait
-// rien. (pointer: coarse) cible le type d'entrée (tactile vs souris/trackpad)
-// plutôt qu'une largeur de fenêtre : un desktop avec une fenêtre étroite n'a
-// pas plus d'appli Maps pour autant, alors qu'une tablette tactile en a une
-// même en plein écran.
-function afficherLienMaps() {
-  return window.matchMedia('(pointer: coarse)').matches;
-}
-
-// Mobile : un lien geo: laisse le téléphone proposer TOUTES les applis de
-// navigation installées, pas seulement Google Maps. q=lat,lon(nom) pose un
-// repère nommé — sans lui, Google Maps centre la carte sans repère, donc sans
-// rien à quoi rattacher un itinéraire. Répéter les coordonnées avant le « ? »
-// garde la compatibilité RFC 5870 pour les applis qui ignorent q=.
-// Desktop : geo: n'ouvre en général rien, d'où le lien Google Maps direct.
-// iPhone / iPad : iOS ne connaît pas le schéma geo: (le lien ne fait rien, sans
-// message) ; le lien https://maps.apple.com ouvre Plans directement, appli
-// présente sur tous les appareils Apple, en itinéraire vers le point.
-function estAppareilApple() {
-  return /iPhone|iPad|iPod/.test(navigator.userAgent)
-    // iPadOS se présente comme un Mac : seul le tactile le distingue.
-    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-function lienItineraire(lat, lon, nom) {
-  const coords = `${lat},${lon}`;
-  if (estAppareilApple()) {
-    const libelle = nom ? `&q=${encodeURIComponent(nom)}` : '';
-    return `https://maps.apple.com/?daddr=${coords}&dirflg=d${libelle}`;
-  }
-  if (afficherLienMaps()) {
-    const libelle = nom ? `(${encodeURIComponent(nom)})` : '';
-    return `geo:${coords}?q=${coords}${libelle}`;
-  }
-  return `https://www.google.com/maps/dir/?api=1&destination=${coords}`;
-}
-
-// Assemble la rangée de liens secondaires (texte souligné, séparés par "·")
-// à partir d'une liste où certaines entrées peuvent être vides (Oblyk
-// absent...) — filtre les vides et joint seulement ce qui reste, pour ne
-// jamais laisser un séparateur orphelin en tête/fin, et n'affiche rien du
-// tout si la liste entière est vide.
-function construireActionsSecondaires(liens) {
-  const presents = liens.filter(Boolean);
-  if (!presents.length) return '';
-  return `<div class="actions-secondaires">${presents.join('<span class="separateur" aria-hidden="true">·</span>')}</div>`;
-}
-
-// Coordonnées GPS : affichées en clair (pas cachées derrière un intitulé
-// générique "Copier coordonnées") et copiables d'un tap. Utile même sans
-// rien coller ensuite : noter à la main, les rentrer dans un GPS de
-// randonnée dédié (souvent sans presse-papiers partagé avec le téléphone),
-// les dicter à quelqu'un. 5 décimales (~1 m de précision) : plus que
-// suffisant pour une approche, largement assez lisible. Le mot "Copier" est
-// affiché EN CLAIR (pas juste un aria-label) — même leçon que la poignée de
-// la fiche mobile : une affordance purement visuelle (case grisée) ne suffit
-// pas, il faut le dire. Il bascule seul en "Copié !" au clic, sans jamais
-// remplacer la valeur elle-même — contrairement à un 1er essai qui la
-// cachait pendant la confirmation, ce qui privait justement de la lire au
-// moment où on en a le plus besoin (double-vérifier ce qu'on vient de copier).
-function boutonGps(lat, lon) {
-  const valeur = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  return `<button type="button" class="gps-copie" data-lat="${lat}" data-lon="${lon}" aria-label="Copier les coordonnées GPS">
-    <span class="gps-info">
-      <span class="gps-label">GPS</span>
-      <span class="gps-valeur">${valeur}</span>
-    </span>
-    <span class="gps-action">Copier</span>
-  </button>`;
+// Groupe "Topo papier" (voir escalade/db/schema/01_falaise.sql, 00_source.sql) :
+// but de retrouver ce secteur dans le topo qu'on a sous la main en
+// préparant une sortie — ET de faire savoir qu'un topo payant existe
+// (l'achat finance l'entretien des falaises/équipement, pas juste une
+// commodité perso). Réutilise .fiche-groupe-suivant/.fiche-groupe-titre
+// (même voix que "Accès" plus haut) plutôt qu'un style bis, maintenant
+// qu'il y a 2 lignes à porter (référence + lien d'achat) et pas juste un
+// repère compact. Titre + auteur + année TOUJOURS en clair (jamais caché
+// dans un title=, invisible au tactile) ; le lien d'achat est SÉPARÉ du
+// texte (pas le titre entier cliquable) pour rester explicite sur ce
+// qu'il fait.
+function groupeTopo(p) {
+  if (!(p.topo_page || p.topoNom)) return '';
+  // ';' : un secteur peut s'étaler sur plusieurs pages du topo (saisi tel
+  // quel dans falaise.csv, ex. "284;286") — affiché en liste lisible.
+  // topo_page peut manquer alors que le topo (topo_id) est déjà identifié
+  // (saisie en cours, vu en pratique sur plusieurs secteurs) : la page
+  // s'omet alors gracieusement, jamais "p. undefined" ni tout le groupe
+  // caché pour autant — le nom du topo et le lien d'achat restent utiles
+  // sans elle.
+  const editeurAnnee = [p.topoEditeur, p.topoAnnee].filter(Boolean).join(', ');
+  const parentheses = editeurAnnee ? ` (${escapeHtml(editeurAnnee)})` : '';
+  // Un badge PAR page (pas "p. 86, 88, 90" en un seul bloc) : reste petit
+  // et lisible quel que soit le nombre de pages, plutôt qu'un pavé qui
+  // s'allongerait au même rythme — même vocabulaire visuel que
+  // .badge-parking/.cat-tag déjà utilisés ailleurs sur le site, pas un
+  // nouveau motif. flex-wrap (CSS) : les badges passent à la ligne
+  // d'eux-mêmes si jamais trop nombreux pour la largeur du popup.
+  const badgesPage = p.topo_page
+    ? String(p.topo_page).split(';').map(pg => `<span class="topo-page-badge">p. ${escapeHtml(pg.trim())}</span>`).join('')
+    : '';
+  const identite = p.topoNom ? `<p class="topo-reference">${escapeHtml(p.topoNom)}${parentheses}</p>` : '';
+  const lignePage = badgesPage ? `<div class="topo-page">${badgesPage}</div>` : '';
+  // Le texte du lien dépend du type de source (jamais "Acheter" sur une
+  // brochure gratuite, ce serait faux) — voir source.type,
+  // escalade/data/raw/NOTICE.md.
+  let libelleLien = 'Voir ce topo';
+  if (p.topoType === 'topo payant') libelleLien = 'Acheter ce topo';
+  else if (p.topoType === 'brochure_gratuite') libelleLien = 'Télécharger cette brochure';
+  // urlSure : les URL viennent des données (source.csv). escapeHtml seul ne
+  // protégerait pas d'un `javascript:` — voir utils.js. Chaîne vide = pas
+  // de lien affiché du tout plutôt qu'un lien inerte trompeur.
+  const urlTopo = urlSure(p.topoUrl);
+  const lienAchat = urlTopo
+    ? `<a class="topo-achat" href="${escapeHtml(urlTopo)}" target="_blank" rel="noopener">${libelleLien}</a>`
+    : '';
+  // Page(s) et lien d'achat sur la MÊME ligne (badges à gauche, lien à
+  // droite, voir .topo-page-ligne) — même motif que .gps-copie (valeur à
+  // gauche, "Copier" à droite) : économise une ligne de hauteur. Repasse
+  // seule sur sa ligne si l'un des deux est absent (topo pas encore
+  // numéroté, ou source sans URL) — pas de wrapper vide dans ce cas.
+  const lignePageEtAchat = (lignePage || lienAchat)
+    ? `<div class="topo-page-ligne">${lignePage}${lienAchat}</div>`
+    : '';
+  return `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Topo papier</div>${identite}${lignePageEtAchat}</div>`;
 }
 
 export function popupFalaise(p, lat, lon, cle) {
@@ -201,7 +112,7 @@ export function popupFalaise(p, lat, lon, cle) {
   // .actions) — les deux répondent à la même question "comment j'y vais",
   // pas de raison de les séparer par tout le reste de la fiche. Poids visuel
   // inchangé (toujours .btn-primary, le bouton le plus utilisé sur le
-  // terrain selon le commentaire d'origine, voir style-carte.css) — seul
+  // terrain selon le commentaire d'origine, voir assets/css/) — seul
   // l'EMPLACEMENT change. Groupe désormais TOUJOURS rendu (plus conditionné
   // à rowsLogistique.length) : Itinéraire/GPS existent pour toute falaise,
   // avec ou sans parking associé.
@@ -214,62 +125,6 @@ export function popupFalaise(p, lat, lon, cle) {
   ];
 
   const secteur = secteurDistinct(p);
-  // Groupe "Topo papier" (voir escalade/db/schema/01_falaise.sql, 00_source.sql) :
-  // but de retrouver ce secteur dans le topo qu'on a sous la main en
-  // préparant une sortie — ET de faire savoir qu'un topo payant existe
-  // (l'achat finance l'entretien des falaises/équipement, pas juste une
-  // commodité perso). Réutilise .fiche-groupe-suivant/.fiche-groupe-titre
-  // (même voix que "Accès" plus haut) plutôt qu'un style bis, maintenant
-  // qu'il y a 2 lignes à porter (référence + lien d'achat) et pas juste un
-  // repère compact. Titre + auteur + année TOUJOURS en clair (jamais caché
-  // dans un title=, invisible au tactile) ; le lien d'achat est SÉPARÉ du
-  // texte (pas le titre entier cliquable) pour rester explicite sur ce
-  // qu'il fait.
-  let groupeTopo = '';
-  if (p.topo_page || p.topoNom) {
-    // ';' : un secteur peut s'étaler sur plusieurs pages du topo (saisi tel
-    // quel dans falaise.csv, ex. "284;286") — affiché en liste lisible.
-    // topo_page peut manquer alors que le topo (topo_id) est déjà identifié
-    // (saisie en cours, vu en pratique sur plusieurs secteurs) : la page
-    // s'omet alors gracieusement, jamais "p. undefined" ni tout le groupe
-    // caché pour autant — le nom du topo et le lien d'achat restent utiles
-    // sans elle.
-    const editeurAnnee = [p.topoEditeur, p.topoAnnee].filter(Boolean).join(', ');
-    const parentheses = editeurAnnee ? ` (${escapeHtml(editeurAnnee)})` : '';
-    // Un badge PAR page (pas "p. 86, 88, 90" en un seul bloc) : reste petit
-    // et lisible quel que soit le nombre de pages, plutôt qu'un pavé qui
-    // s'allongerait au même rythme — même vocabulaire visuel que
-    // .badge-parking/.cat-tag déjà utilisés ailleurs sur le site, pas un
-    // nouveau motif. flex-wrap (CSS) : les badges passent à la ligne
-    // d'eux-mêmes si jamais trop nombreux pour la largeur du popup.
-    const badgesPage = p.topo_page
-      ? String(p.topo_page).split(';').map(pg => `<span class="topo-page-badge">p. ${escapeHtml(pg.trim())}</span>`).join('')
-      : '';
-    const identite = p.topoNom ? `<p class="topo-reference">${escapeHtml(p.topoNom)}${parentheses}</p>` : '';
-    const lignePage = badgesPage ? `<div class="topo-page">${badgesPage}</div>` : '';
-    // Le texte du lien dépend du type de source (jamais "Acheter" sur une
-    // brochure gratuite, ce serait faux) — voir source.type,
-    // escalade/data/raw/NOTICE.md.
-    let libelleLien = 'Voir ce topo';
-    if (p.topoType === 'topo payant') libelleLien = 'Acheter ce topo';
-    else if (p.topoType === 'brochure_gratuite') libelleLien = 'Télécharger cette brochure';
-    // urlSure : les URL viennent des données (source.csv). escapeHtml seul ne
-    // protégerait pas d'un `javascript:` — voir utils.js. Chaîne vide = pas
-    // de lien affiché du tout plutôt qu'un lien inerte trompeur.
-    const urlTopo = urlSure(p.topoUrl);
-    const lienAchat = urlTopo
-      ? `<a class="topo-achat" href="${escapeHtml(urlTopo)}" target="_blank" rel="noopener">${libelleLien}</a>`
-      : '';
-    // Page(s) et lien d'achat sur la MÊME ligne (badges à gauche, lien à
-    // droite, voir .topo-page-ligne) — même motif que .gps-copie (valeur à
-    // gauche, "Copier" à droite) : économise une ligne de hauteur. Repasse
-    // seule sur sa ligne si l'un des deux est absent (topo pas encore
-    // numéroté, ou source sans URL) — pas de wrapper vide dans ce cas.
-    const lignePageEtAchat = (lignePage || lienAchat)
-      ? `<div class="topo-page-ligne">${lignePage}${lienAchat}</div>`
-      : '';
-    groupeTopo = `<div class="fiche-groupe-suivant"><div class="fiche-groupe-titre">Topo papier</div>${identite}${lignePageEtAchat}</div>`;
-  }
   const urlOblyk = urlSure(p.lien_oblyk);
   const urlC2C = urlSure(p.lien_camptocamp);
   const lienOblyk = urlOblyk ? `<a href="${escapeHtml(urlOblyk)}" target="_blank" rel="noopener">Voir sur Oblyk</a>` : '';
@@ -292,7 +147,7 @@ export function popupFalaise(p, lat, lon, cle) {
       </div>
       <div class="fiche-infos">${rows.join('')}</div>
       <div class="actions">
-        ${groupeTopo}
+        ${groupeTopo(p)}
         ${groupePlusLoin}
         <button type="button" class="btn-partager" data-cle="${escapeHtml(cle)}" data-nom="${escapeHtml(p.nom)}">Partager cette fiche</button>
       </div>
@@ -334,558 +189,4 @@ export function popupGite(p, lat, lon, cle) {
         ${boutonGps(lat, lon)}
       </div>
     </div>`;
-}
-
-function champ(label, valeur) {
-  return `<div class="info-ligne"><span class="info-label">${label}</span><span class="info-valeur">${escapeHtml(String(valeur))}</span></div>`;
-}
-
-// Variante "bloc" (voir .info-bloc) : libellé sur sa propre ligne, valeur en
-// pleine largeur en dessous — pour une valeur à donner en évidence (ex. le
-// temps de trajet "71 min en voiture" dans la popup parking) plutôt que
-// serrée à droite d'un libellé.
-// hauteur_max_voie_m est un PLAFOND DE SECTEUR, jamais la hauteur d'une voie
-// et jamais une longueur de corde. Vérifié sur les données : un plafond de
-// 350 m coexiste avec une voie de 13 longueurs, et sur « L'Éperon » le plafond
-// saisi (150 m) est de l'ordre de la voie entière calculée (185 m), jamais
-// d'une longueur (50 m). C'est la hauteur de la paroi.
-//
-// D'où DEUX libellés, et c'est le libellé qui porte la distinction :
-//   secteur sans grande voie   « Hauteur 30 m »   se lit directement en corde
-//   secteur avec grande voie   « Paroi 350 m »    ne se confond avec rien
-//
-// C'est la seule donnée du site dont une mauvaise lecture a une conséquence
-// physique : annoncer « hauteur 350 m » sur une grande voie laisserait croire
-// qu'il faut une corde de 350 m. Ne jamais fusionner ces deux libellés.
-//
-// Renvoie null quand la donnée manque (12 secteurs sur 171) : la colonne
-// disparaît plutôt que d'afficher un tiret ou une valeur par défaut.
-export function colonneHauteur(p) {
-  const m = p && p.hauteur_max_voie_m;
-  if (typeof m !== 'number' || !(m > 0)) return null;
-  return { label: (p.nb_gv || 0) > 0 ? 'Paroi' : 'Hauteur', valeur: `${m} m` };
-}
-
-function champBloc(label, valeur) {
-  return `<div class="info-bloc"><span class="info-label">${label}</span><span class="info-valeur">${escapeHtml(String(valeur))}</span></div>`;
-}
-
-// Mini-colonne d'info (Roche / Voies, fiche falaise) : label en petite
-// majuscule au-dessus de la valeur (voir .fiche-infos-cols/.col).
-function col(label, valeur) {
-  return `<div class="col"><span class="col-label">${label}</span><span class="col-valeur">${escapeHtml(String(valeur))}</span></div>`;
-}
-
-
-
-// « min à pied » et non « min » : approche_min est un temps de MARCHE, à ne
-// pas confondre avec trajet_gite_min, en voiture — les deux se ressemblent
-// d'un coup d'œil sans ce qualificatif.
-function champParkingAssocie(noms, approches) {
-  // Chaque parking est une LIGNE cliquable avec son temps d'approche — modèle
-  // uniforme entre 1 et N parkings : [P] Parking [n] · X min à pied. La ligne
-  // entière navigue vers le parking (handler .parking-ligne dans actions-fiche.js,
-  // même chemin que .lien-secteur). Le badge P relie aux icônes P de la carte,
-  // le libellé "Parking n" est souligné (affordance de lien cliquable).
-  const badgeP = '<span class="badge-parking" aria-hidden="true">P</span>';
-  const lignes = noms.map((nom, i) => {
-    const libelle = noms.length === 1 ? 'Parking' : `Parking ${i + 1}`;
-    const duree = approches[i] ? `<span class="parking-duree">· ${approches[i]} min à pied</span>` : '';
-    return `<button type="button" class="parking-ligne" data-nom="${escapeHtml(nom)}">${badgeP}<span class="parking-libelle">${libelle}</span>${duree}</button>`;
-  }).join('');
-  return `<div class="parkings-list">${lignes}</div>`;
-}
-
-// Liste des falaises desservies par un parking, regroupées par sommet (nom).
-// Un même sommet peut apporter jusqu'à une dizaine de secteurs (vu en
-// pratique) : un bouton par secteur qui répète à chaque fois le nom du
-// sommet devient un mur illisible. On affiche donc le nom une seule fois en
-// en-tête de groupe, seulement s'il y a plus d'un sommet desservi (avec un
-// seul sommet, le badge de site au-dessus de la popup le montre déjà).
-// Au-delà de ce nombre d'entrées, la liste se replie. Seuil calé sur une
-// HAUTEUR mesurée, pas sur une intuition : au parking principal de Pen-Hir,
-// les 44 liens occupent 396 px alors que la partie visible de la fiche mobile
-// en fait 380 — la liste chassait donc « Itinéraire » et « GPS » hors de
-// l'écran, c'est-à-dire les deux seuls gestes qu'on vient faire en arrivant
-// au parking. Douze liens tiennent en 4 à 5 lignes et leur laissent la place.
-// La Drôme plafonne à 11 secteurs par parking (médiane 2) : elle n'est pas
-// concernée, ce qui est une observation, pas la raison du seuil.
-const SEUIL_REPLI_FALAISES = 12;
-
-function champLiensFalaises(falaises) {
-  const parNom = new Map();
-  falaises.forEach(f => {
-    if (!parNom.has(f.nom)) parNom.set(f.nom, []);
-    parNom.get(f.nom).push(f);
-  });
-
-  const bouton = (f, texte) => `<button type="button" class="lien-secteur" data-nom="${escapeHtml(f.cle)}">${escapeHtml(texte)}</button>`;
-
-  // Tri alphabétique, absent jusqu'ici : la liste sortait dans l'ordre du CSV,
-  // ce qui se lit comme du hasard passé quelques entrées. PAS de tri par temps
-  // d'approche, qui serait pourtant plus utile : cette donnée n'existe que
-  // dans la Drôme (aucune approche saisie côté breton), et une liste dont
-  // l'ordre change de sens d'une carte à l'autre vaut moins qu'un ordre
-  // prévisible partout.
-  const cmp = (a, b) => a.localeCompare(b, 'fr');
-  const groupes = Array.from(parNom.entries())
-    .sort(([a], [b]) => cmp(a, b))
-    .map(([nom, items]) => {
-      const liens = [...items]
-        .sort((x, y) => cmp(x.secteur || nom, y.secteur || nom))
-        .map(f => bouton(f, f.secteur || nom)).join(' · ');
-      const seulUnSommet = parNom.size === 1;
-      const seulSecteurEtSansNomDistinct = items.length === 1 && !items[0].secteur;
-      const afficherEntete = !seulUnSommet && !seulSecteurEtSansNomDistinct;
-      return afficherEntete
-        ? `<span class="groupe-falaises"><span class="nom-falaise">${escapeHtml(nom)} :</span> ${liens}</span>`
-        : `<span class="groupe-falaises">${liens}</span>`;
-    }).join('');
-
-  // Pas de valeur simple à mettre à droite du libellé (c'est une liste, pas
-  // un fait unique) : le libellé reste seul sur sa ligne, la liste suit en
-  // pleine largeur en dessous, en flux (plusieurs sommets courts peuvent
-  // partager une ligne plutôt que d'en forcer chacun une).
-  // « Secteurs » et non « Falaises » : ce sont des couples site+secteur, et le
-  // résumé du repli dit déjà « N secteurs » — les deux se contredisaient.
-  const etiquette = '<div class="info-ligne"><span class="info-label">Secteurs</span></div>';
-  const liste = `<div class="liens-detail">${groupes}</div>`;
-  if (falaises.length <= SEUIL_REPLI_FALAISES) return etiquette + liste;
-
-  // <details> natif plutôt qu'un bouton câblé dans actions-fiche.js : rien à
-  // ajouter au répartiteur de clics, et l'ouverture au clavier vient sans une
-  // ligne de JS. Le compte reste lisible replié — « 44 secteurs » dit déjà
-  // quelque chose d'utile : ce parking dessert toute la pointe.
-  return `${etiquette}<details class="liens-replies"><summary>${falaises.length} secteurs</summary>${liste}</details>`;
-}
-
-
-// Synthèse "Voies" (total + répartition sportives/autres) : n'utilise que les
-// compteurs du fichier principal, pas le détail des voies — affichée tout de
-// suite à l'ouverture de la fiche, pendant que l'histogramme se charge à la
-// demande. "autres" (trad/artificielle) n'est pas détaillé par voie (seul le
-// compte existe dans les données) — pas d'histogramme pour cette part,
-// seulement ce compteur global.
-// Styles de grimpe de la falaise (colonne "Grimpe"), déduits des compteurs :
-// la colonne Voies porte le TOTAL, l'histogramme ne montre que les SPORTIVES
-// (titre "Cotation voies sportives") — la colonne Grimpe signale l'écart sans
-// ligne de texte séparée. Tous les styles présents sont listés ("sportive,
-// trad"), à la place de l'ancien "mixte" qui ne disait pas lesquels. Les
-// données portent la répartition exacte (nb_voie_sportive / nb_voie_trad /
-// nb_voie_artificielle) : on ne déduit plus le style d'un vague "autres".
-// Libellé affiché quand il diffère du nom de donnée (le type interne reste
-// 'artificielle', comme la clé nb_voie_artificielle et le filtre). Aligné sur
-// la case « Artif » du filtre Style.
-const LIBELLE_GRIMPE = { artificielle: 'artif' };
-
-// Un secteur peut avoir plusieurs roches, saisies séparées par "|" dans
-// falaise.csv (même convention que l'orientation) : affichées avec ", ", comme
-// les styles de la colonne Grimpe, sans les barres verticales de la saisie.
-function libelleRoche(typeRoche) {
-  return String(typeRoche).split('|').map((r) => r.trim()).filter(Boolean).join(', ');
-}
-
-function styleGrimpe(p) {
-  const total = p.nb_voie_total ?? 0;
-  if (total <= 0) return '';
-  // Ordre = ordre d'affichage de la liste.
-  // « moulinette » comptait auparavant comme sportive, faute d'exister dans
-  // le modèle : elle était donc annoncée à tort comme grimpe en tête.
-  const styles = [
-    ['sportive', p.nb_voie_sportive ?? 0],
-    ['trad', p.nb_voie_trad ?? 0],
-    ['artificielle', p.nb_voie_artificielle ?? 0],
-    ['moulinette', p.nb_voie_moulinette ?? 0],
-  ].filter(([, n]) => n > 0);
-  return styles.map(([nom]) => LIBELLE_GRIMPE[nom] || nom).join(', ');
-}
-
-// Histogramme « 1 case = 1 voie » : une colonne par cotation RÉELLEMENT
-// présente sur cette falaise, pas sur les ~39 crans possibles — une falaise
-// typique n'en couvre que 2-3, et une échelle globale les compressait dans
-// une tranche illisible. Contrepartie assumée : les colonnes ne sont plus
-// comparables d'une fiche à l'autre.
-// L'approximation de cotation ne sert QU'À positionner une case ici ;
-// cotationVersValeur (donnees.js) reste strict, une estimation n'ayant pas sa
-// place dans un filtre.
-// nAutresDetaillees : voies trad + artificielles détaillées dans le fichier de
-// routes (0 tant que l'export ne les fournit pas). Sans voie sportive, elles
-// suffisent à justifier le bouton « Voir le détail des voies » : un secteur
-// 100 % trad ou 100 % artif n'aurait sinon aucun accès à son détail.
-const BOUTON_DETAIL_VOIES = '<button type="button" class="btn-voir-detail-voies">Voir le détail des voies</button>';
-
-// Pas d'histogramme (rien de sportif à y montrer), seulement le bouton s'il y
-// a un détail à ouvrir.
-const boutonDetailSeul = (nAutresDetaillees) => (nAutresDetaillees > 0
-  ? `<div class="fiche-voies-resume">${BOUTON_DETAIL_VOIES}</div>`
-  : '');
-
-export function construireHistogramme(voiesSportives, aAutresDisciplines, nAutresDetaillees = 0) {
-  if (!voiesSportives || !voiesSportives.length) return boutonDetailSeul(nAutresDetaillees);
-
-  // Regroupe par cotation EXACTE (6a et 6a+ n'ont jamais la même colonne).
-  // Les voies à cotation non standard (~2,5% des cas réels — anciennes
-  // cotations sans lettre, ex. certaines voies "Les Roches" à Crest, issues
-  // d'une brochure plus ancienne que le reste des données) rejoignent leur
-  // colonne via approximerCotation quand c'est raisonnablement déductible
-  // (voir cette fonction pour le détail des règles retenues) ; les cases qui
-  // en résultent ne sont pas distinguées visuellement des cotations exactes
-  // — un choix assumé une fois la règle posée, pas une approximation à
-  // signaler à chaque fois. Ce qui reste incalculable récolte sa propre
-  // colonne "non côté" en fin de graphique — le compte de cases affiché
-  // correspond alors bien au total sportif annoncé plus haut.
-  const parCotation = new Map();
-  const nonCotees = [];
-  voiesSportives.forEach(v => {
-    let val = cotationVersValeur(v.cotation);
-    let label = v.cotation;
-    if (val == null) {
-      const estimee = approximerCotation(v.cotation);
-      if (estimee) {
-        val = cotationVersValeur(estimee.label);
-        label = estimee.label;
-      }
-    }
-    if (val == null) { nonCotees.push(v); return; }
-    if (!parCotation.has(label)) parCotation.set(label, { val, voies: [] });
-    parCotation.get(label).voies.push(v);
-  });
-  // Aucune voie sportive positionnable : le bouton seul, voir plus haut.
-  if (!parCotation.size && !nonCotees.length) return boutonDetailSeul(nAutresDetaillees);
-
-  const colonnes = Array.from(parCotation.entries())
-    .map(([cotation, { val, voies }]) => ({ cotation, val, voies, nonCote: false }))
-    .sort((a, b) => a.val - b.val);
-  if (nonCotees.length) colonnes.push({ cotation: 'non côté', voies: nonCotees, nonCote: true });
-
-  const case_ = (v, nonCote) => {
-    const classe = nonCote ? 'non-cote' : (v.type_voie === 'couenne' ? 'couenne' : 'gv');
-    return `<span class="histo-case ${classe}"></span>`;
-  };
-  const colonnesHtml = colonnes.map(c => `
-    <div class="histo-colonne">
-      <div class="histo-cases">${c.voies.map(v => case_(v, c.nonCote)).join('')}</div>
-      <span class="histo-label">${escapeHtml(c.cotation)}</span>
-    </div>`).join('');
-
-  // Pas d'entrée de légende pour "non côté" : contrairement à couenne/grande
-  // voie (mélangées à l'intérieur d'une même colonne, indécodables sans
-  // légende), la colonne non côté porte déjà sa propre étiquette explicite
-  // — une légende redondante n'ajouterait rien.
-  const legende = [
-    '<span class="histo-cle"><span class="histo-swatch couenne"></span>couenne</span>',
-    '<span class="histo-cle"><span class="histo-swatch gv"></span>grande voie</span>',
-  ];
-
-  // Un seul aria-label résumé sur l'histogramme entier, pas un par case :
-  // annoncer plusieurs dizaines de cases n'aiderait personne, le détail vient
-  // du bouton ci-dessous.
-  // Titre par EXCLUSION quand la falaise a aussi du trad/artificiel :
-  // l'histogramme ne les couvre pas (comptés mais non détaillés), et un titre
-  // par inclusion laisserait croire l'inverse face au total « Voies » plus
-  // haut. Sur une falaise 100 % sportive la mention n'exclurait plus rien.
-  // Dit ce qui EST montré plutôt que d'énumérer ce qui ne l'est pas : la
-  // liste des autres styles s'allonge (moulinette est arrivée avec Pen-Hir),
-  // pas le titre.
-  const titre = aAutresDisciplines ? 'Cotation (voies sportives seules)' : 'Cotation';
-  // Répartition couenne/grande voie ÉNONCÉE DANS L'aria-label : dans le
-  // graphique, cette distinction ne repose que sur la couleur des cases
-  // (WCAG 1.4.1). L'encodage par la couleur est le bon choix sémiologique
-  // pour une différence de nature — y ajouter une 2e variable visuelle
-  // (forme) entrerait en concurrence avec la lecture "1 case = 1 voie", qui
-  // est justement quantitative. La redondance passe donc par le TEXTE, où
-  // elle ne coûte rien à la lisibilité du graphique.
-  const nbCouenne = voiesSportives.filter(v => v.type_voie === 'couenne').length;
-  const nbGv = voiesSportives.length - nbCouenne;
-  const repartition = [
-    nbCouenne ? `${nbCouenne} couenne${nbCouenne > 1 ? 's' : ''}` : '',
-    nbGv ? `${nbGv} grande${nbGv > 1 ? 's' : ''} voie${nbGv > 1 ? 's' : ''}` : '',
-  ].filter(Boolean).join(' et ');
-  const resumeAria = `Répartition des ${voiesSportives.length} voies sportives par cotation`
-    + (nonCotees.length ? `, dont ${nonCotees.length} non côtées` : '')
-    + (repartition ? ` — ${repartition}` : '');
-  // .fiche-voies-resume : conteneur masqué en bloc quand le détail (plus bas)
-  // est ouvert (voir style-carte.css, .mode-detail-voies) — un seul swap de
-  // classe sur .popup bascule l'un pour l'autre, pas de logique JS dédiée.
-  const histo = `
-    <div class="fiche-voies-resume">
-      <span class="legende-titre">${titre}</span>
-      <div class="voies-histo" role="img" aria-label="${escapeHtml(resumeAria)}">
-        ${colonnesHtml}
-      </div>
-      <div class="histo-legende">${legende.join('')}</div>
-      ${BOUTON_DETAIL_VOIES}
-    </div>`;
-
-  return histo;
-}
-
-// Liste détaillée des voies (nom, cotation, points d'assurage, hauteur
-// estimée) — drill-down depuis le bouton "Voir le détail des voies" de
-// construireHistogramme (même tableau voiesSportives, pas un 2e fetch : voir
-// afficherDetailVoies, marqueurs.js, qui relit le cache déjà rempli). Pas de
-// case cliquable individuelle (voir le commentaire dans construireHistogramme
-// sur la règle des 44px) ni de lien par voie vers un site communautaire (seul
-// lien_oblyk/lien_camptocamp existe, au niveau falaise) : nom + points +
-// hauteur suffisent à justifier l'écran sans ces deux ajouts.
-// Valeur numérique pour trier par cotation croissante (même logique
-// d'approximation que le regroupement en colonnes de l'histogramme,
-// réutilisée à l'identique pour que les deux vues restent cohérentes entre
-// elles). Une voie dont la cotation reste incalculable part en FIN de liste
-// (Infinity), jamais mélangée au hasard parmi de vraies valeurs.
-function valeurCotationPourTri(v) {
-  const direct = cotationVersValeur(v.cotation);
-  if (direct != null) return direct;
-  const estimee = approximerCotation(v.cotation);
-  return estimee ? cotationVersValeur(estimee.label) : Infinity;
-}
-
-// Même normalisation qu'à l'histogramme, sinon la MÊME voie afficherait deux
-// cotations différentes selon qu'on la lit dans l'un ou dans cette liste. Une
-// cotation ni standard ni approximable reste affichée telle quelle.
-function libelleCotationAffichee(cotation) {
-  if (cotationVersValeur(cotation) != null) return cotation;
-  // "6c+/A0" garde son passage d'artif : seul le positionnement l'ignore.
-  if (/[ABC]\d/.test(cotation)) return cotation;
-  const estimee = approximerCotation(cotation);
-  return estimee ? estimee.label : cotation;
-}
-
-// Valeur numérique pour trier par position sur la paroi (gauche à droite) :
-// v.numero est la clé technique assignée côté CSV (voir NOTICE.md, dépôt
-// escalade) — jamais affichée telle quelle, seulement comme ordre de tri.
-// Une voie sans numero (secteur pas encore numéroté, faute de topo papier)
-// part en fin de liste (même motif Infinity que valeurCotationPourTri),
-// jamais mélangée au hasard parmi de vraies positions.
-function valeurPositionPourTri(v) {
-  return v.numero != null ? v.numero : Infinity;
-}
-
-function classeSwatch(v) {
-  return v.type_voie === 'couenne' ? 'couenne' : 'gv';
-}
-
-// Rang d'une cotation artificielle : le chiffre du grade A ou C (A0 à A5, "C1").
-// La cotation est saisie telle quelle dans les données, parfois avec le
-// passage libre ("5c/A1", "A1/A2", "C1-5b") : on cherche le grade d'artif, pas
-// le premier chiffre venu. Illisible ou absente, la voie part en fin de liste,
-// même motif que valeurCotationPourTri.
-function valeurAidePourTri(v) {
-  const m = /[AC](\d)/.exec(String(v.cotation_artif ?? ''));
-  return m ? Number(m[1]) : Infinity;
-}
-
-// Les trois styles détaillés, dans l'ordre d'affichage : les sportives
-// d'abord (comme avant), puis trad et artif à la suite. Un groupe vide est
-// omis : clés absentes du fichier de routes (export amont pas encore fait) =
-// détail identique à celui d'avant. `libelle` sert de sous-titre quand
-// plusieurs groupes coexistent (même libellé que la colonne Grimpe).
-const GROUPES_DETAIL = [
-  { groupe: 'sportive', cle: 'sportives', libelle: 'Sportive' },
-  { groupe: 'trad', cle: 'trad', libelle: 'Trad' },
-  { groupe: 'artificielle', cle: 'artificielles', libelle: 'Artif' },
-];
-
-// detail : { sportives, trad, artificielles }, trois tableaux (éventuellement
-// vides), voir detailDepuisEntree dans marqueurs.js.
-// selection : (voie, groupe) => true | false | 'sans-cote', les filtres de voie
-// actifs sur la carte (voir definirSelectionVoies, marqueurs.js). 'sans-cote' :
-// la voie n'a pas de cotation comparable à la fourchette (artif pur "A1"),
-// elle reste listée mais ne compte pas dans le titre. Absente = toutes les voies.
-export function construireDetailVoies(detail, mode = 'cotation', selection = null) {
-  const compte = (gs) => gs.reduce((total, g) => total + g.voies.length, 0);
-  const tous = GROUPES_DETAIL.map((g) => ({ ...g, voies: (detail && detail[g.cle]) || [] }));
-  let sansCote = 0;
-  const groupes = tous
-    .map((g) => (selection ? {
-      ...g,
-      voies: g.voies.filter((v) => {
-        const retenue = selection(v, g.groupe);
-        if (retenue === 'sans-cote') sansCote += 1;
-        return retenue !== false;
-      }),
-    } : g))
-    .filter((g) => g.voies.length);
-  const n = compte(groupes) - sansCote;
-  const nTotal = compte(tous);
-  // Juste le compte (utile pour se repérer avant de faire défiler la liste),
-  // sans répéter "(hors trad et artificielle)" : cette précision vient déjà
-  // d'être lue à l'instant sur l'écran précédent (titre de l'histogramme,
-  // voir construireHistogramme) — la redire ici alourdit sans rien apporter
-  // de nouveau, contrairement à sa 1ère apparition où elle évite une
-  // confusion avec le total "Voies" de la fiche compacte.
-  const titre = `${n} voie${n > 1 ? 's' : ''}`
-    + (n + sansCote < nTotal ? ` sur ${nTotal}` : '')
-    + (sansCote ? ` · ${sansCote} sans cotation comparable` : '');
-  // En-tête TEXTE (pas d'icône) pour "Points"/"Hauteur" : ce site a déjà une
-  // règle posée ailleurs (le "P" du marqueur parking) — texte plutôt
-  // qu'icône, aucun pictogramme nulle part sur ce site, justement parce
-  // qu'une icône est ambiguë (quel symbole désigne sans confusion "points
-  // d'assurage" ?) alors qu'un mot ne l'est jamais.
-  //
-  // Deux tris, deux besoins différents (pas un mélange des deux dans une
-  // seule liste) : Cotation répond à "quoi de facile/dur", en une ligne par
-  // voie comme avant ; Position répond à "qu'y a-t-il en marchant le long de
-  // la paroi", et EXPOSE le détail longueur par longueur des grandes voies
-  // (v.longueurs, absent des voies à une seule longueur) — demandé pour
-  // préparer une sortie en amont, sans intérêt pour le tri Cotation qui n'a
-  // pas vocation à s'alourdir de ce détail.
-  const liste = construireListeVoies(groupes, mode);
-  const bascule = (valeur, libelle) =>
-    `<button type="button" class="btn-tri-voies${mode === valeur ? ' actif' : ''}" data-tri="${valeur}" aria-pressed="${mode === valeur}">${libelle}</button>`;
-  // « Retour » en bas et non près du titre : fiche quasi plein écran sur
-  // mobile, un bouton en haut tombe à l'opposé du pouce. En sticky dans la
-  // liste, il reste atteignable au milieu de 40 voies.
-  return `
-    <div class="fiche-voies-detail">
-      <h4 class="detail-voies-titre">${escapeHtml(titre)}</h4>
-      <div class="detail-voies-tri" role="group" aria-labelledby="detail-voies-tri-titre">
-        <span id="detail-voies-tri-titre" class="detail-voies-tri-label">Trier par</span>
-        ${bascule('cotation', 'Cotation')}
-        ${bascule('position', 'Position')}
-      </div>
-      ${liste}
-      <button type="button" class="btn-retour-fiche" aria-label="Retour à la fiche"><span aria-hidden="true">←</span> Retour</button>
-    </div>`;
-}
-
-// Liste des voies. Une grande voie (v.longueurs renseigné) devient, en mode
-// Position, un GROUPE de lignes — une ligne "voie" (identique à ligneDetailVoie,
-// valeurs globales déjà connues du mode Cotation) suivie d'une ligne indentée
-// par longueur (cotation/points/hauteur DE cette longueur précise). La zébrure
-// suit la VOIE (index), pas la ligne brute, pour que l'en-tête et ses
-// sous-lignes restent visuellement une seule bande — sinon chaque longueur
-// alternerait indépendamment, cassant la lecture "ceci est une seule voie".
-//
-// Mode Cotation (par défaut) : un bloc par style (sportives puis trad puis
-// artif, voir GROUPES_DETAIL), chaque bloc trié séparément : une cotation
-// française et une cotation A0-A5 ne se comparent pas, les mélanger n'aurait
-// aucun ordre lisible. Du plus facile en haut au plus dur en bas (pas l'ordre
-// alphabétique du nom, celui renvoyé par défaut côté SQL — sans rapport avec
-// la difficulté). sort() est stable (ES2019+) : à cotation égale, l'ordre
-// alphabétique d'origine sert de sous-tri, sans code dédié pour ça. Une ligne
-// par voie, jamais de détail longueur par longueur ici. Sous-titre de bloc
-// seulement quand plusieurs styles coexistent : une liste 100 % sportive (ou
-// 100 % trad) reste identique à celle d'avant.
-//
-// Mode Position : UNE seule liste, tous styles confondus, trié de gauche à
-// droite sur la paroi (voir valeurPositionPourTri) : le numéro est unique par
-// secteur, quel que soit le style, et une voie trad entre deux sportives se
-// lit à sa place sur la paroi. Ni sous-titre ni bloc ; le carré couenne /
-// grande voie reste réservé aux sportives (voir ligneDetailVoie). Le nom
-// lui-même ne porte aucun repère de position (pas de préfixe numéro : le
-// badge actif "Position" du bandeau de tri suffit déjà à signaler que ce tri
-// est bien appliqué, voir construireDetailVoies). À numéro égal ou absent,
-// l'ordre sportive, trad, artif sert de départage (tri stable).
-function construireListeVoies(groupes, mode) {
-  let blocs;
-  if (mode === 'position') {
-    const voies = groupes.flatMap(({ groupe, voies }) => voies.map((v) => ({ v, groupe })));
-    voies.sort((a, b) => valeurPositionPourTri(a.v) - valeurPositionPourTri(b.v));
-    blocs = voies.map(({ v, groupe }, index) => {
-      const entete = ligneDetailVoie(v, index, groupe);
-      if (!v.longueurs || !v.longueurs.length) return entete;
-      return entete + v.longueurs.map((l) => ligneDetailLongueur(l, index)).join('');
-    }).join('');
-  } else {
-    const plusieursStyles = groupes.length > 1;
-    blocs = groupes.map(({ groupe, libelle, voies }) => {
-      const valeur = groupe === 'artificielle' ? valeurAidePourTri : valeurCotationPourTri;
-      const lignes = [...voies].sort((a, b) => valeur(a) - valeur(b))
-        .map((v, index) => ligneDetailVoie(v, index, groupe)).join('');
-      const sousTitre = plusieursStyles ? `<li class="detail-voie-groupe">${escapeHtml(libelle)}</li>` : '';
-      return sousTitre + lignes;
-    }).join('');
-  }
-  return `
-    <ul class="detail-voies-liste">
-      <li class="detail-voie detail-voie-entete-colonnes" aria-hidden="true">
-        <span class="detail-voie-type"></span><span>Voie</span><span>Cotation</span><span>Points</span><span>Hauteur</span>
-      </li>
-      ${blocs}
-    </ul>`;
-}
-
-// Une <li> par voie, mais display:contents en CSS (voir style-carte.css) :
-// ses enfants deviennent des items du grid porté par .detail-voies-liste —
-// alignement en vraies colonnes sur TOUTE la liste (nom/cotation/points/
-// hauteur), pas juste au sein d'une ligne. Chaque ligne émet TOUJOURS ses 5
-// cellules, même vides (points/hauteur en particulier) : une grille a besoin
-// d'un nombre de cellules fixe par ligne pour que l'alignement colonne par
-// colonne reste correct d'une voie à l'autre. Le repère couenne/grande voie
-// est enveloppé dans .detail-voie-type (pas directement .histo-swatch en
-// cellule de grille) : la cellule porte le padding/la bordure de séparation
-// de ligne, le carré lui-même doit en rester indemne pour garder EXACTEMENT
-// les mêmes proportions que dans la légende de l'histogramme juste au-dessus
-// (repéré en test : le padding de la cellule, appliqué directement sur un
-// carré de 8px avec box-sizing:border-box, l'écrasait en rectangle 8×13).
-// nb_points rempli à 59,6% des voies seulement (jeu de données actuel) :
-// omission pure si absent (cellule vide, pas de texte) — jamais "0"/"N/A",
-// qui se lirait comme "aucun point" (faux signal de sécurité) plutôt que
-// "non renseigné". 0 est affiché tel quel quand IL EST réellement saisi (ex.
-// certaines traversées sans point fixe) : != null distingue bien les deux
-// cas. Partagé entre les 3 formes de ligne (voie/en-tête/longueur) : mêmes
-// champs nb_points/hauteur_estimee_m, qu'ils viennent d'une voie ou d'une
-// longueur individuelle (voir export_geojson.py, struct "longueurs").
-function formatPoints(nbPoints) {
-  return nbPoints != null ? `${nbPoints} pt${nbPoints > 1 ? 's' : ''}` : '';
-}
-// hauteur_estimee_m : affichée en chiffre nu (pas de "≈", jugé superflu à
-// l'usage) — reste malgré tout une estimation lue sur photo de topo, jamais
-// un métrage terrain.
-function formatHauteur(hauteurM) {
-  return hauteurM != null ? `${hauteurM} m` : '';
-}
-
-// Cotation affichée selon le style : la française pour sportive (normalisée
-// comme l'histogramme) ; pour trad, telle que saisie ("V+", "6b/A0", pas
-// d'histogramme à laquelle l'aligner), avec la protection R/X/PG à côté quand
-// elle existe ; cotation_artif telle que saisie pour l'artif. Champ absent =
-// cellule vide, jamais "N/A".
-function cotationDetailVoie(v, groupe) {
-  if (groupe === 'artificielle') return escapeHtml(v.cotation_artif ?? '');
-  const cotation = escapeHtml(groupe === 'trad' ? (v.cotation ?? '') : libelleCotationAffichee(v.cotation));
-  if (groupe === 'trad' && v.protection) {
-    return `${cotation}<span class="detail-voie-protection">${escapeHtml(v.protection)}</span>`;
-  }
-  return cotation;
-}
-
-function ligneDetailVoie(v, index, groupe = 'sportive') {
-  // Classe posée ici et non par nth-child en CSS : display:contents aplatit
-  // chaque voie en 5 cellules et la ligne d'en-tête décale tout calcul CSS.
-  const impaire = index % 2 === 1;
-  // Le carré couenne / grande voie n'a de sens que pour une sportive : trad et
-  // artif gardent la cellule, vide, pour que les colonnes restent alignées
-  // avec les sportives du même tableau.
-  const repere = groupe === 'sportive'
-    ? `<span class="histo-swatch ${classeSwatch(v)}"></span>`
-    : '';
-  return `
-    <li class="detail-voie${impaire ? ' detail-voie-impaire' : ''}">
-      <span class="detail-voie-type">${repere}</span>
-      <span class="detail-voie-nom">${escapeHtml(v.nom)}</span>
-      <span class="detail-voie-cotation">${cotationDetailVoie(v, groupe)}</span>
-      <span class="detail-voie-points">${formatPoints(v.nb_points)}</span>
-      <span class="detail-voie-hauteur">${formatHauteur(v.hauteur_estimee_m)}</span>
-    </li>`;
-}
-
-// Mode Position, sous-ligne d'une longueur (grande voie uniquement, voir
-// construireListePosition) : le repère couenne/gv ne se répète pas (déjà
-// porté par la ligne "voie" juste au-dessus, cellule laissée vide plutôt que
-// de dupliquer le même carré à chaque longueur), remplacé par "L1"/"L2"...
-// à la place du nom — indentée en CSS (voir style-carte.css,
-// .detail-voie-longueur) pour signaler visuellement son appartenance à la
-// voie précédente plutôt qu'une voie indépendante dans la liste.
-function ligneDetailLongueur(l, indexGroupe) {
-  const impaire = indexGroupe % 2 === 1;
-  return `
-    <li class="detail-voie detail-voie-longueur${impaire ? ' detail-voie-impaire' : ''}">
-      <span class="detail-voie-type"></span>
-      <span class="detail-voie-nom">L${l.numero_longueur}</span>
-      <span class="detail-voie-cotation">${escapeHtml(libelleCotationAffichee(l.cotation))}</span>
-      <span class="detail-voie-points">${formatPoints(l.nb_points)}</span>
-      <span class="detail-voie-hauteur">${formatHauteur(l.hauteur_estimee_m)}</span>
-    </li>`;
 }

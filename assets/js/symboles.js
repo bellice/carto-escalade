@@ -5,29 +5,11 @@
 import { estFalaiseVideDansMode, valeurSelection, statsSelection } from './donnees.js';
 
 // Rayon min/max des cercles proportionnels (falaises) — taille VISUELLE
-// réelle, cf. CIBLE_TACTILE_MIN ci-dessous pour la zone cliquable (les deux
-// sont découplés : réduire RAYON_MIN n'affecte pas la cible tactile).
+// réelle. La zone cliquable des marqueurs DOM est fixée en CSS (--cote).
 // Diamètre 14px → 52px (ratio ~3.7, ~14x en surface) : le contraste de taille
-// reste lisible, la cible tactile étant assurée par poserTailleMarqueur().
+// reste lisible.
 const RAYON_MIN = 7;
 const RAYON_MAX = 26;
-
-// Cible tactile minimale (repère Apple/Google), indépendante de la taille
-// visuelle du marqueur (cercle proportionnel, losange gîte, rond parking) —
-// un petit cercle proportionnel doit rester facile à taper du doigt.
-const CIBLE_TACTILE_MIN = 44;
-
-// Pose la taille d'un marqueur : la zone tactile (el, l'élément externe posé
-// par MapLibre) fait au moins CIBLE_TACTILE_MIN, le disque/losange visuel
-// (visuel, l'enfant centré dedans) garde sa vraie taille, potentiellement
-// plus petite.
-export function poserTailleMarqueur(el, visuel, diametre) {
-  const cote = Math.max(CIBLE_TACTILE_MIN, diametre);
-  el.style.width = cote + 'px';
-  el.style.height = cote + 'px';
-  visuel.style.width = diametre + 'px';
-  visuel.style.height = diametre + 'px';
-}
 
 // Rayon proportionnel à la valeur (donc à la surface, pas au rayon, comme la
 // racine carrée classique) — mais avec la correction de Flannery : James
@@ -162,11 +144,9 @@ export function construireLegendeFalaises(max, median, remplissage, raisonSansTa
   // « Secteurs » et non « Falaises » : un point de la carte est un couple
   // site+secteur (111 points pour 37 noms de falaise en Drôme, 60 pour 10 en
   // Bretagne).
-  // Ce bloc RÉÉCRIT le HTML de la page : corriger le libellé dans
-  // <lieu>/index.html seul n'a aucun effet, c'est cette ligne qui gagne.
   const zoneFalaises = document.getElementById('cle-falaises-zone');
   if (zoneFalaises) {
-    zoneFalaises.innerHTML = `<span class="cle"><span class="dot" style="background:${remplissage}"></span> Secteurs</span>`;
+    zoneFalaises.style.setProperty('--remplissage', remplissage);
   }
 
   const conteneur = document.getElementById('legende-falaises');

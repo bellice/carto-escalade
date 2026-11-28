@@ -17,7 +17,9 @@ import {
   STYLES, deriverStyles, estDuStyle, valeurSelection, estFalaiseVideDansMode, statsSelection,
   compterCroiseDansFourchette, cotationVersValeur, approximerCotation,
 } from '../assets/js/donnees.js';
-import { construireHistogramme, construireDetailVoies, popupFalaise } from '../assets/js/popups.js';
+import { popupFalaise } from '../assets/js/popups.js';
+import { construireHistogramme } from '../assets/js/histogramme.js';
+import { construireDetailVoies } from '../assets/js/detail-voies.js';
 
 const RACINE = fileURLToPath(new URL('..', import.meta.url));
 const lire = (rel) => readFile(join(RACINE, rel), 'utf8');
@@ -39,6 +41,13 @@ async function trouverLieux() {
   return lieux.sort();
 }
 const LIEUX = await trouverLieux();
+// La CSS de la page carte tient en plusieurs feuilles dont l'ordre EST la
+// cascade : on les relit dans l'ordre des <link> d'une page, comme le navigateur.
+async function lireCarteCss() {
+  const html = await lire(`${LIEUX[0]}/index.html`);
+  const feuilles = [...html.matchAll(/href="\.\.\/(assets\/css\/[\w-]+\.css)"/g)].map((m) => m[1]);
+  return (await Promise.all(feuilles.map(lire))).join('\n');
+}
 const geojsonDe = async (lieu) => JSON.parse(await lire(`${lieu}/data.geojson`));
 
 // Même principe que trouverLieux ci-dessus, appliqué aux pages : toute page
@@ -117,6 +126,19 @@ describe('Service worker : pré-cache', () => {
     assert.deepEqual(manquants, [],
       `Modules absents du PRECACHE de sw.js : ${manquants.join(', ')}. ` +
       'Un module non pré-caché fait échouer tout le graphe au 1er chargement hors ligne.');
+  });
+
+  test('les feuilles de assets/css sont liées dans le même ordre par chaque lieu, et pré-cachées', async () => {
+    const sw = await lire('sw.js');
+    const surDisque = (await readdir(join(RACINE, 'assets/css'))).filter((f) => f.endsWith('.css')).sort();
+    const liste = async (rel) => [...(await lire(rel)).matchAll(/href="\.\.\/assets\/css\/([\w-]+\.css)"/g)].map((m) => m[1]);
+    const reference = await liste(`${LIEUX[0]}/index.html`);
+    assert.deepEqual([...reference].sort(), surDisque, 'Une feuille de assets/css est absente des pages, ou liée sans exister.');
+    for (const lieu of LIEUX) {
+      assert.deepEqual(await liste(`${lieu}/index.html`), reference, `${lieu} : feuilles différentes ou dans un autre ordre (la cascade en dépend).`);
+    }
+    const manquantes = reference.filter((f) => !sw.includes(`'./assets/css/${f}'`));
+    assert.deepEqual(manquantes, [], `Feuilles absentes du PRECACHE de sw.js : ${manquantes.join(', ')}.`);
   });
 
   test('PRECACHE ne référence aucun module inexistant', async () => {
@@ -761,7 +783,7 @@ describe('Lisibilité : échelle typographique', () => {
   // l'élément touché reste affiché comme sélectionné jusqu'à ce qu'on tape
   // ailleurs. Constaté sur le bouton "Filtres" de la légende (.legende-toggle).
   test('aucun état de survol hors de @media (hover: hover)', async () => {
-    const css = (await lire('assets/style-carte.css')).replace(/\/\*[\s\S]*?\*\//g, '');
+    const css = (await lireCarteCss()).replace(/\/\*[\s\S]*?\*\//g, '');
     const garde = css.indexOf('@media (hover: hover)');
     assert.ok(garde > 0, 'Bloc @media (hover: hover) absent');
     const avant = css.slice(0, garde);
@@ -776,7 +798,7 @@ describe('Lisibilité : échelle typographique', () => {
   // qu'alourdir un réglage secondaire. D'où le garde (pointer: coarse) —
   // le test vérifie donc la cible LÀ OÙ elle s'applique, pas partout.
   test('la cible tactile de 44 px est garantie sur pointeur grossier', async () => {
-    const css = await lire('assets/style-carte.css');
+    const css = await lireCarteCss();
     // Découpage par indexOf plutôt que par expression régulière : le bloc
     // s'étend sur plusieurs règles, et une regex multiligne ici demandait
     // des échappements que la moindre réécriture du fichier casse.
@@ -800,7 +822,7 @@ describe('Lisibilité : échelle typographique', () => {
   // était écrite en dur à quatre endroits, tout changement de contenu de
   // l'en-tête la rendait fausse en silence.
   test("la hauteur d'en-tête est un jeton, pas une constante répétée", async () => {
-    const carte = await lire('assets/style-carte.css');
+    const carte = await lireCarteCss();
     const base = await lire('assets/style.css');
     assert.match(base, /--hauteur-entete:\s*\d+px/, 'Jeton --hauteur-entete absent');
     assert.match(carte, /\.map-header\s*\{[^}]*height:\s*var\(--hauteur-entete\)/,
@@ -819,7 +841,7 @@ describe('Lisibilité : échelle typographique', () => {
   // ("Type de voie"), que ce bug Safari ne concerne pas — seuls restent les
   // deux <select> de cotation.
   test('les contrôles de formulaire font 16 px sur mobile', async () => {
-    const css = await lire('assets/style-carte.css');
+    const css = await lireCarteCss();
     // Ancrer sur la SECTION mobile : `.recherche-champ input` existe aussi en
     // règle de base (à --fs-base), qu'un motif non ancré attrapait d'abord.
     const ancre = css.indexOf('Champs de saisie sur mobile');
@@ -846,7 +868,7 @@ describe('Sécurité : échappement', () => {
   // lecture a une conséquence physique, d'où deux libellés qu'il ne faut
   // jamais fusionner.
   test('la hauteur ne se présente jamais comme une corde sur une grande voie', async () => {
-    const { colonneHauteur } = await import('../assets/js/popups.js');
+    const { colonneHauteur } = await import('../assets/js/champs-fiche.js');
 
     assert.deepEqual(colonneHauteur({ hauteur_max_voie_m: 30, nb_gv: 0 }),
       { label: 'Hauteur', valeur: '30 m' }, 'Secteur de couennes : lisible en corde');
@@ -865,7 +887,7 @@ describe('Sécurité : échappement', () => {
   // Le même contrôle, mais sur les données réellement publiées : c'est là
   // qu'une régénération pourrait introduire un secteur mal étiqueté.
   test('aucun secteur publié ne porte « Hauteur » alors qu\'il a une grande voie', async () => {
-    const { colonneHauteur } = await import('../assets/js/popups.js');
+    const { colonneHauteur } = await import('../assets/js/champs-fiche.js');
     const fautifs = [];
     let avec = 0;
     for (const lieu of LIEUX) {
@@ -1022,7 +1044,7 @@ describe('Pages HTML', () => {
 
   // Convention : chaque page carte porte DEUX libellés du même lieu, le nom
   // complet et sa forme courte, et le CSS bascule à 641px (voir .titre-long
-  // dans style-carte.css). Un lieu dupliqué dont on n'aurait renommé qu'un
+  // dans assets/css/). Un lieu dupliqué dont on n'aurait renommé qu'un
   // seul des deux afficherait le nom du lieu précédent sur la moitié des
   // écrans — sans que rien d'autre ne le signale.
   test('chaque page carte porte un nom long et un nom court', async () => {

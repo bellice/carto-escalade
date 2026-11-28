@@ -1,0 +1,169 @@
+/* controles.css — boutons à filet, chargement et erreur, hors ligne.
+   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   cascade : voir la liste des <link> dans chaque page. */
+
+/* ===== La recette « bouton à filet » =====
+   Sept classes la recopiaient à l'identique, sans classe de base : mono,
+   --fs-sm, filet --stone-dark, --radius, fond --paper. Le coût n'était pas
+   la duplication mais l'invisibilité des écarts — impossible, en lisant le
+   CSS, de dire si un « 6px 8px » était une décision ou une faute de frappe.
+   Deux fonds de survol différents pour cette même recette avaient d'ailleurs
+   fini par s'installer (corrigés, voir « États de survol » en fin de feuille).
+   Groupées ici, les déclarations communes sont écrites une fois ; ce qui reste
+   dans chaque bloc individuel est, par construction, un écart VOULU :
+     .btn-preparer / .btn-reessayer-voies → color: --forest
+     .btn-reessayer                        → filet --clay, --fs-base
+   La mise en page (padding, min-height, width, position) reste propre à
+   chaque bouton : elle dépend de l'endroit où il vit, pas de sa famille.
+   Placé AVANT tous les blocs concernés : à spécificité égale, c'est l'ordre
+   de source qui tranche, et l'écart doit gagner sur la recette.
+   .btn-tri-voies n'en fait pas partie : fond transparent, texte --forest et
+   font: inherit — c'est la grammaire « segment/bascule », pas celle-ci. */
+.btn-tout-voir,
+.btn-reessayer,
+.btn-reessayer-voies,
+.btn-preparer,
+.btn-epuree,
+.btn-reinitialiser-filtres,
+.btn-voir-detail-voies,
+.btn-retour-fiche {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+/* Vue d'ensemble — contrôle MapLibre (voir creerControleToutVoir dans
+   app.js), empilé automatiquement sous NavigationControl (top-right) par la
+   carte elle-même : seul le style visuel du bouton est à définir ici, sa
+   position/son espacement sont gérés par MapLibre. */
+.btn-tout-voir {
+  padding: 4px 10px;
+}
+
+/* État de chargement / erreur (le temps que data.geojson arrive) */
+.etat-chargement {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  background: var(--paper);
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  color: var(--ink);
+  text-align: center;
+  max-width: min(240px, calc(100vw - 40px));
+}
+.etat-chargement.erreur {
+  color: var(--clay-dark);
+  border-color: var(--clay);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+/* Bouton "Réessayer" du chargement initial : ici on assume un vrai bouton
+   à cadre (et non un lien texte comme les actions secondaires de la fiche) —
+   c'est la seule action possible à cet instant, l'écran ne contient rien
+   d'autre. Cible 44 px, même règle que partout ailleurs. */
+.btn-reessayer {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--clay);
+  color: var(--clay-dark);
+  font-size: var(--fs-base);
+}
+
+/* Indicateur hors-ligne — non bloquant : il informe, il n'interrompt pas (le
+   site reste pleinement utilisable en cache). role=status et non alert :
+   annoncé sans voler le focus.
+   Persistant et textuel : être hors ligne est un état durable, pas un
+   évènement, et une simple marque colorée échouerait à WCAG 1.4.1.
+   Puce posée sur la carte, et non plus barre pleine largeur ancrée en bas :
+   recouvrir le canevas est gratuit, recouvrir de l'interface coûte. En bas,
+   mesuré à 390x844, elle masquait entièrement l'attribution OpenStreetMap
+   (obligation de crédit) et mangeait 7px de la légende dépliée. Ici elle ne
+   réserve aucune place : la carte ne perd pas un pixel. */
+.bandeau-hors-ligne {
+  /* fixed et non absolute : enfant DOM de #panneau-lateral (voir carte.js),
+     qui devient lui-même position:absolute en mode Filtres (voir plus bas,
+     body.mode-filtres) — un enfant resté absolute se positionnerait alors
+     par rapport à CE panneau plutôt qu'au viewport. fixed échappe à tout
+     ancêtre positionné. Aucun changement de rendu ailleurs : sans ancêtre
+     positionné avant lui en mode Carte, absolute et fixed y donnent déjà le
+     même résultat. */
+  position: fixed;
+  top: 101px; /* sous .recherche : top 54 + ~39 de hauteur + 8 d'air */
+  left: 12px;
+  z-index: 30;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  background: var(--clay-dark);
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.bandeau-hors-ligne[hidden] { display: none; }
+
+/* Détail des voies indisponible (échec réseau) — remplace la disparition
+   silencieuse de l'histogramme, qui se confondait avec "pas de données". */
+.detail-indisponible {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.btn-reessayer-voies {
+  min-height: 44px;
+  padding: 0 10px;
+  color: var(--forest);
+}
+
+/* « Préparer le hors-ligne » (voir hors-ligne.js) — dans l'en-tête, plus
+   dans la légende : c'est une action de préparation ponctuelle (avant de
+   partir, sur wifi), pas un réglage de carte. Elle y occupait 53 px alors
+   que la légende couvrait déjà 49 % du viewport mobile.
+   Libellé court porté par le bouton lui-même (« Préparer », « 42 % »,
+   « Prête ») : une seconde ligne de statut ne tiendrait pas dans l'en-tête
+   d'un téléphone. L'action complète reste dite par aria-label + title.
+   Le jeu de libellés est calé sur un budget de 107 px mesuré à 390 px de
+   large, et conçu pour ne jamais s'élargir en cours d'usage — voir le
+   commentaire de `poser` dans hors-ligne.js. */
+#preparation-hors-ligne {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.btn-preparer {
+  padding: 4px 10px;
+  color: var(--forest);
+  white-space: nowrap;
+}
+/* Préparation à jour : encre verte pleine, sans icône (règle du site) — le
+   seul signal dont on a besoin est « c'est fait », le détail est dans
+   l'aria-label. */
+.btn-preparer.pret {
+  border-color: var(--cotation);
+  color: var(--cotation);
+}
+/* Hors ligne, préparer ne peut rien produire : chaque tuile échouerait. Le
+   bouton se désactive (voir poser, hors-ligne.js) plutôt que d'accepter un
+   clic sans effet — la raison est dite dans title/aria-label, l'état grisé
+   seul ne l'expliquerait pas. --muted plutôt qu'une opacité : 6,19:1 sur
+   --paper, donc lisible, là où opacity:0.5 aurait dilué aussi la bordure. */
+.btn-preparer:disabled {
+  border-color: var(--stone-dark);
+  color: var(--muted);
+  cursor: not-allowed;
+}

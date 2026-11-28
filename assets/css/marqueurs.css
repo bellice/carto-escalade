@@ -1,0 +1,145 @@
+/* marqueurs.css — marqueurs DOM (falaise, parking, gîte) et libellés de site et de secteur.
+   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   cascade : voir la liste des <link> dans chaque page. */
+
+.marqueur {
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* Zone cliquable : au moins 44px, quel que soit le diamètre visuel
+     (--diametre, posé par catégorie plus bas). */
+  --cote: max(44px, var(--diametre, 0px));
+  width: var(--cote);
+  height: var(--cote);
+}
+/* Nom de site, nom de secteur, parking : cachés par visibilite.js. visibility
+   et non display, pour que les libellés restent mesurables (anti-collision). */
+.masque { visibility: hidden; }
+.marqueur:focus-visible {
+  outline: 3px solid var(--forest);
+  outline-offset: 2px;
+}
+
+/* Disque/losange réellement affiché — jamais de logique d'interaction ici,
+   le marqueur cliquable/focusable est .marqueur (le parent, la cible tactile). */
+.marqueur-visuel {
+  display: block;
+  pointer-events: none;
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  width: var(--diametre);
+  height: var(--diametre);
+}
+
+/* Gîte : losange, pour se distinguer des ronds falaise/parking. La rotation
+   vit sur le visuel, jamais sur .marqueur dont MapLibre réécrit le transform. */
+.marqueur-hebergement { --diametre: 16px; }
+.marqueur-hebergement .marqueur-visuel {
+  background: var(--ink);
+  transform: rotate(45deg);
+}
+
+/* Parking : carré et non rond, la catégorie est codée par la forme, la couleur
+   changeant déjà de sens sur les falaises selon le mode actif. Lettre "P"
+   centrée (voir addMarker, marqueurs.js) — display:flex écrase le
+   display:block de .marqueur-visuel ci-dessus, le reste (bordure, ombre)
+   reste hérité. */
+.marqueur-parking { --diametre: 22px; }
+.marqueur-parking .marqueur-visuel {
+  background: var(--teal);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Vue d'ensemble (zoom < ZOOM_SIMPLIFICATION) : les falaises sont rendues en
+   couche native MapLibre, avec des expressions de zoom qui les réduisent à un
+   petit point uniforme (7px, voir construireCoucheFalaises dans couche-falaises.js) —
+   les parkings/gîte (marqueurs DOM) suivent la même réduction de taille
+   (même valeur 7px) pour rester cohérents : sans ça un parking à 22px ferait
+   un pavé disproportionné à côté de points de 7px. Couleur propre à chacun
+   conservée. */
+.marqueur-parking.zoom-eloigne .marqueur-visuel,
+.marqueur-hebergement.zoom-eloigne .marqueur-visuel {
+  width: 7px !important;
+  height: 7px !important;
+  border-width: 1px !important;
+}
+/* Le "P" n'a plus sa place à 7px (illisible, déborderait) : simple point de
+   couleur à cette échelle, comme les falaises simplifiées au-dessus. */
+.marqueur-parking.zoom-eloigne .marqueur-visuel {
+  font-size: 0 !important;
+}
+
+/* Nom de site (marqueur DOM non interactif, ajouté après les marqueurs
+   falaise/parking/gîte pour passer au-dessus dans l'empilement — voir
+   ajouterLabelsSites). Le fond semi-opaque garde le texte lisible même par
+   -dessus un figuré ponctuel ou un fond de carte plus sombre. */
+.label-site {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  background: rgba(251, 250, 246, 0.85);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.label-site:focus-visible {
+  outline: 2px solid var(--forest);
+  outline-offset: 1px;
+}
+
+/* Nom de secteur, affiché seulement à fort zoom (voir ZOOM_LABELS_SECTEUR /
+   ajouterLabelsSecteurs dans labels.js) — cliquable, même motif que
+   .label-site (voir ajouterLabelsSecteurs/ajouterLabelsDeSecteur) : le
+   cercle juste au-dessus et cette étiquette désignent la MÊME falaise, donc
+   aucun risque de détourner le clic d'un voisin en la rendant réceptive.
+   Volontairement plus discret que .label-site (pas de majuscules/letter-
+   spacing, plus petit, fond moins opaque) : un secteur est un niveau en
+   dessous du site dans la hiérarchie des noms de lieux — même logique qu'une
+   carte topo où un toponyme secondaire est rendu plus petit et plus léger
+   qu'un toponyme principal, pas juste dans une autre couleur. */
+.label-secteur {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  color: var(--muted);
+  background: rgba(251, 250, 246, 0.65);
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  /* Pas de nowrap : certains noms de secteur sont longs ("Champagne pour
+     tout le monde") — laissé à la coupure naturelle plutôt qu'un seul chip
+     très large. max-width fixe la largeur où ça coupe (indépendante de la
+     longueur du nom) ; appliquerAntiCollisionSecteurs mesure la vraie
+     hauteur (offsetHeight) à chaque fois, donc reste correct quel que soit
+     le nombre de lignes. line-clamp plafonne à 2 lignes pile (repéré après
+     coup : sans plafond, un nom à 4 mots peut déborder sur 3 — "…" en fin de
+     2e ligne si jamais un nom encore plus long apparaît). */
+  max-width: 115px;
+  text-align: center;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.label-secteur:focus-visible {
+  outline: 2px solid var(--forest);
+  outline-offset: 1px;
+}

@@ -1,0 +1,301 @@
+/* fiche-actions.css — listes de liens, itinéraire et GPS, topo papier, partage.
+   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   cascade : voir la liste des <link> dans chaque page. */
+
+/* Liste de boutons .lien-secteur en flux (flex-wrap) : réutilisée pour la
+   liste "Falaises" (popup parking, plusieurs sommets) et la liste "Parking"
+   (popup falaise, plusieurs parkings, voir champParkingAssocie) — même
+   besoin dans les deux sens (label seul sur sa ligne, boutons qui s'enroulent
+   en dessous), pas de raison d'avoir deux règles identiques. Corrige un texte
+   assemblé en ligne avec des "·" (1er jet) : au-delà d'une certaine longueur
+   de bouton (ex. "Parking 1 (5 min à pied)"), le séparateur pouvait se
+   retrouver seul sur sa propre ligne au retour à la ligne — constaté en réel. */
+.popup .liens-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 2px;
+}
+.popup .nom-falaise {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--forest);
+}
+
+.popup .lien-secteur {
+  font: inherit;
+  color: var(--forest);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Liste repliée au-delà de SEUIL_REPLI_FALAISES entrées (voir champs-fiche.js).
+   <details> natif : ouverture au clavier et annonce par lecteur d'écran sans
+   une ligne de JS, et rien à ajouter au répartiteur de clics des fiches.
+   Le marqueur par défaut (triangle) est retiré des deux façons qu'il faut
+   (list-style pour les navigateurs récents, ::-webkit-details-marker pour
+   Safari) et remplacé par un chevron textuel, comme le repli de la légende —
+   le site n'emploie aucun pictogramme. min-height : la cible tactile de 44px
+   du reste du site. */
+.popup .liens-replies > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--forest);
+  text-decoration: underline;
+}
+.popup .liens-replies > summary::-webkit-details-marker { display: none; }
+.popup .liens-replies > summary::after {
+  content: '▾';
+  text-decoration: none;
+  font-size: var(--fs-xs);
+}
+.popup .liens-replies[open] > summary::after { content: '▴'; }
+
+/* Listes des parkings d'une falaise (voir champParkingAssocie) : une ligne
+   cliquable par parking, uniforme entre 1 et N — [P] Parking [n] - X min à
+   pied. La ligne entière navigue vers le parking (le badge P relie aux
+   icônes de la carte). */
+.popup .parkings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+/* Itinéraire + GPS, une fois déplacés dans "Accès" (voir popups.js,
+   popupFalaise) : simples <a>/<div> frères de .parkings-list, sans le
+   gap:8px que fournissait avant .actions en display:flex — collés l'un à
+   l'autre sans cette marge (repéré en test réel : "trop collé" entre la
+   liste de parkings et le bouton Itinéraire). Ciblé sur .fiche-groupe-suivant
+   uniquement : popupParking/popupGite gardent Itinéraire+GPS dans .actions,
+   dont le gap flex reste inchangé, pas concerné par cette règle. */
+.popup .fiche-groupe-suivant .btn-primary,
+.popup .fiche-groupe-suivant .gps-copie {
+  margin-top: 8px;
+}
+.popup .parking-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: none;
+  border: none;
+  padding: 3px 4px;
+  margin: 0 -4px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+/* Affordance cliquable : le libellé "Parking n" ressemble à un lien
+   (souligné, vert), le temps reste en gris muet ; au survol la ligne se
+   teinte légèrement et le libellé passe en argile. */
+.popup .parking-libelle {
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.popup .parking-ligne .badge-parking { flex-shrink: 0; }
+.popup .parking-duree { color: var(--muted); }
+
+/* Une seule action "forte" (bouton plein, l'itinéraire — la plus utilisée
+   sur le terrain) et le reste en discrets liens texte soulignés en dessous
+   (même traitement que .lien-secteur) : 4 boutons encadrés de même poids
+   étaient plus difficiles à scanner qu'à réellement départager. */
+.popup .actions {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popup a.btn-primary {
+  display: block;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--forest);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+/* Coordonnées GPS : affichées en clair plutôt que cachées derrière un
+   intitulé générique — copiables d'un tap (voir boutonGps dans app.js).
+   Traitement à part de .actions-secondaires (ci-dessous) : ce n'est ni une
+   navigation externe ni l'action principale, plutôt une donnée brute qu'on
+   peut aussi vouloir lire/noter sans rien coller ensuite. Le mot "Copier" à
+   droite est un texte réel, pas juste un aria-label — une case grisée seule
+   ne suffit pas à dire "on peut taper ici" (même leçon que .poignee-fiche). */
+.popup .gps-copie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font-family: var(--font-mono);
+  border: 1px solid var(--stone-dark);
+  background: var(--stone);
+  color: var(--ink);
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.popup .gps-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.popup .gps-label {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.popup .gps-valeur {
+  font-size: var(--fs-sm);
+}
+.popup .gps-action {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+.popup .gps-copie.copied {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--paper);
+}
+.popup .gps-copie.copied .gps-label {
+  color: var(--paper);
+}
+
+.popup .actions-secondaires {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.popup .actions-secondaires a {
+  font: inherit;
+  color: var(--forest);
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.popup .actions-secondaires .separateur {
+  color: var(--stone-dark);
+}
+
+/* Groupe "Topo papier" (voir popups.js, groupeTopo) : même gabarit que
+   "Accès", aligné à gauche comme .fiche-infos/.actions (pas centré comme
+   l'ancienne rangée compacte).
+   font-family: var(--font-body), pas --font-mono : un titre de topo est une
+   phrase (nom + auteur + année), et le monospace élargit anormalement les
+   espaces après une virgule sur ce genre de texte (repéré sur "... Diois
+   (FFME 26, 2020), p. 86, 88, 90", qui semblait troué). C'est déjà la police
+   par défaut de .maplibregl-popup-content, écrasée ici par erreur au 1er jet.
+   --fs-base, pas --fs-sm : c'est du contenu à lire (comme "10 min à pied"
+   dans .parking-ligne), pas à de la
+   prose informative ; le confondre ici la faisait paraître trop petite. */
+.popup .topo-reference {
+  margin: 0 0 4px;
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  color: var(--muted);
+}
+/* Page(s) + lien d'achat sur la même ligne (voir popups.js,
+   lignePageEtAchat) : badges à gauche, lien à droite — même motif que
+   .gps-copie (valeur à gauche, "Copier" à droite) : économise une ligne de
+   hauteur plutôt que d'empiler. flex-wrap : si les deux ne tiennent pas
+   côte à côte (plusieurs badges + lien dans une popup de 260px), le lien
+   repasse sous les badges de lui-même au lieu de les compresser. */
+.popup .topo-page-ligne {
+  margin: 0 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+/* Page(s) en badges : c'est le repère le plus utile une fois qu'on a déjà
+   le bon topo en main, mis en avant sans reprendre une ligne de texte de
+   plus (essayé puis écarté : une 2e ligne "p. 34" faisait doublon avec la
+   référence juste au-dessus). Un badge par page (jamais "p. 86, 88, 90" en
+   un seul badge) : reste compact quel que soit le nombre de pages. */
+.popup .topo-page {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.popup .topo-page-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: var(--stone);
+  color: var(--ink);
+}
+/* Lien d'achat/téléchargement séparé du texte de référence ci-dessus (pas le
+   titre entier cliquable) : reste explicite sur ce qu'il fait ("Acheter ce
+   topo" finance l'entretien des falaises, pas une simple commodité perso).
+   font-family/font-size explicites (oubliés au 1er jet) : sans ça le lien
+   hérite du corps de page (16px, --font-body) au lieu de l'échelle du
+   popup — d'où le "beaucoup trop gros" repéré en vrai. Mono + --fs-sm,
+   comme "Voir sur Oblyk" juste en dessous (.actions-secondaires a) : un
+   libellé court sans ponctuation interne n'a pas le problème d'espacement
+   de .topo-reference ci-dessus, et une action reste volontairement plus
+   discrète qu'une info à lire. white-space: nowrap : ne coupe jamais au
+   milieu de "Acheter ce topo" quand il repasse à côté/sous les badges. */
+.popup .topo-achat {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+/* Partager cette fiche : action secondaire (même voix que les liens
+   .actions-secondaires ci-dessus), pas un bouton encadré — ne rivalise pas
+   avec Itinéraire (la seule action "forte" de la fiche, voir plus haut).
+   Aligné à gauche comme le reste de la fiche (pas centré : cohérence avec
+   .actions-secondaires ci-dessus, à revoir plus en profondeur plus tard). */
+.popup .btn-partager {
+  display: block;
+  margin-top: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-align: left;
+  cursor: pointer;
+}

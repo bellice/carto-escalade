@@ -269,7 +269,7 @@ function cablerBandeauReseau() {
   // Dans le panneau latéral et non dans <body> : sur desktop il s'y place en
   // flux sous la légende, dont la hauteur varie au repli — un ancrage en
   // pixels serait faux la moitié du temps. Sur mobile le panneau n'a aucune
-  // règle (voir style-carte.css) : l'élément s'y positionne contre le
+  // règle (voir assets/css/) : l'élément s'y positionne contre le
   // viewport, exactement comme .recherche et .legende le font déjà.
   (document.getElementById('panneau-lateral') || document.body).appendChild(bandeauReseau);
   const majReseau = () => {

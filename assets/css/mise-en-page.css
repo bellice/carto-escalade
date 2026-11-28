@@ -1,0 +1,349 @@
+/* mise-en-page.css — page carte : en-tête, panneaux gauche et droit, recherche.
+   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   cascade : voir la liste des <link> dans chaque page. */
+
+/* ===== Map page ===== */
+.map-header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: var(--hauteur-entete);
+  padding: 0 14px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--stone-dark);
+  font-size: var(--fs-md);
+}
+
+/* flex-shrink: 0 — sans lui, flex rétrécit tous les enfants souples quand
+   l'en-tête est à l'étroit, y compris ce lien : mesuré à 62px au lieu de 74,
+   donc sous la largeur de son propre texte, qui repassait alors sur deux
+   lignes (32px de haut dans un en-tête de 44px) — la flèche « se décalait ».
+   Le titre, lui, a min-width:0 + ellipse : c'est lui qui doit céder, et lui
+   seul. Un élément de navigation ne se déforme pas. */
+.map-header a {
+  flex-shrink: 0;
+  white-space: nowrap;
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+}
+
+/* <h1> et non <span> : la page n'avait aucun titre de niveau 1, sa hiérarchie
+   démarrait aux <h3> des popups (WCAG 1.3.1 / 2.4.6) — un lecteur d'écran
+   n'avait aucun point d'entrée pour identifier la page. font-size/margin
+   remis à plat : le rendu visuel est strictement identique à l'ancien span,
+   seule la sémantique change. */
+.map-header .titre {
+  margin: 0;
+  /* Tronque plutôt que de pousser le bouton hors de l'écran : sur un
+     téléphone étroit, c'est le nom de la sortie qui peut céder, pas
+     l'accès à la préparation hors-ligne. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--forest);
+}
+
+/* Deux libellés pour un même lieu : le nom complet quand l'en-tête a la place,
+   la forme courte sinon. Le titre dispose de (largeur d'écran − 243px), une
+   fois retranchés le lien de retour et le bouton « Préparer » à son libellé le
+   plus large — mesuré.
+   « Vallée de la Drôme et Diois » fait 183px et tiendrait donc dès ~430px,
+   mais le seuil retenu est 641px, celui du reste du site : une seule rupture
+   dimensionnelle à retenir, et ~400px de budget au lieu de 4px de marge. C'est
+   ce qui laisse la place au prochain nom de région sans avoir à re-mesurer.
+   Un test statique vérifie que chaque page carte porte bien les deux formes,
+   et un test navigateur qu'aucune ne déborde à sa largeur. */
+.map-header .titre-long { display: none; }
+@media (min-width: 641px) {
+  .map-header .titre-long { display: inline; }
+  .map-header .titre-court { display: none; }
+}
+
+#map {
+  position: absolute;
+  top: var(--hauteur-entete); bottom: 0; left: 0; right: 0;
+}
+
+/* Panneau gauche (recherche + légende) et panneau droit (fiche falaise) —
+   overlays par-dessus la carte, pas des colonnes qui la redimensionnent
+   (#map ne change jamais de taille, aucun map.resize() n'est appelé).
+   Deux designs écartés : une fiche seule dockée à droite, sans panneau de
+   filtres permanent ; puis tout fusionné dans une colonne gauche unique, où
+   une fiche longue poussait la légende hors écran et forçait à scroller pour
+   ajuster un filtre en cours de lecture. Design actuel : panneau gauche
+   compact (recherche + légende, toujours visible) et panneau droit
+   contextuel (fiche seule, apparaît à la sélection) — les filtres restent
+   lisibles pendant la lecture du détail.
+   Masqué par défaut hors media query : la fiche reste invisible sur mobile
+   quel que soit l'état JS (classe .ouvert). */
+#panneau-falaise { display: none; }
+
+@media (min-width: 641px) {
+  /* Bloc compact ancré en haut à gauche (pas pleine hauteur comme le 2e jet)
+     — se dimensionne à son contenu (recherche + légende), avec un plafond de
+     hauteur + scroll interne en secours pour un petit écran ou une légende
+     très développée. Traité comme une carte flottante (bordure+ombre sur
+     tout le pourtour) plutôt qu'une colonne bord à bord, cohérent avec son
+     nouveau gabarit compact. */
+  #panneau-lateral {
+    position: absolute;
+    top: 54px; left: 12px;
+    z-index: 10;
+    width: var(--largeur-panneau-gauche);
+    max-height: calc(100vh - 54px - 20px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.12);
+  }
+
+  /* .recherche et .legende redeviennent des enfants de flux normal (plus de
+     position:absolute individuel — c'est #panneau-lateral qui porte
+     désormais le positionnement) : sélecteur #panneau-lateral > .recherche
+     (spécificité ID+classe) plutôt que compter sur l'ordre de cascade,
+     robuste indépendamment de la position de ce bloc dans le fichier. Sur
+     mobile, hors de ce bloc, .recherche/.legende gardent leurs règles
+     position:absolute d'origine (plus bas dans ce fichier) : elles se
+     positionnent par rapport au viewport (aucun ancêtre positionné avant
+     641px), exactement comme avant leur déplacement dans #panneau-lateral. */
+  #panneau-lateral > .recherche,
+  #panneau-lateral > .legende-cercles,
+  #panneau-lateral > .legende {
+    position: static;
+    top: auto; left: auto; bottom: auto;
+    width: auto;
+    z-index: auto;
+    padding: 14px 16px;
+  }
+  #panneau-lateral > .recherche { border-bottom: 1px solid var(--stone-dark); }
+  /* .legende-cercles (pictos + cercles proportionnels) est un flottant
+     autonome sur mobile (voir plus bas, hors media query) : sur desktop il
+     s'aplatit ici au même titre que .legende ci-dessus, sans cadre propre —
+     pas de padding:0 comme .legende-contenu plus bas, il n'a pas de wrapper
+     externe qui lui donnerait déjà les 14/16 ci-dessus par un autre biais. */
+  #panneau-lateral > .legende-cercles {
+    border: none;
+    background: none;
+    border-radius: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    width: 100%;
+  }
+  /* display:flex (règle par défaut, hors media query) l'emporterait sur le
+     style natif de [hidden] sans ceci — même piège déjà couvert pour
+     .legende-contenu[hidden] plus bas. Desktop seulement : sur mobile,
+     .legende-cercles reste affiché quel que soit cet attribut (voir sa
+     règle par défaut, plus haut dans ce fichier). */
+  #panneau-lateral > .legende-cercles[hidden] { display: none; }
+
+  /* Sur desktop l'indicateur hors-ligne revient dans le flux, en dernière
+     ligne du panneau : la légende se replie et se déplie, donc sa hauteur
+     varie — l'ancrage en pixels de la règle mobile serait faux la moitié du
+     temps. Coins droits, le panneau ayant lui-même overflow:auto qui découpe
+     aux siens. */
+  #panneau-lateral > .bandeau-hors-ligne {
+    position: static;
+    border-radius: 0;
+    padding: 6px 16px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  /* Sur desktop, .legende-contenu vit dans la carte #panneau-lateral
+     (bordure + fond + ombre sur tout le panneau) : son propre cadre
+     (bordure/fond/padding) serait une "boîte dans la boîte" redondante. On
+     l'aplatit — le contenu de la légende s'aligne alors sur les bords du
+     champ de recherche (.recherche-champ), tous deux calés au padding 16px
+     du panneau. La largeur stable vient du panneau lui-même (width fixe
+     --largeur-panneau-gauche) : le width:280px ajouté précédemment n'a plus
+     lieu d'être. Le plafond de hauteur + scroll reviennent au panneau
+     (overflow-y:auto), pas à la légende.
+     width:100% (pas auto) : .legende est display:flex avec
+     align-items:flex-start (règle mobile, non annulée ici) -- un enfant flex
+     en width:auto s'y dimensionne à son contenu (shrink-to-fit) au lieu de
+     remplir la largeur disponible. 100% force le remplissage quel que soit
+     align-items, et rétablit la largeur stable que ce bloc visait déjà
+     (repéré au test : .legende-contenu rétrécissait avec .reperes-taille,
+     même symptôme que la règle mobile ci-dessus, cause différente). */
+  #panneau-lateral > .legende .legende-contenu {
+    border: none;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    width: 100%;
+  }
+
+  /* Panneau droit : fiche falaise, contextuelle (apparaît/disparaît à la
+     sélection), plein hauteur, largeur 0 -> fixe. Révélation par width (pas
+     grid-template-rows comme les sections repliables de la légende) : sa
+     hauteur ne varie jamais (top:44px à bottom:0 fixes), seule sa largeur
+     change — une simple transition width + overflow:hidden suffit, sans le
+     piège du padding qui bloquait grid-template-rows:0fr (rencontré et
+     documenté lors du 2e jet, non applicable ici). */
+  #panneau-falaise {
+    display: block;
+    position: absolute;
+    top: var(--hauteur-entete); right: 0; bottom: 0;
+    width: 0;
+    overflow: hidden;
+    z-index: 10;
+    background: var(--paper);
+    border-left: 1px solid var(--stone-dark);
+    box-shadow: -3px 0 14px rgba(0, 0, 0, 0.12);
+    transition: width 0.2s ease; /* même langage d'animation que le reste du site (ex. .legende-contenu.fiche-reduite mobile) */
+  }
+  #panneau-falaise.ouvert { width: var(--largeur-panneau-droit); }
+
+  /* Largeur fixe sur l'intérieur, indépendante du width animé du parent :
+     sans ça, le contenu se compresserait pendant les 200ms de transition
+     puis "pop" à sa taille finale au dernier instant — avec une largeur
+     fixe, seule la fenêtre de clipping (overflow du parent) grandit, le
+     contenu est simplement révélé, jamais redimensionné. */
+  .panneau-falaise-interieur {
+    position: relative; /* ancre pour .panneau-falaise-fermer */
+    width: var(--largeur-panneau-droit);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panneau-falaise-contenu {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto; /* scroll propre au panneau droit, indépendant du panneau gauche */
+    /* Le bouton fermer (position:absolute, right:8px) ne chevauche que le
+       bord droit de l'en-tête (titre à gauche, bouton à droite) : dégagé via
+       padding-right sur l'en-tête (voir #panneau-falaise .popup-entete), pas
+       un grand padding-top qui poussait tout le contenu vers le bas. */
+    padding: 14px 16px 14px;
+  }
+
+  /* En-tête falaise dans le panneau droit : bouton fermer 28px à right:8px
+     (contre 22px à right:2px pour les popups flottantes) — les 24px du
+     .popup-entete global ne suffisent plus, le titre/coin serait chevauché. */
+  #panneau-falaise .popup-entete {
+    padding-right: 40px;
+  }
+
+  .panneau-falaise-fermer {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink);
+    font-size: var(--fs-xl);
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1;
+  }
+
+  /* Les contrôles MapLibre top-right (zoom, "Tout voir") sont rendus à
+     l'intérieur de #map (map.addControl(..., 'top-right')) — le panneau
+     droit (z-index 10, ancré right:0) les recouvrirait sinon pendant qu'il
+     est ouvert. */
+  body.panneau-falaise-ouvert .maplibregl-ctrl-top-right {
+    right: var(--largeur-panneau-droit);
+    transition: right 0.2s ease;
+  }
+}
+
+/* Recherche */
+.recherche {
+  position: absolute;
+  top: 54px;
+  left: 12px;
+  z-index: 10;
+  /* 260px, plus étroit que .legende-contenu (340px) juste en dessous : cette
+     ligne partage sa hauteur avec les contrôles de zoom de la carte (haut
+     droit), contrairement à la légende. Mesuré au test sur le plus petit
+     viewport visé (320px) : au-delà de 260px, "Voir" chevauche déjà le
+     bouton "+" de 27px. La légende n'a pas cette contrainte, rien à sa
+     droite à cette hauteur-là. */
+  width: min(260px, calc(100vw - 24px));
+  display: flex;
+  gap: 6px;
+}
+
+.recherche-champ {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.recherche-champ input {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  padding: 8px 28px 8px 10px; /* marge à droite pour le bouton effacer */
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.recherche-champ input:focus {
+  outline: 2px solid var(--forest);
+  outline-offset: 1px;
+}
+
+/* Le bouton effacer custom (ci-dessous) remplace le "x" natif de
+   type=search, pour un rendu cohérent entre navigateurs. */
+.recherche-champ input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.recherche-champ .btn-effacer {
+  position: absolute;
+  /* Centré sans transform : le retour d'appui (translateY(1px) sur :active,
+     plus bas) écraserait translateY(-50%), le bouton sauterait de 12px sous le
+     doigt et le clic n'aboutirait jamais. */
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
+  right: 3px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-size: var(--fs-xl);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.recherche button {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  padding: 8px 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.recherche button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

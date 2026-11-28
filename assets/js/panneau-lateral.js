@@ -80,7 +80,7 @@ export function cablerRepliFiltres() {
 // plus concernée depuis que c'est un sibling séparé de .legende, affiché
 // en permanence des deux côtés desktop et mobile — seuls les réglages
 // (#legende-contenu) se replient. ---
-// --- Bascule mobile "Carte" / "Filtres" (voir style-carte.css, @media
+// --- Bascule mobile "Carte" / "Filtres" (voir assets/css/, @media
 // max-width:640px) : sous 641px, remplace la légende flottante par un
 // aller-retour plein écran entre la carte et le panneau de filtres —
 // #panneau-lateral, invisible hors media query. Sans effet ≥641px (garde

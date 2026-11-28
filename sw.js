@@ -12,7 +12,7 @@ const CACHE_PREFIXE = 'sorties-escalade-v';
 // À bumper quand un module est ajouté à la coquille : un module absent du
 // cache fait échouer l'import au premier chargement hors ligne, et toute la
 // carte tombe. Le rafraîchissement paresseux ne le rattrape pas.
-const CACHE_NAME = `${CACHE_PREFIXE}9`;
+const CACHE_NAME = `${CACHE_PREFIXE}11`;
 
 // Cache SÉPARÉ du fond de carte, à ne surtout pas fusionner avec la coquille :
 // il n'est pas versionné par CACHE_NAME, sans quoi bumper la coquille pour
@@ -28,7 +28,16 @@ const PRECACHE = [
   './index.html',
   './manifest.webmanifest',
   './assets/style.css',
-  './assets/style-carte.css',
+  './assets/css/marqueurs.css',
+  './assets/css/mise-en-page.css',
+  './assets/css/controles.css',
+  './assets/css/legende-filtres.css',
+  './assets/css/bascule-mobile.css',
+  './assets/css/fiche.css',
+  './assets/css/detail-voies.css',
+  './assets/css/fiche-actions.css',
+  './assets/css/fiche-mobile.css',
+  './assets/css/adaptations.css',
   './assets/js/carte.js',
   './assets/js/actions-fiche.js',
   './assets/js/carte-utils.js',
@@ -46,6 +55,11 @@ const PRECACHE = [
   './assets/js/sw-client.js',
   './assets/js/marqueurs.js',
   './assets/js/popups.js',
+  './assets/js/rose-des-vents.js',
+  './assets/js/liens-acces.js',
+  './assets/js/champs-fiche.js',
+  './assets/js/histogramme.js',
+  './assets/js/detail-voies.js',
   './assets/js/symboles.js',
   './assets/js/utils.js',
   // maplibre-gl (CDN, pré-caché pour l'offline) :

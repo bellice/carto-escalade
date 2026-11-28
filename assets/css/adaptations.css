@@ -1,0 +1,226 @@
+/* adaptations.css — impression, mouvement réduit, champs 16 px, survol, retour d'appui.
+   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   cascade : voir la liste des <link> dans chaque page. */
+
+/* ===== Impression ===== */
+@media print {
+  .map-header, .recherche, .legende, .btn-tout-voir, .etat-chargement, .maplibregl-control-container { display: none !important; }
+  #map { position: static !important; height: 60vh; }
+  body::after {
+    content: "Version imprimée — carte interactive disponible en ligne.";
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    margin-top: 20px;
+  }
+}
+
+/* ===== Mouvement réduit =====
+   Pendant CSS de dureeAnimation() (carte-utils.js), qui traite les vols de
+   caméra MapLibre. Ici : les transitions de l'interface (ouverture du panneau
+   falaise, repli de la légende, feuille du bas mobile).
+   On neutralise la durée, pas l'effet : les éléments arrivent au même état
+   final, immédiatement. Mettre `transition: none` produirait le même résultat,
+   mais une durée quasi nulle reste compatible avec les écouteurs
+   `transitionend` s'il en apparaît un jour. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* "Cotation des voies" : section à part entière (voir le HTML), plus un
+   sous-réglage du mode "Cercles" — même séparateur que .legende-figure
+   juste au-dessus plutôt qu'un simple margin-top.
+   Deux <select> natifs plutôt qu'un curseur à deux poignées : accessibles au
+   clavier, cible tactile correcte, et rien à maintenir — voir le commentaire
+   dans filtres.js. */
+.legende-cotation {
+  border-top: 1px solid var(--stone-dark);
+  padding-top: 8px;
+}
+.legende-cotation-bornes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.legende-cotation-bornes select {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 32px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  padding: 2px 4px;
+}
+
+/* ===== Champs de saisie sur mobile : 16 px minimum =====
+   iOS Safari zoome automatiquement la page quand on met le focus sur un
+   champ dont la police fait moins de 16 px — la carte saute, et l'utilisateur
+   doit pincer pour revenir. Ce n'est pas un réglage qu'on peut désactiver
+   proprement (`user-scalable=no` le ferait, mais en supprimant aussi le zoom
+   volontaire, ce qui est un vrai recul d'accessibilité en extérieur).
+   La seule solution correcte est de passer ces contrôles à 16 px.
+   Uniquement sous 640 px : sur desktop le problème n'existe pas, et la
+   densité de la colonne y est bien réglée. */
+@media (max-width: 640px) {
+  .recherche-champ input {
+    font-size: 16px;
+  }
+  #cotation-min,
+  #cotation-max {
+    font-size: 16px;
+  }
+  /* Un <select> se dimensionne sur son option la plus longue : passer la
+     police à 16px l'a fait gonfler à 297px, d'où une barre de défilement
+     horizontale sur toute la légende (constaté du temps où #mode-figure
+     portait des phrases comme « Voies par cotation » -- devenu 3 boutons
+     depuis, seuls les select de cotation ci-dessous en ont encore besoin).
+     width:100% + min-width:0 (indispensable dans un conteneur flex, où la
+     largeur minimale vaut auto par défaut et empêche tout rétrécissement)
+     le ramènent dans son cadre. */
+  .legende-cotation-bornes {
+    min-width: 0;
+  }
+  .legende-cotation-bornes select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* ===== États de survol =====
+   Regroupés sous (hover: hover) : sur un écran tactile, :hover ne se
+   « dé-survole » jamais après un tap — l'élément touché restait affiché
+   comme sélectionné jusqu'à ce qu'on tape ailleurs (constaté sur le
+   bouton Masquer/Afficher de la légende). Cette requête média les réserve
+   aux pointeurs capables de survoler réellement.
+   Placées en fin de feuille : à spécificité égale, un état de survol doit
+   l'emporter sur l'état de base, jamais l'inverse. */
+@media (hover: hover) {
+  .label-site:hover {
+    background: var(--stone-dark);
+  }
+  .label-secteur:hover {
+    background: var(--stone-dark);
+  }
+  /* Pas des :hover : déclenchées en JS au survol du CERCLE (couche native,
+     donc sans :hover CSS possible), voir ajouterLabelsDeSecteur dans
+     carte.js. Même déclencheur qu'un survol direct de l'étiquette
+     ci-dessus, pour que les deux figurés d'une même cible réagissent pareil
+     à la souris — le nom de secteur ou celui du site selon le zoom, jamais
+     les deux en même temps (voir ZOOM_LABELS_SECTEUR). */
+  .label-secteur.survole,
+  .label-site.survole {
+    background: var(--stone-dark);
+  }
+  /* LA famille bouton, en un seul bloc plutôt qu'une règle par classe.
+     L'ancienne forme (une ligne chacune) avait laissé s'installer DEUX fonds
+     de survol pour une seule et même recette visuelle : --stone-dark pour la
+     moitié des boutons, --stone pour l'autre, sans qu'aucune raison ne les
+     sépare. Groupées ici, deux valeurs différentes deviennent impossibles à
+     écrire sans le voir. --stone-dark l'emporte : sur un bouton posé sur
+     --paper, --stone ne se distinguait presque pas. */
+  .recherche-champ .btn-effacer:hover,
+  .recherche button:hover,
+  .btn-tout-voir:hover,
+  .btn-reinitialiser-filtres:hover,
+  .btn-reessayer:hover,
+  .btn-reessayer-voies:hover,
+  .btn-preparer:hover,
+  .btn-tri-voies:hover,
+  .legende-toggle:hover,
+  .btn-vue:hover,
+  .btn-epuree:hover,
+  .btn-voir-detail-voies:hover,
+  .btn-retour-fiche:hover,
+  .panneau-falaise-fermer:hover,
+  .popup .gps-copie:hover {
+    background: var(--stone-dark);
+  }
+  /* Désactivé : aucun retour, le bouton ne fera rien. Plus spécifique que le
+     bloc ci-dessus, donc l'emporte. */
+  .recherche button:disabled:hover,
+  .btn-reinitialiser-filtres:disabled:hover,
+  .btn-preparer:disabled:hover {
+    background: var(--paper);
+  }
+  /* Boutons ENCLENCHÉS : survoler ne doit pas effacer le rempli qui porte
+     l'état actif. .btn-tri-voies.actif est en plus non cliquable
+     (cursor: default) — le survol n'y annonce donc rien du tout. */
+  .btn-vue[aria-pressed="true"]:hover,
+  .btn-epuree[aria-pressed="true"]:hover,
+  .btn-tri-voies.actif:hover {
+    background: var(--forest);
+  }
+  .popup .lien-secteur:hover { color: var(--clay); }
+  .popup .parking-ligne:hover { background: rgba(0, 0, 0, 0.045); }
+  .popup .parking-ligne:hover .parking-libelle { color: var(--clay); }
+  .popup a.btn-primary:hover {
+    background: var(--teal-dark);
+  }
+  .popup .actions-secondaires a:hover {
+    color: var(--clay);
+  }
+  .popup .topo-achat:hover {
+    color: var(--clay);
+  }
+  .popup .btn-partager:hover {
+    color: var(--clay);
+  }
+}
+
+/* ===== Retour d'appui =====
+   HORS de @media (hover: hover), et c'est tout l'intérêt : le garde tactile
+   ci-dessus prive à raison les écrans tactiles du survol, mais rien n'avait
+   été mis à la place. Sur mobile, appuyer sur « Couenne » ne produisait
+   AUCUN accusé de réception tant que la carte n'avait pas fini de se
+   redessiner — l'interface paraissait morte au doigt alors qu'elle
+   travaillait. :active est la seule confirmation qu'un doigt peut recevoir,
+   et il sert aussi la souris (le clic maintenu répond).
+   Un cran plus loin que le survol dans le même sens : --stone-dark survole,
+   --stone-dark + 1px d'enfoncement appuie. Pas de transition : l'accusé de
+   réception doit être instantané, une durée le retarderait — c'est aussi
+   pourquoi prefers-reduced-motion n'a rien à retirer ici, le décalage est un
+   état, pas une animation.
+   Placé après le bloc de survol : à spécificité égale, l'appui l'emporte. */
+.recherche-champ .btn-effacer:active,
+.recherche button:not(:disabled):active,
+.btn-tout-voir:active,
+.btn-reinitialiser-filtres:not(:disabled):active,
+.btn-reessayer:active,
+.btn-reessayer-voies:active,
+.btn-preparer:not(:disabled):active,
+.btn-tri-voies:not(.actif):active,
+.legende-toggle:active,
+.btn-vue:not([aria-pressed="true"]):active,
+.btn-epuree:not([aria-pressed="true"]):active,
+.btn-voir-detail-voies:active,
+.btn-retour-fiche:active,
+.panneau-falaise-fermer:active,
+.popup .gps-copie:active {
+  background: var(--stone-dark);
+  transform: translateY(1px);
+}
+
+/* Boutons PLEINS : ils sont déjà à --forest, un fond clair les ferait
+   clignoter à l'envers. Ils s'enfoncent donc vers --forest-dark (voir
+   style.css). .btn-tri-voies.actif et .btn-vue[aria-pressed] enclenchés en
+   sont exclus plus haut : les appuyer ne déclenche rien, leur donner un
+   retour mentirait. .btn-epuree enclenché, lui, se désenclenche — il répond. */
+.btn-epuree[aria-pressed="true"]:active,
+.popup a.btn-primary:active {
+  background: var(--forest-dark);
+  transform: translateY(1px);
+}

@@ -1,0 +1,200 @@
+/* fiche-mobile.css — fiche mobile : feuille du bas.
+   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   cascade : voir la liste des <link> dans chaque page. */
+
+/* ===== Fiche mobile : feuille du bas ===== */
+@media (max-width: 640px) {
+  .maplibregl-popup {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+    transform: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    z-index: 20;
+  }
+  .maplibregl-popup-tip {
+    display: none !important;
+  }
+  .maplibregl-popup-content {
+    position: relative !important;
+    border-radius: 14px 14px 0 0 !important;
+    max-width: 100% !important;
+    width: 100% !important; /* sans ce width explicite (repéré après test),
+      un contenu court (popup parking, souvent plus courte qu'une popup
+      falaise) restait en largeur naturelle au lieu de remplir la feuille —
+      max-width seul ne force pas la largeur à s'étendre. */
+    max-height: min(45vh, 380px);
+    overflow-y: auto;
+    padding-top: 34px !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25) !important;
+    transition: max-height 0.2s ease;
+  }
+  .maplibregl-popup-content.fiche-reduite {
+    max-height: min(25vh, 220px);
+  }
+  .maplibregl-popup-content.detail-voies-ouvert {
+    /* pas 100vh : sur mobile, "vh" se base sur la hauteur du viewport barre
+       d'adresse masquée (le maximum théorique) — tant que le navigateur
+       affiche encore sa barre (cas courant à l'ouverture), 100vh dépasse la
+       zone réellement visible et le haut de la fiche déborde hors écran
+       (constaté). "dvh" (dynamic viewport height) se recalcule sur la zone
+       réellement visible à tout instant — 1ère ligne gardée en repli pour
+       les rares navigateurs sans dvh (valeur ignorée par les autres).
+       calc(...- 44px) plutôt que 100% pile : laisse le bandeau d'en-tête
+       (← Sorties / nom de la sortie, voir .map-header) visible même en
+       plein détail, repère d'orientation constant — 44px = même valeur que
+       #map/#panneau-falaise (top:44px), pas une nouvelle constante. */
+    max-height: calc(100vh - var(--hauteur-entete));
+    max-height: calc(100dvh - var(--hauteur-entete));
+  }
+  .popup .poignee-fiche {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90px;
+    height: 30px;
+    padding: 6px 0 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+  .popup .poignee-fiche::before {
+    content: "";
+    width: 36px;
+    height: 4px;
+    border-radius: var(--radius-sm);
+    background: var(--stone-dark);
+  }
+  .popup .poignee-texte {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--muted);
+  }
+  .popup .poignee-fiche:focus-visible {
+    outline: 2px solid var(--forest);
+    outline-offset: 2px;
+  }
+  .maplibregl-popup-close-button {
+    width: 32px;
+    height: 32px;
+    font-size: var(--fs-xl);
+    top: 6px !important;
+    right: 6px !important;
+  }
+  .popup-entete {
+    padding-right: 38px; /* bouton de fermeture plus grand sur mobile (32px) */
+  }
+
+  /* La popup occupe toute la largeur du viewport sur mobile (pas les 260px
+     plafonnés du desktop) : il y a objectivement plus de place, l'histogramme
+     de voies (carrés + étiquettes de cotation) paraissait trop petit dans cet
+     espace élargi (repéré après test) — même raisonnement déjà appliqué
+     ailleurs sur ce fichier (ex. .voies-case avant refonte). histo-cases
+     élargi en conséquence (2 cases de 13px + marge, au lieu de 10px). */
+  .histo-case {
+    width: 13px;
+    height: 13px;
+  }
+  .histo-cases {
+    width: 28px;
+  }
+
+  /* Micro-libellés de la fiche (Roche/Parking via .info-label/.info-valeur ;
+     Voies/Grimpe/Roche via .col-label/.col-valeur ; "Cotation (hors trad et
+     artificielle)"/"Accès" via .legende-titre et .fiche-groupe-titre) : trop
+     petits pour rester confortablement lisibles sur mobile (--fs-2xs/--fs-sm,
+     calés à l'origine pour la popup desktop de 260px) — même logique déjà
+     appliquée à .histo-label (--fs-xs en permanence, desktop et mobile, pas
+     seulement bumpé ici : seul élément du groupe à porter une cotation à
+     lire, pas juste le nom d'une section). .legende-titre/.fiche-groupe-
+     titre/.col-label sont explicitement déclarés à la même taille l'un que
+     l'autre ailleurs dans ce fichier ("même voix typographique") — bumpés
+     ensemble ici pour ne pas rouvrir cet écart. */
+  .popup .info-label,
+  .popup .info-valeur,
+  .popup .col-valeur {
+    font-size: var(--fs-base);
+  }
+  .popup .legende-titre,
+  .popup .fiche-groupe-titre,
+  .popup .col-label {
+    font-size: var(--fs-xs);
+  }
+
+  /* Rien ne doit se superposer à la feuille : on cache le reste de l'UI
+     tant qu'une fiche est ouverte (voir addMarker dans app.js). */
+  body.fiche-ouverte .recherche,
+  body.fiche-ouverte .legende,
+  body.fiche-ouverte .legende-cercles,
+  body.fiche-ouverte .btn-tout-voir,
+  body.fiche-ouverte .bascule-vue {
+    display: none;
+  }
+}
+
+/* Fiche : cibles de 44px. Après le bloc mobile ci-dessus, dont il reprend
+   la poignée et la croix (même cascade, même spécificité). Les lignes
+   empilées grandissent pour de vrai : une zone invisible déborderait sur la
+   voisine. La poignée garde sa position visuelle (top 0 + padding 10px = top
+   4px + padding 6px d'avant), la croix s'étend par pseudo-élément. */
+@media (pointer: coarse) {
+  .popup .parking-ligne,
+  .popup .gps-copie { min-height: 44px; }
+  .popup .parkings-list { gap: 0; }
+  .popup a.btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+  .popup .poignee-fiche {
+    top: 0;
+    height: 44px;
+    padding-top: 10px;
+  }
+  .maplibregl-popup-close-button::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
+
+  /* « Épurer » et « Tout voir » : zone étendue par pseudo-élément, comme
+     .btn-preparer plus haut. Rien d'interactif au-dessus ni en dessous. */
+  .btn-epuree,
+  .btn-tout-voir { position: relative; }
+  .btn-epuree::after,
+  .btn-tout-voir::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+
+  /* Zoom et boussole : boutons collés les uns aux autres, ils grandissent
+     pour de vrai. La recherche cède 12px de largeur à 320px pour ne pas
+     toucher la colonne de contrôles (44px au lieu de 29px). Le sélecteur
+     monte en spécificité : la feuille MapLibre arrive après la nôtre (preload
+     puis application), elle gagnerait à égalité. */
+  .maplibregl-ctrl-top-right .maplibregl-ctrl-group button {
+    width: 44px;
+    height: 44px;
+  }
+  .recherche { width: min(260px, calc(100vw - 72px)); }
+  .maplibregl-ctrl-attrib-button::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+}

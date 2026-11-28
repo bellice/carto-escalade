@@ -3,8 +3,9 @@
 
 import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
 import { cleFalaise, libelleFalaise, secteurDistinct, categoriserEnsoleillement, deriverStyles } from './donnees.js';
-import { poserTailleMarqueur } from './symboles.js';
-import { popupFalaise, popupParking, popupGite, construireHistogramme, construireDetailVoies } from './popups.js';
+import { popupFalaise, popupParking, popupGite } from './popups.js';
+import { construireHistogramme } from './histogramme.js';
+import { construireDetailVoies } from './detail-voies.js';
 import { reinitialiserPadding, margeAvantPopup, estPointVisible, dureeAnimation } from './carte-utils.js';
 
 // id_falaise -> { sportives, trad, artificielles } (tableaux BRUTS, jamais du
@@ -165,9 +166,27 @@ export function synchroniserPoignee(poignee, reduire) {
   if (spanTexte) spanTexte.textContent = texte;
 }
 
+// Pose l'état replié/déplié partagé (estFicheReduite) sur une fiche qui
+// vient de s'ouvrir. toggle(classe, force) et non add/remove conditionnel :
+// ce conteneur est réutilisé et peut porter un état périmé. La transition est
+// coupée le temps de poser l'état de départ, sinon une fiche ouverte déjà
+// réduite semble se replier toute seule ; la lecture d'offsetHeight force le
+// reflow, sans quoi "transition: none" s'appliquerait après la classe.
+function poserEtatFiche(elPopup, estFicheReduite) {
+  const contenu = elPopup?.querySelector('.maplibregl-popup-content');
+  if (!contenu) return;
+  const reduire = Boolean(estFicheReduite?.());
+  contenu.style.transition = 'none';
+  contenu.classList.toggle('fiche-reduite', reduire);
+  contenu.offsetHeight;
+  contenu.style.transition = '';
+  const poignee = elPopup.querySelector('.poignee-fiche');
+  if (poignee) synchroniserPoignee(poignee, reduire);
+}
+
 // Une fiche qui s'ouvre ramène toujours sur "Carte" (jamais sur "Filtres",
 // voir panneau-lateral.js/definirVueMobile) : la CSS masque déjà .bascule-vue tant que
-// body.fiche-ouverte est posé (voir style-carte.css), mais l'état interne du
+// body.fiche-ouverte est posé (voir assets/css/), mais l'état interne du
 // panneau "Filtres" doit être remis à zéro dès maintenant — sinon fermer
 // cette fiche plus tard réafficherait la pilule bloquée sur "Filtres" et la
 // carte resterait inert.
@@ -249,20 +268,10 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
   visuel.className = 'marqueur-visuel';
   el.appendChild(visuel);
 
-  if (cat === 'hebergement') {
-    poserTailleMarqueur(el, visuel, 16);
-    visuel.style.background = 'var(--ink)';
-    visuel.style.transform = 'rotate(45deg)'; // losange : se distingue des ronds falaise/parking
-  } else if (cat === 'parking') {
-    // Carré et non rond : la catégorie est codée par la forme, la couleur
-    // changeant déjà de sens sur les falaises selon le mode actif. Le « P »
-    // le distingue des carrés de l'histogramme (« 1 carré = 1 voie »), tout
-    // en restant du texte — le site n'a aucun pictogramme.
-    poserTailleMarqueur(el, visuel, 22);
-    visuel.style.borderRadius = 'var(--radius)';
-    visuel.style.background = 'var(--teal)';
-    visuel.textContent = 'P';
-  }
+  // Taille, forme et couleur : voir .marqueur-parking / .marqueur-hebergement
+  // dans assets/css/. Le « P » distingue le carré parking des carrés de
+  // l'histogramme (« 1 carré = 1 voie »), tout en restant du texte.
+  if (cat === 'parking') visuel.textContent = 'P';
   // Pas de branche "falaise" ici : retour anticipé plus haut, cat ne vaut plus
   // que "parking" ou "hebergement".
 
@@ -303,20 +312,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     // survivre au changement de fiche. toggle(classe, force) et non add/remove
     // conditionnel : ce conteneur est réutilisé et peut porter un état périmé.
     const elPopupOuverture = popup.getElement();
-    const contenuOuverture = elPopupOuverture && elPopupOuverture.querySelector('.maplibregl-popup-content');
-    const poigneeOuverture = elPopupOuverture && elPopupOuverture.querySelector('.poignee-fiche');
-    if (contenuOuverture) {
-      const reduire = Boolean(estFicheReduite && estFicheReduite());
-      // Coupe la transition le temps de poser l'état de départ, sinon une
-      // popup ouverte déjà réduite semble se replier toute seule. La lecture
-      // d'offsetHeight force le reflow : sans elle, "transition: none"
-      // s'appliquerait après le changement de classe, pas avant.
-      contenuOuverture.style.transition = 'none';
-      contenuOuverture.classList.toggle('fiche-reduite', reduire);
-      contenuOuverture.offsetHeight;
-      contenuOuverture.style.transition = '';
-      if (poigneeOuverture) synchroniserPoignee(poigneeOuverture, reduire);
-    }
+    poserEtatFiche(elPopupOuverture, estFicheReduite);
     // Les actions du contenu passent par un écouteur délégué unique dans
     // initCarte : rien à ré-attacher ici, donc insensible à un nœud périmé.
     if (cat === 'falaise') {
@@ -373,16 +369,7 @@ export function ouvrirPopupFalaise(map, entree, ctx, cameraDejaEncadree = false)
     document.body.classList.add('fiche-ouverte');
     reinitialiserVueMobile(map);
     const elPopup = popup.getElement();
-    const contenu = elPopup && elPopup.querySelector('.maplibregl-popup-content');
-    const poignee = elPopup && elPopup.querySelector('.poignee-fiche');
-    if (contenu) {
-      const reduire = Boolean(estFicheReduite && estFicheReduite());
-      contenu.style.transition = 'none';
-      contenu.classList.toggle('fiche-reduite', reduire);
-      contenu.offsetHeight;
-      contenu.style.transition = '';
-      if (poignee) synchroniserPoignee(poignee, reduire);
-    }
+    poserEtatFiche(elPopup, estFicheReduite);
     if (onSelectionFalaise) onSelectionFalaise(entree.cle);
     enSurbrillance([entree.cle, ...entree.parkingAssocie]);
 

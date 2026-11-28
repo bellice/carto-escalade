@@ -123,14 +123,14 @@ function construireGeojsonSecteurs(geojson) {
 // keydown). Le raisonnement inverse tenu ici auparavant était erroné :
 // contrairement à un nom de SITE (qui coiffe plusieurs falaises différentes,
 // d'où un vrai risque de détourner le clic de l'une d'elles au profit du
-// site — mesuré, voir le commentaire de .label-site dans style-carte.css),
+// site — mesuré, voir le commentaire de .label-site dans assets/css/),
 // un nom de SECTEUR désigne la MÊME entité que le cercle juste au-dessus
 // (même cle, voir cleFalaise) : cliquer l'un ou l'autre ouvre toujours la
 // même fiche, sans rien voler à un voisin DIFFÉRENT.
 // Toujours PAS de zone tactile élargie (::after) au-delà du texte visible :
 // le risque n'est plus le cercle en dessous mais un secteur VOISIN (voir
 // appliquerAntiCollisionSecteurs) — même exception WCAG 2.5.8 que
-// .label-site, voir style-carte.css et le test "Cibles tactiles".
+// .label-site, voir assets/css/ et le test "Cibles tactiles".
 // Renvoie {el, marker, nom, cle} (pas juste l'élément) : appliquerAntiCollisionSecteurs
 // (carte.js) a besoin de la position de chaque marqueur pour son
 // anti-collision à l'écran, et cle sert à retrouver l'étiquette d'un secteur

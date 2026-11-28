@@ -9,7 +9,7 @@
 const MARGE_MOBILE = { top: 120, bottom: 170, left: 70, right: 70 };
 
 // Seuil desktop/mobile — même valeur que le CSS (@media max-width:640px,
-// style-carte.css). Centralisé ici plutôt que dans chaque appelant.
+// assets/css/). Centralisé ici plutôt que dans chaque appelant.
 export function estDesktop() {
   return !window.matchMedia('(max-width: 640px)').matches;
 }
@@ -95,7 +95,7 @@ export function estPointVisible(map, lon, lat, padding, marge = 24) {
 //   (contextuel, réservé uniquement par margeAvantPopup(true)).
 // - Mobile : mesure la VRAIE hauteur occupée à l'écran par .legende-cercles
 //   (pictos + cercles proportionnels, flottant en permanence en bas, voir
-//   style-carte.css) plutôt que de deviner un chiffre fixe — c'est le plus
+//   assets/css/) plutôt que de deviner un chiffre fixe — c'est le plus
 //   HAUT des deux éléments empilés dans ce coin (lui, puis la pilule
 //   Carte/Filtres en dessous), le mesurer couvre donc les deux d'un coup.
 //   Recalculée à chaque appel : la hauteur d'écran peut changer (rotation).

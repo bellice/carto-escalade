@@ -31,7 +31,7 @@ export function escapeHtml(str) {
 // plutôt que liste noire (une liste noire se contourne : `JaVaScRiPt:`,
 // espaces insécables, encodages...). Les schémas retenus sont ceux que le
 // site produit réellement : http/https (topo, Oblyk, Camptocamp) et geo:
-// (lien d'itinéraire mobile, voir lienItineraire dans popups.js).
+// (lien d'itinéraire mobile, voir lienItineraire dans liens-acces.js).
 // Une URL RELATIVE reste acceptée (résolue contre la page courante).
 // Renvoie '' si le schéma n'est pas autorisé : l'appelant n'affiche alors
 // pas de lien du tout, plutôt qu'un lien inerte qui aurait l'air cliquable.

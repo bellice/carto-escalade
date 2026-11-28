@@ -1,0 +1,227 @@
+/* detail-voies.css — détail des voies (drill-down).
+   Dépend des jetons de style.css. L'ordre de chargement est l'ordre de la
+   cascade : voir la liste des <link> dans chaque page. */
+
+/* ===== Détail des voies (drill-down depuis "Voir le détail des voies") :
+   swap en place dans .popup, partagé mobile/desktop — voir afficherDetailVoies/
+   masquerDetailVoies (marqueurs.js). Seule la contrainte de hauteur du
+   conteneur (media query plus bas, mobile uniquement) diffère entre les
+   deux : desktop n'a besoin d'aucun CSS séparé (#panneau-falaise n'a pas de
+   plafond de hauteur, un contenu plus long y scrolle simplement). ===== */
+.popup .fiche-voies-detail { display: none; }
+.popup.mode-detail-voies .fiche-voies-resume,
+.popup.mode-detail-voies .fiche-infos-cols,
+.popup.mode-detail-voies .fiche-groupe-suivant,
+.popup.mode-detail-voies .actions,
+.popup.mode-detail-voies .poignee-fiche {
+  display: none;
+}
+.popup.mode-detail-voies .fiche-voies-detail {
+  display: block;
+}
+
+/* Cible tactile ≥44px (même règle que poserTailleMarqueur, symboles.js),
+   décorrélée de la taille visuelle du bouton. */
+.btn-voir-detail-voies {
+  min-height: 44px;
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.detail-voies-titre {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+/* Bandeau de tri Cotation/Position (voir detail-voies.js, construireDetailVoies) :
+   texte, pas des icônes (règle déjà posée ailleurs sur ce site) — l'état
+   actif reprend le remplissage plein utilisé pour .gps-copie.copied
+   (confirmation/état actif), plus adapté ici à un choix binaire persistant
+   qu'un simple soulignement (l'inactif, lui, reprend le style des liens
+   .actions-secondaires — même vocabulaire, cohérent avec le reste du site). */
+.detail-voies-tri {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+/* Libellé visible du groupe de tri : l'aria-labelledby (voir detail-voies.js)
+   suffisait aux lecteurs d'écran mais laissait un utilisateur voyant sans
+   indice que "Cotation"/"Position" sont des tris (pourrait passer pour deux
+   onglets de contenu différent) — même voix que .col-label (Voies/Grimpe/
+   Roche de la fiche compacte), cohérent avec le reste du site plutôt qu'un
+   nouveau style de libellé. */
+.detail-voies-tri-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--fs-2xs);
+}
+.btn-tri-voies {
+  padding: 4px 10px;
+  border: 1px solid var(--stone-dark);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--forest);
+  font: inherit;
+  cursor: pointer;
+}
+.btn-tri-voies.actif {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--paper);
+  cursor: default;
+}
+
+/* "← Retour" ancré en bas (sticky), pas en haut à côté du titre (1er/2e jet,
+   abandonnés) : sur mobile, une fois la fiche quasi plein écran, un bouton
+   en haut se retrouve à l'opposé du pouce dans une liste de 40+ voies —
+   sticky le garde accessible en permanence, quelle que soit la position de
+   scroll. `position: sticky` s'accroche au conteneur qui défile réellement
+   (.maplibregl-popup-content mobile, .panneau-falaise-contenu desktop) sans
+   rien connaître de lui explicitement. Redevenu un vrai bouton à cadre
+   (comme "Voir le détail des voies"), pas un lien souligné : plus prononcé,
+   corrige aussi le manque d'affordance relevé sur la version précédente
+   (texte simple à côté du titre, trop discret). Fond opaque (--paper)
+   indispensable : le contenu qui défile doit disparaître sous le bouton,
+   pas se voir par transparence ; l'ombre au-dessus le détache visuellement
+   de ce contenu une fois collé en bas. */
+.btn-retour-fiche {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px;
+  width: 100%;
+  margin-top: 10px;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Grille (pas une simple liste flex) : chaque <li> passe en display:contents,
+   ses enfants deviennent directement des items de cette grille — alignement
+   en vraies colonnes sur toute la liste (nom/cotation/points/hauteur),
+   colonne par colonne, pas juste au sein d'une ligne isolée (ce qu'aurait
+   donné un flex par <li>, chaque ligne se dimensionnant indépendamment). */
+.detail-voies-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  /* pas de column-gap : un vrai "trou" entre les colonnes de grille, jamais
+     peint par le fond d'aucune cellule — avec le zébrage 1 ligne sur 2 (voir
+     .detail-voie-impaire), ce trou coupait la bande de couleur (et la
+     bordure du bas) à chaque séparation de colonne, discontinue au lieu
+     d'une seule bande pleine largeur. L'espacement entre colonnes vient
+     maintenant du padding horizontal de chaque cellule (voir .detail-voie >
+     *) : les boîtes se touchent, mais chacune peint sa propre moitié de
+     l'espacement — plus aucun trou non peint entre elles. */
+  /* stretch (valeur par défaut, plus "baseline") : chaque cellule occupe
+     toute la hauteur de sa ligne de grille, pas seulement celle de son
+     propre contenu — indispensable pour que les bordures du bas tombent
+     toutes à la même hauteur (voir .detail-voie > * ci-dessous). Avec
+     baseline (essayé, retiré), les cellules cotation/points/hauteur ont des
+     tailles de police différentes (--fs-sm vs --fs-xs) donc des hauteurs de
+     ligne différentes : la bordure de chaque cellule suivait sa propre
+     hauteur au lieu de celle de la ligne entière, dessinant des traits
+     décalés d'une colonne à l'autre (repéré : lignes du tableau visiblement
+     désalignées vis-à-vis de cotation/points/hauteur). */
+  align-items: stretch;
+  font-size: var(--fs-sm);
+}
+.detail-voie { display: contents; }
+/* La bordure vit sur chaque cellule (pas sur .detail-voie, qui n'a plus de
+   boîte propre en display:contents) : posée sur les 5 enfants, elle dessine
+   quand même une ligne continue sous chaque voie. display:flex +
+   align-items:center sur chaque cellule : stretch (ci-dessus) les rend
+   toutes de la même hauteur, mais sans ça leur texte se retrouverait collé
+   en haut plutôt que centré verticalement dans cette hauteur commune. */
+.detail-voie > * {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px; /* remplace l'ex-column-gap (8px) : chaque cellule peint sa propre moitié de l'espacement inter-colonnes, plus de trou non peint */
+  border-bottom: 1px solid var(--stone);
+}
+/* Fond alterné 1 ligne sur 2 : aide à suivre une ligne des yeux jusqu'à la
+   colonne Hauteur, la plus éloignée du nom — surtout utile sur les longues
+   listes (jusqu'à 40+ voies). Posé sur les cellules (pas .detail-voie-impaire
+   directement, sans boîte propre en display:contents — un fond dessus
+   n'aurait aucun effet visible). */
+.detail-voie-impaire > * { background: rgba(0, 0, 0, 0.03); }
+.detail-voie-type { justify-content: center; }
+.detail-voie-nom { overflow-wrap: anywhere; }
+.detail-voie-cotation { font-family: var(--font-mono); color: var(--muted); }
+.detail-voie-points, .detail-voie-hauteur {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+/* En-tête de colonnes ("Voie"/"Cotation"/"Points"/"Hauteur") : même voix
+   typographique que .col-label (Voies/Grimpe/Roche de la fiche compacte,
+   juste au-dessus) — cohérence entre les deux vues, pas un nouveau style. */
+.detail-voie-entete-colonnes > * {
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border-bottom-color: var(--stone-dark);
+}
+/* Cellule "type" de l'en-tête : vide (juste un repère visuel, pas de texte
+   de colonne pour un swatch décoratif) — sans bordure propre, sinon elle
+   dessine un petit trait isolé, large de ~8px, juste avant "VOIE" (repéré :
+   ressemblait à un "-" parasite). */
+.detail-voie-entete-colonnes .detail-voie-type { border-bottom: none; }
+.detail-voie-entete-colonnes .detail-voie-points,
+.detail-voie-entete-colonnes .detail-voie-hauteur {
+  font-size: var(--fs-2xs);
+}
+
+/* Sous-titre d'un bloc de style ("Trad", "Artif") dans le détail des voies,
+   affiché seulement quand plusieurs styles coexistent : pleine largeur de la
+   grille, même voix que l'en-tête de colonnes. Les voies trad et artif n'ont
+   pas de carré couenne / grande voie (leur cellule "type" reste vide). */
+.detail-voie-groupe {
+  grid-column: 1 / -1;
+  padding: 12px 8px 4px;
+  border-bottom: 1px solid var(--stone-dark);
+  font-family: var(--font-mono);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+/* Protection d'une voie trad (R/X/PG) : collée à la cotation française, un
+   cran plus discrète. */
+.detail-voie-protection {
+  margin-left: 6px;
+  font-size: var(--fs-xs);
+}
+
+/* Sous-ligne "L1"/"L2"... d'une grande voie (mode Position uniquement, voir
+   detail-voies.js/ligneDetailLongueur) : indentée pour signaler visuellement son
+   appartenance à la ligne "voie" juste au-dessus plutôt qu'une voie
+   indépendante de plus dans la liste ; taille réduite (même voix que
+   Points/Hauteur) car secondaire par rapport à cette ligne "voie". Le
+   zébrage (.detail-voie-impaire) est piloté par l'appelant au niveau du
+   groupe (voir construireListePosition) : une grande voie et toutes ses
+   longueurs partagent la même bande, jamais une alternance indépendante par
+   longueur qui casserait la lecture "ceci est une seule voie". */
+.detail-voie-longueur .detail-voie-nom {
+  padding-left: 20px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.detail-voie-longueur .detail-voie-cotation {
+  font-size: var(--fs-xs);
+}

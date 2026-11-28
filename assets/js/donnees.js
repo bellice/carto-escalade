@@ -27,7 +27,7 @@ export function libelleFalaise(p) {
 
 // Pour chaque parking : les falaises (secteurs) qui le référencent — clé,
 // sommet (nom) et secteur distinct séparément (pour pouvoir les regrouper
-// par sommet dans la popup, voir champLiensFalaises dans popups.js) — et
+// par sommet dans la popup, voir champLiensFalaises dans champs-fiche.js) — et
 // l'ensemble des "site" de ces falaises, pour le badge affiché sur la popup
 // parking.
 export function indexerParkingInfos(geojson) {
