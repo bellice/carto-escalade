@@ -105,7 +105,7 @@ export function afficherDetailVoies(popupEl, falaiseId) {
   // sans rappeler estDesktop().
   const contenuMobile = popupEl.closest('.maplibregl-popup-content');
   if (contenuMobile) {
-    // Dépliage LOCAL, sans toucher à ficheReduite (carte.js) : le dernier
+    // Dépliage LOCAL, sans toucher à ficheReduite (etat.js) : le dernier
     // choix explicite de l'utilisateur sur la poignée doit survivre.
     contenuMobile.classList.remove('fiche-reduite');
     contenuMobile.classList.add('detail-voies-ouvert');
@@ -126,7 +126,7 @@ export function basculerTriDetailVoies(popupEl, falaiseId, mode) {
 }
 
 // Filtres de voie de la carte (Pratique, Type de voie, Cotation), posés par
-// carte.js : le détail ne liste que les voies qui y répondent.
+// filtres.js : le détail ne liste que les voies qui y répondent.
 let selectionVoies = null;
 export function definirSelectionVoies(selection) {
   selectionVoies = selection;
@@ -142,7 +142,7 @@ export function rafraichirDetailVoies() {
   basculerTriDetailVoies(popupEl, placeholder.dataset.routeFalaise, actif ? actif.dataset.tri : 'cotation');
 }
 
-// ficheReduite vient de l'appelant (carte.js en est seul propriétaire) :
+// ficheReduite vient de l'appelant (etat.js, partagé par toutes les fiches) :
 // restaurer un état neutre fixe écraserait la préférence de l'utilisateur.
 export function masquerDetailVoies(popupEl, ficheReduite) {
   popupEl.classList.remove('mode-detail-voies');
@@ -166,7 +166,7 @@ export function synchroniserPoignee(poignee, reduire) {
 }
 
 // Une fiche qui s'ouvre ramène toujours sur "Carte" (jamais sur "Filtres",
-// voir carte.js/definirVueMobile) : la CSS masque déjà .bascule-vue tant que
+// voir panneau-lateral.js/definirVueMobile) : la CSS masque déjà .bascule-vue tant que
 // body.fiche-ouverte est posé (voir style-carte.css), mais l'état interne du
 // panneau "Filtres" doit être remis à zéro dès maintenant — sinon fermer
 // cette fiche plus tard réafficherait la pilule bloquée sur "Filtres" et la
@@ -202,7 +202,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
       // {cotation: nombre} : permet le filtre par fourchette sans télécharger
       // routes/*.json.
       cotations: p.cotations || null,
-      nbDansFourchette: 0, // recalculé par majFourchette (carte.js)
+      nbDansFourchette: 0, // recalculé par majFourchette (filtres.js)
       // Croisement style x type x cotation de l'export ; nbParTypeFourchette en
       // est la part dans les bornes choisies (null tant que la fourchette n'est
       // pas resserrée), voir majFourchette.
@@ -271,7 +271,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     cat === 'parking' ? popupParking(p, lat, lon, parkingInfos, cle) :
     popupGite(p, lat, lon, cle);
 
-  // closeOnClick:false — la fermeture au clic carte est reprise par carte.js :
+  // closeOnClick:false — la fermeture au clic carte est reprise par navigation.js :
   // sur desktop, une popup parking peut se superposer au panneau falaise, et
   // le clic doit alors fermer la popup seule, pas le panneau.
   const popup = new maplibregl.Popup({ offset: 14, closeOnClick: false }).setHTML(popupHtml);
@@ -290,7 +290,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
 
   popup.on('open', () => {
     // Une seule fiche flottante à la fois : le clic direct sur un marqueur ne
-    // passe pas par carte.js, on ferme donc ici la popup précédente — en
+    // passe pas par navigation.js, on ferme donc ici la popup précédente — en
     // laissant le panneau falaise desktop en place.
     const precedente = suivrePopup ? suivrePopup(popup, false) : null;
     if (precedente && precedente !== popup && !precedente.estPanneauFalaise && precedente.remove) {
@@ -299,7 +299,7 @@ export function addMarker(map, feature, parkingInfos, maxima, enSurbrillance, on
     if (suivrePopup) suivrePopup(popup, true);
     document.body.classList.add('fiche-ouverte');
     reinitialiserVueMobile(map);
-    // L'état replié/déplié est partagé (ficheReduite, carte.js) et doit
+    // L'état replié/déplié est partagé (ficheReduite, etat.js) et doit
     // survivre au changement de fiche. toggle(classe, force) et non add/remove
     // conditionnel : ce conteneur est réutilisé et peut porter un état périmé.
     const elPopupOuverture = popup.getElement();
@@ -426,9 +426,9 @@ export function ouvrirPopupFalaise(map, entree, ctx, cameraDejaEncadree = false)
 }
 
 // Panneau droit (desktop) : alternative à ouvrirPopupFalaise, choisie par
-// carte.js selon estDesktop(). Singleton DOM réutilisé, pas un élément recréé
+// navigation.js selon estDesktop(). Singleton DOM réutilisé, pas un élément recréé
 // à chaque falaise.
-let panneauFacade = null; // façade à .remove(), pour être suivie comme une popup par carte.js
+let panneauFacade = null; // façade à .remove(), pour être suivie comme une popup par navigation.js
 let declencheurFocus = null; // élément à qui rendre le focus à la fermeture
 
 // Filet de sécurité : le panneau est en HTML statique dans chaque sortie, on

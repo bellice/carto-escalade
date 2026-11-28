@@ -384,7 +384,7 @@ function col(label, valeur) {
 function champParkingAssocie(noms, approches) {
   // Chaque parking est une LIGNE cliquable avec son temps d'approche — modèle
   // uniforme entre 1 et N parkings : [P] Parking [n] · X min à pied. La ligne
-  // entière navigue vers le parking (handler .parking-ligne dans carte.js,
+  // entière navigue vers le parking (handler .parking-ligne dans actions-fiche.js,
   // même chemin que .lien-secteur). Le badge P relie aux icônes P de la carte,
   // le libellé "Parking n" est souligné (affordance de lien cliquable).
   const badgeP = '<span class="badge-parking" aria-hidden="true">P</span>';

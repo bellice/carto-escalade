@@ -51,8 +51,8 @@ export async function exposerCarte(page) {
     const reponse = await route.fetch();
     const source = await reponse.text();
     const modifie = source.replace(
-      /(map = new maplibregl\.Map\(\{[\s\S]*?\n\s*\}\);)/,
-      '$1\n      window.__carteTest = map;'
+      /(etat\.map = new maplibregl\.Map\(\{[\s\S]*?\n\s*\}\);)/,
+      '$1\n    window.__carteTest = etat.map;'
     );
     if (modifie === source) throw new Error('exposerCarte : motif de construction de la carte introuvable — carte.js a changé ?');
     await route.fulfill({ response: reponse, body: modifie });

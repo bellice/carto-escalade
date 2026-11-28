@@ -8,9 +8,8 @@
 // balisage. Or escapeHtml est justement utilisé dans une douzaine
 // d'attributs (data-cle, data-nom, href, data-route...). Une falaise nommée
 // `Falaise" onmouseover="…` produisait un vrai gestionnaire d'évènement.
-// Les données sont aujourd'hui auto-produites (CSV maintenu à la main), donc
-// le risque était latent et non actif — corrigé quand même : rien ne garantit
-// qu'une source tierce (contribution, import) ne rentre pas un jour.
+// Les données sont auto-produites (CSV maintenu à la main), mais rien ne
+// garantit qu'une source tierce (contribution, import) n'arrive pas un jour.
 //
 // Table explicite plutôt que le détour par le DOM : plus rapide, et surtout
 // le comportement ne dépend plus du contexte d'insertion.

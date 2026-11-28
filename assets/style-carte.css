@@ -45,7 +45,7 @@
 
 /* Vue d'ensemble (zoom < ZOOM_SIMPLIFICATION) : les falaises sont rendues en
    couche native MapLibre, avec des expressions de zoom qui les réduisent à un
-   petit point uniforme (7px, voir construireCoucheFalaises dans carte.js) —
+   petit point uniforme (7px, voir construireCoucheFalaises dans couche-falaises.js) —
    les parkings/gîte (marqueurs DOM) suivent la même réduction de taille
    (même valeur 7px) pour rester cohérents : sans ça un parking à 22px ferait
    un pavé disproportionné à côté de points de 7px. Couleur propre à chacun
@@ -1069,7 +1069,7 @@
   cursor: not-allowed;
 }
 
-/* Filtre "Depuis le gîte" — slider à un seul seuil (voir carte.js) : montre
+/* Filtre "Depuis le gîte" — slider à un seul seuil (voir filtres.js) : montre
    tout par défaut (poignée au maximum), glisser vers la gauche resserre
    progressivement aux falaises les plus proches. Label+valeur sur une ligne
    (comme .info-ligne des popups : libellé à gauche, valeur à droite), le
@@ -1120,7 +1120,7 @@
   white-space: nowrap;
 }
 
-/* Filtre "Ensoleillement" (configurerFiltreEnsoleillement, carte.js) : même
+/* Filtre "Ensoleillement" (configurerFiltreEnsoleillement, filtres.js) : même
    voix typographique et même séparateur que .legende-temps, chacun sa
    propre section depuis le retrait du repli commun qui les enveloppait.
    Les filtres à choix multiples (Type de voie, Style, Ensoleillement) sont
@@ -1216,7 +1216,7 @@
 /* ===== Bascule mobile Carte/Filtres =====
    Sous 641px, remplace le couple recherche flottante + légende
    flottante-repliable par un aller-retour plein écran explicite (voir
-   carte.js, definirVueMobile) — même mécanisme que body.fiche-ouverte plus
+   panneau-lateral.js, definirVueMobile) — même mécanisme que body.fiche-ouverte plus
    bas dans ce fichier, juste un second état plutôt qu'un widget de plus.
    Réutilise #panneau-lateral (déjà le parent commun de .recherche et
    .legende) comme conteneur plein écran, exactement comme
@@ -2485,7 +2485,7 @@
    juste au-dessus plutôt qu'un simple margin-top.
    Deux <select> natifs plutôt qu'un curseur à deux poignées : accessibles au
    clavier, cible tactile correcte, et rien à maintenir — voir le commentaire
-   dans carte.js. */
+   dans filtres.js. */
 .legende-cotation {
   border-top: 1px solid var(--stone-dark);
   padding-top: 8px;

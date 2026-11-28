@@ -45,6 +45,12 @@
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs" crossorigin />
   <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl-shared.mjs" crossorigin />
   <link rel="modulepreload" href="../assets/js/carte.js" />
+  <link rel="modulepreload" href="../assets/js/etat.js" />
+  <link rel="modulepreload" href="../assets/js/visibilite.js" />
+  <link rel="modulepreload" href="../assets/js/couche-falaises.js" />
+  <link rel="modulepreload" href="../assets/js/filtres.js" />
+  <link rel="modulepreload" href="../assets/js/navigation.js" />
+  <link rel="modulepreload" href="../assets/js/panneau-lateral.js" />
   <link rel="modulepreload" href="../assets/js/actions-fiche.js" />
   <link rel="modulepreload" href="../assets/js/carte-utils.js" />
   <link rel="modulepreload" href="../assets/js/marqueurs.js" />
@@ -73,6 +79,7 @@
   <link rel="stylesheet" href="../assets/style-carte.css" />
 </head>
 <body>
+  <a class="lien-evitement" href="#map">Aller à la carte</a>
 
   <header class="map-header">
     <a href="../">← Accueil</a>
@@ -102,13 +109,11 @@
          ne filtre rien. Séparé de .legende (qui, elle, filtre) pour rester
          visible en permanence des deux côtés, desktop ET mobile, quel que
          soit l'état du bouton "Filtres" (desktop) ou le mode Carte/Filtres
-         (mobile, voir style-carte.css et carte.js). -->
+         (mobile, voir style-carte.css et panneau-lateral.js). -->
     <div class="legende-cercles" id="legende-cercles">
       <div class="legende-cats">
-        <!-- SECTEURS et non « Falaises » : un point de la carte est un couple
-     site+secteur. 111 points pour 37 noms de falaise en Drôme, 60 pour
-     10 en Bretagne — le libellé était faux d’un facteur 3 à 6. Même
-     erreur que le « 111 falaises » corrigé sur l’accueil. -->
+        <!-- Secteurs et non « Falaises » : un point de la carte est un couple
+     site+secteur (111 points pour 37 noms de falaise en Drôme). -->
         <span id="cle-falaises-zone"><span class="cle"><span class="dot"></span> Secteurs</span></span>
         <span class="cle"><span class="dot parking"></span> Parkings</span>
         <span class="cle" id="legende-gite"><span class="dot gite"></span> Gîte</span>
@@ -142,7 +147,7 @@
       <div class="legende-entete">
         <button type="button" class="legende-toggle" aria-expanded="true" aria-controls="legende-contenu" aria-label="Réduire les filtres">
           <!-- Compte les filtres actifs ("Filtres · 2"), tenu à jour par
-               rafraichirBoutonReinitialiserFiltres (carte.js) — même
+               rafraichirBoutonReinitialiserFiltres (filtres.js) — même
                convention que le bouton "Filtres" de la bascule mobile. Le
                chevron seul dit replié/déplié (rotation CSS sur
                aria-expanded, voir .legende-toggle-icone) : le texte ne
@@ -154,7 +159,7 @@
       <div class="legende-contenu" id="legende-contenu">
         <!-- Visible seulement dans le panneau "Filtres" plein écran mobile
              (voir style-carte.css) : falaisesVisibles est déjà tenue à jour
-             par appliquerFiltres, aucun nouveau calcul (carte.js). -->
+             par appliquerFiltres, aucun nouveau calcul (visibilite.js). -->
         <p class="legende-resultat" id="legende-resultat" aria-live="polite"></p>
         <!-- Deux questions distinctes : le type de voie compté par la taille des
              cercles (.legende-figure dans .legende-cercles, toujours visible
@@ -165,14 +170,14 @@
              par défaut, sinon Couenne ou Grande voie, qui restreint aux
              secteurs qui en ont et donne aux cercles la taille et la couleur
              de ce type. Se combine avec "Cotation des voies" juste en dessous,
-             un filtre indépendant (voir appliquerFiltreCotation, carte.js). -->
+             un filtre indépendant (voir appliquerFiltreCotation, filtres.js). -->
         <div class="legende-ensoleillement" id="legende-type-voie" role="radiogroup" aria-label="Filtrer par type de voie">
           <span class="legende-ensoleillement-label">Type de voie</span>
           <label class="case-ensoleillement"><input type="radio" name="type-voie" data-type-voie="aucun" checked />Tous</label>
           <label class="case-ensoleillement"><input type="radio" name="type-voie" data-type-voie="couenne" />Couenne</label>
           <label class="case-ensoleillement"><input type="radio" name="type-voie" data-type-voie="gv" />Grande voie</label>
         </div>
-        <!-- Filtre "Style d’escalade" (configurerFiltreStyle, carte.js) : choix unique en
+        <!-- Filtre "Style d’escalade" (configurerFiltreStyle, filtres.js) : choix unique en
              pastilles (boutons radio), "Tous" par défaut, mêmes classes que
              Ensoleillement (aucun CSS propre). Donne sa taille aux cercles,
              comme Type de voie. Masqué tant que la sortie compte moins de deux
@@ -205,13 +210,13 @@
              ailleurs sur ce site (tri Cotation/Position, vue Épurée) — les
              réutiliser ici aurait suggéré la même règle à tort, alors que
              PLUSIEURS catégories sont cochables à la fois (voir
-             configurerFiltreEnsoleillement, carte.js). Une case à cocher le
+             configurerFiltreEnsoleillement, filtres.js). Une case à cocher le
              dit sans un mot d'explication.
              Deux groupes : Matin/Journée/Après-midi se cochent ensemble EN
              OU, chacune une correspondance EXACTE — pas de règle qui
              devinerait qu'on veut aussi "Journée" en cochant Matin+Après-
              midi (essayé, retiré, voir le commentaire de
-             filtres.ensoleillement dans carte.js) : "au moins ce moment-là,
+             filtres.ensoleillement dans etat.js) : "au moins ce moment-là,
              peu importe le reste" et "CE moment précis, pas plus" sont deux
              besoins réels et opposés, cocher Journée EN PLUS explicitement
              est la seule façon de dire lequel des deux on veut. "Non" reste
@@ -236,7 +241,7 @@
         </div>
         <!-- Efface d'un coup les quatre filtres qui masquent des falaises —
              Type de voie, Cotation des voies, Ensoleillement, Depuis le gîte
-             (voir configurerReinitialisationFiltres, carte.js). Placé après
+             (voir configurerReinitialisationFiltres, filtres.js). Placé après
              eux, pas avant : sa portée se lit par adjacence, pas par un
              titre. Affiché en permanence (carte.js le montre au chargement),
              seulement grisé tant que rien n'est actif : pas de saut du DOM à
@@ -249,7 +254,7 @@
   <!-- Bascule mobile plein écran Carte/Filtres : sous 641px, remplace la
        légende flottante par un aller-retour explicite entre la carte et un
        panneau plein écran (voir style-carte.css @media max-width:640px et
-       carte.js, definirVueMobile). Ancrée là où vivait .legende-toggle (bas
+       panneau-lateral.js, definirVueMobile). Ancrée là où vivait .legende-toggle (bas
        gauche) : jamais de chevauchement avec l'attribution OpenStreetMap
        (bas droite, voir le commentaire de .bandeau-hors-ligne sur ce même
        risque) ni avec l'indicateur hors-ligne (haut gauche). Invisible
@@ -272,9 +277,9 @@
 
   <!-- data-donnees est lu par demarrer-sortie.js ; le chemin reste relatif à
        CETTE page, chaque lieu ayant son propre data.geojson. -->
-  <div id="map" data-donnees="data.geojson"></div>
+  <main id="map" data-donnees="data.geojson" aria-label="Carte des falaises"></main>
 
-  <div id="etat-chargement" class="etat-chargement">Chargement de la carte…</div>
+  <div id="etat-chargement" class="etat-chargement" role="status">Chargement de la carte…</div>
 
   <!-- Externalisé pour que la CSP puisse refuser 'unsafe-inline'. -->
   <script type="module" src="../assets/js/demarrer-sortie.js"></script>

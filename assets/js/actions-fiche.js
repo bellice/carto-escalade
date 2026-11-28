@@ -24,7 +24,7 @@ const DUREE_CONFIRMATION = 1500;
 
 // urlRoute        : (idSite) => URL du fichier de détail des voies
 // lireFicheReduite / ecrireFicheReduite : l'état replié est PARTAGÉ avec le
-//                   reste de la carte (voir carte.js), d'où l'accesseur plutôt
+//                   reste de la carte (voir etat.js), d'où l'accesseur plutôt
 //                   qu'une copie locale qui divergerait.
 // popupCourante   : () => la fiche suivie, ou null
 // allerVers       : (nom, origineCle) => navigation
@@ -97,7 +97,7 @@ export function cablerActionsFiche({
       return;
     }
 
-    // Construit le même lien profond que lit le handler ?falaise= de carte.js.
+    // Construit le même lien profond que lit le handler ?falaise= de navigation.js.
     // navigator.share quand il existe (feuille de partage native), repli
     // presse-papiers sinon.
     const btnPartager = e.target.closest('.btn-partager');

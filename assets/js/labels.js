@@ -31,7 +31,7 @@ function construireGeojsonSites(geojson) {
 // la superposition DOM, par construction) — le texte disparaissait donc
 // derrière un figuré ponctuel dès qu'il le chevauchait. En DOM, on récupère
 // l'empilement standard : ajoutés après les marqueurs falaise/parking/gîte
-// (voir l'appel dans carte.js), ils passent naturellement au-dessus.
+// (voir l'appel dans navigation.js), ils passent naturellement au-dessus.
 // nbVoies sert de priorité d'affichage (voir appliquerAntiCollisionSites
 // dans carte.js) : en cas de conflit à l'écran, le site le plus fourni
 // l'emporte — une vraie décollision au pixel est appliquée (même algorithme
@@ -44,7 +44,7 @@ function construireGeojsonSites(geojson) {
 // près improbable en pratique).
 //
 // Renvoie {el, marker, site} par site (pas juste les éléments) :
-// appliquerAntiCollisionSites (carte.js) a besoin de la position de chaque
+// appliquerAntiCollisionSites (visibilite.js) a besoin de la position de chaque
 // marqueur pour son anti-collision à l'écran, en plus de masquer l'étiquette
 // d'un site qui n'a plus aucune falaise visible sous le mode "Cercles"/la
 // recherche courants — sans ça, un thème vidant entièrement un site (ex.

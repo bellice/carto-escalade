@@ -5,12 +5,11 @@
 // réservées pour tout autre usage UI. Padding asymétrique passé à
 // flyTo/fitBounds. Utilisées UNIQUEMENT sur mobile depuis la fusion de la
 // recherche/légende/fiche falaise en une colonne latérale desktop (voir
-// margeDesktop ci-dessous) — ex-MARGE_UI, valeurs inchangées.
+// margeDesktop ci-dessous).
 const MARGE_MOBILE = { top: 120, bottom: 170, left: 70, right: 70 };
 
 // Seuil desktop/mobile — même valeur que le CSS (@media max-width:640px,
-// style-carte.css). Centralisé ici : avant, chaque appelant refaisait son
-// propre window.matchMedia(...).
+// style-carte.css). Centralisé ici plutôt que dans chaque appelant.
 export function estDesktop() {
   return !window.matchMedia('(max-width: 640px)').matches;
 }
@@ -18,7 +17,7 @@ export function estDesktop() {
 // Largeur réelle des deux panneaux desktop, lue depuis leurs tokens CSS
 // (--largeur-panneau-gauche/-droit, style.css) plutôt que dupliquée en dur
 // ici — une seule source de vérité entre CSS et JS, comme
-// couleurCss/COULEUR_ELOIGNE dans carte.js pour --clay.
+// couleurEloigne (initCarte, carte.js) pour --clay.
 function largeurToken(nom, repli) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(nom);
   return parseInt(v, 10) || repli;
@@ -30,9 +29,8 @@ function largeurPanneauDroit() {
   return largeurToken('--largeur-panneau-droit', 380);
 }
 
-// Marge de confort desktop générique (haut/bas/droite hors fiche ouverte) —
-// reprend la même valeur que l'ex-MARGE_UI.left/right (70) : rien ne
-// justifie qu'elle change maintenant que plus rien ne flotte en haut/bas de
+// Marge de confort desktop générique (haut/bas/droite hors fiche ouverte) :
+// 70, rien ne flottant plus en haut/bas de
 // la carte sur desktop (recherche et légende vivent dans le panneau gauche
 // compact, pas en overlay top/bottom comme sur mobile).
 const CONFORT_DESKTOP = 70;
@@ -49,7 +47,7 @@ function margeDesktop() {
 }
 
 // Variante de marge pour un cadrage immédiatement suivi d'une ouverture de
-// fiche (voir allerVers/ouvrirFalaise dans carte.js) :
+// fiche (voir allerVers/ouvrirFalaise dans navigation.js) :
 // - Mobile : la popup prend la forme d'une feuille du bas jusqu'à ~45vh (cf.
 //   @media max-width:640px dans le CSS) — bien plus haute que les 170px
 //   prévus pour la légende. Sans ce correctif, un marqueur pouvait finir
@@ -100,19 +98,14 @@ export function estPointVisible(map, lon, lat, padding, marge = 24) {
 //   style-carte.css) plutôt que de deviner un chiffre fixe — c'est le plus
 //   HAUT des deux éléments empilés dans ce coin (lui, puis la pilule
 //   Carte/Filtres en dessous), le mesurer couvre donc les deux d'un coup.
-//   MARGE_MOBILE.bottom (170) avait été réglé pour l'ancienne légende
-//   flottante, remplacée depuis par ce couple. Recalculée à chaque appel :
-//   la hauteur d'écran peut changer (rotation).
+//   Recalculée à chaque appel : la hauteur d'écran peut changer (rotation).
 //   Repli sur MARGE_MOBILE.bottom si .legende-cercles est présent dans le
 //   DOM mais MASQUÉ : body.fiche-ouverte lui applique display:none tant
 //   qu'une fiche reste ouverte (voir le CSS) — un élément display:none
 //   renvoie un getBoundingClientRect() à zéro, donc top=0, ce qui aurait
-//   donné bas≈innerHeight (quasi tout l'écran). Bug réel constaté à
-//   l'origine sur l'ancienne légende : cliquer un libellé de site (qui
-//   recadre via margeToutVoir) pendant que la fiche falaise est ouverte sur
-//   mobile ne faisait plus rien — le padding obtenu dépassait la hauteur du
-//   conteneur, MapLibre abandonnait silencieusement le fitBounds (même
-//   défaillance déjà documentée plus bas, voir reinitialiserPadding).
+//   donné bas≈innerHeight (quasi tout l'écran). Le padding dépassait alors la
+//   hauteur du conteneur et MapLibre abandonnait le fitBounds sans erreur
+//   (voir reinitialiserPadding).
 //   getComputedStyle(...).display et non offsetParent : .legende-cercles est
 //   position:fixed (voir son commentaire dans le CSS) — offsetParent d'un
 //   élément fixed vaut TOUJOURS null par spec, qu'il soit visible ou non,
@@ -153,11 +146,11 @@ export function reinitialiserPadding(map) {
 // de la vue déjà obtenue, la marge reste toujours cohérente avec ce qui est
 // effectivement affiché, quel que soit le padding utilisé.
 // zoomPlancher : le dézoom doit pouvoir ATTEINDRE ce niveau, pas seulement s'en
-// approcher. Un ratio fixe de marge (l'ancien 50 %, gardé ici comme plancher)
-// ne suffit plus sur un lieu compact : mesuré sur les Dentelles de Montmirail,
+// approcher. Un ratio fixe de marge (50 %, gardé comme plancher) ne suffit
+// pas sur un lieu compact : sur les Dentelles de Montmirail,
 // vue initiale à 14,18, un ratio de 50 % ne laissait dézoomer qu'à 13,18 —
 // au-dessus du seuil de simplification en petits points (13, voir
-// ZOOM_SIMPLIFICATION dans carte.js), le rendant structurellement inatteignable
+// ZOOM_SIMPLIFICATION dans etat.js), le rendant structurellement inatteignable
 // alors que Crozon et la Drôme (vues initiales à 10-11) l'atteignaient sans
 // difficulté avec le même ratio. Doubler la largeur de la vue = 1 niveau de
 // zoom arrière : on calcule donc le ratio qui donne exactement l'agrandissement

@@ -7,10 +7,8 @@ import { estFalaiseVideDansMode, valeurSelection, statsSelection } from './donne
 // Rayon min/max des cercles proportionnels (falaises) — taille VISUELLE
 // réelle, cf. CIBLE_TACTILE_MIN ci-dessous pour la zone cliquable (les deux
 // sont découplés : réduire RAYON_MIN n'affecte pas la cible tactile).
-// Diamètre 14px → 52px (ratio ~3.7, ~14x en surface) : nettement plus
-// contrasté que l'ancien 24px → 52px (ratio ~2, ~4.7x), hérité d'une époque
-// où RAYON_MIN devait lui-même garantir une cible tactile correcte — ce
-// n'est plus le cas depuis poserTailleMarqueur().
+// Diamètre 14px → 52px (ratio ~3.7, ~14x en surface) : le contraste de taille
+// reste lisible, la cible tactile étant assurée par poserTailleMarqueur().
 const RAYON_MIN = 7;
 const RAYON_MAX = 26;
 
@@ -84,7 +82,7 @@ export function infosLegendePourMode(mode, entries, pratique = 'tous') {
 // spécifiquement une sous-catégorie entre falaises (comptage brut, pas une
 // proportion — plus lisible et plus actionnable pour la logistique qu'une
 // "part", qui masquait la taille réelle du secteur). La fourchette de
-// cotation est un filtre indépendant (carte.js), pas un mode de taille : elle
+// cotation est un filtre indépendant (filtres.js), pas un mode de taille : elle
 // n'entre pas ici. Le remplissage suit la même logique : uni / teinte dédiée
 // par sous-catégorie (grande voie-couenne, catégorielle donc couleur, pas
 // taille).
@@ -134,9 +132,9 @@ export function construireSourceFalaises(entries, mode, maxima, epuree, pratique
         recherche: entree.recherche,
         tempsGite: entree.tempsGite ?? null,
         // Lus par les filtres "Ensoleillement" et "Cotation des voies"
-        // (map.setFilter dans carte.js), pas par ce fichier. La cotation
+        // (map.setFilter dans visibilite.js), pas par ce fichier. La cotation
         // agit aussi sur "valeur" (voir valeurSelection).
-        // nbDansFourchette est recalculé par majFourchette (carte.js) à chaque
+        // nbDansFourchette est recalculé par majFourchette (filtres.js) à chaque
         // changement de bornes ; la source est reconstruite dans la foulée.
         ensoleillement: entree.ensoleillement,
         // Texte et non tableau : les tableaux traversent mal le découpage en
@@ -162,9 +160,8 @@ export function construireLegendeFalaises(max, median, remplissage, raisonSansTa
   // Pastille des secteurs (à côté de Parkings/Gîte dans .legende-cats),
   // couleur du mode "Cercles" actif.
   // « Secteurs » et non « Falaises » : un point de la carte est un couple
-  // site+secteur — 111 points pour 37 noms de falaise en Drôme, 60 pour 10 en
-  // Bretagne. Le libellé était faux d'un facteur 3 à 6, même erreur que le
-  // « 111 falaises » corrigé sur l'accueil.
+  // site+secteur (111 points pour 37 noms de falaise en Drôme, 60 pour 10 en
+  // Bretagne).
   // Ce bloc RÉÉCRIT le HTML de la page : corriger le libellé dans
   // <lieu>/index.html seul n'a aucun effet, c'est cette ligne qui gagne.
   const zoneFalaises = document.getElementById('cle-falaises-zone');

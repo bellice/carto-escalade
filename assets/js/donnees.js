@@ -68,7 +68,7 @@ export function indexerParkingInfos(geojson) {
 // juste hors de ce filtre. Minimum sur tous les parkings associés (un
 // grimpeur choisirait le plus rapide, pas une moyenne). null si aucun
 // parking associé n'a de trajet_gite_min renseigné — utilisé par le filtre
-// "Depuis le gîte" (carte.js) pour masquer les falaises trop éloignées, une
+// "Depuis le gîte" (filtres.js) pour masquer les falaises trop éloignées, une
 // falaise sans temps calculable reste affichée par défaut (on ne peut pas
 // prouver qu'elle est hors plage).
 export function calculerTempsDepuisGite(geojson) {
@@ -241,7 +241,7 @@ export function compterDansFourchette(cotations, min, max) {
 // petit cercle laisserait croire à une petite quantité plutôt qu'à une
 // absence. Utilisée à la fois pour exclure ces falaises de la SOURCE native
 // (construireSourceFalaises, symboles.js) et de la cascade de visibilité des
-// parkings (appliquerFiltres, carte.js) — sinon un parking reste affiché
+// parkings (appliquerFiltres, visibilite.js) — sinon un parking reste affiché
 // seul, sans qu'aucune falaise visible ne justifie sa présence sur ce thème.
 export function estFalaiseVideDansMode(entree, mode, pratique = 'tous') {
   // Aucun filtre de voie actif (ni pratique, ni type, ni fourchette de
@@ -261,7 +261,7 @@ export function estFalaiseVideDansMode(entree, mode, pratique = 'tous') {
 //    (une voie trad peut être en couenne ou en grande voie) — lu dans
 //    nb_par_type, le croisement précalculé à l'export ;
 //  - une fourchette de cotation active (entree.nbParTypeFourchette, posé par
-//    carte.js) : seules comptent les voies dont la cotation est dans les
+//    filtres.js) : seules comptent les voies dont la cotation est dans les
 //    bornes, en plus de la pratique et du type choisis.
 export function valeurSelection(entree, mode, pratique = 'tous') {
   const croise = entree.nbParTypeFourchette;
@@ -324,7 +324,7 @@ export function deriverStyles(p) {
 // Vrai si le secteur porte la pratique choisie ("tous" = aucun filtre). Choix
 // unique : sportive, trad ou artificielle. Un secteur sans pratique connue ne
 // peut satisfaire aucun choix (même règle que l'ensoleillement).
-// Miroir exact de la condition posée sur la couche native (carte.js,
+// Miroir exact de la condition posée sur la couche native (visibilite.js,
 // appliquerFiltres) : les deux doivent rester d'accord.
 export function estDuStyle(entree, pratique) {
   return pratique === 'tous' || entree.types.includes(pratique);
@@ -372,8 +372,3 @@ export function categoriserEnsoleillement(orientation) {
   return 'aucune'; // défensif : direction cardinale inconnue, ne devrait pas arriver
 }
 
-// NOTE : l'ancienne fonction falaiseVisible (lecture du DOM d'un marqueur)
-// a été retirée à la Phase 3 — les falaises sont rendues en couche native
-// (source "falaises"), sans marqueur DOM. La logique équivalente vit
-// désormais dans carte.js sous le nom entreeVisible() (Set falaisesVisibles
-// maintenu par appliquerFiltres).

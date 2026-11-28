@@ -31,7 +31,7 @@
   /* Vert « c'est fait » : seul usage restant, le bouton Préparer une fois la
      sortie enregistrée hors ligne (.btn-preparer.pret). Servait auparavant au
      mode carte « voies par cotation », devenu un filtre qui ne teinte plus
-     rien (voir appliquerFiltreCotation, carte.js). Reste séparé de --forest,
+     rien (voir appliquerFiltreCotation, filtres.js). Reste séparé de --forest,
      qui est la couleur des liens : 5.26:1 sur --paper ici, largement au-delà
      du seuil de 3:1 exigé pour un élément porteur d'information. */
   --cotation: #38754d;
@@ -120,6 +120,24 @@ a:visited { color: var(--forest); }
 :focus-visible {
   outline: 2px solid var(--forest);
   outline-offset: 2px;
+}
+
+/* Lien d'évitement des pages carte : hors écran tant qu'il n'a pas le focus
+   clavier, pour passer l'en-tête et les filtres. */
+.lien-evitement {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--paper);
+  border: 1px solid var(--forest);
+}
+.lien-evitement:focus {
+  top: 8px;
 }
 
 /* Le lien de la 404 est le seul contrôle de sa page, et mesurait 118x17.

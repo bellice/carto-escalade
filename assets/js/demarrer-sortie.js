@@ -26,7 +26,5 @@ const conteneur = document.getElementById('map');
 initCarte((conteneur && conteneur.dataset.donnees) || 'data.geojson');
 
 // Scope racine : le SW couvre aussi l'accueil et les autres lieux.
-// '../' et non '../../' : les dossiers de lieu sont à UN niveau depuis
-// l'abandon de sorties/<date>/. L'ancien chemin se repliait sur la racine
-// (une URL ne remonte pas au-dessus), donc il marchait — par accident.
+// '../' : les dossiers de lieu sont à un niveau de la racine.
 enregistrerServiceWorker('../sw.js', { scope: '../' });

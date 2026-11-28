@@ -6,16 +6,13 @@
 //   serveur de dev qui transforme le HTML (Vite) ;
 // - fond de carte OpenFreeMap : cache d'abord, les tuiles étant versionnées
 //   donc immuables. C'est le principal gain de bande passante du site.
-// Bumper CACHE_NAME force un renouvellement IMMÉDIAT (correctif urgent), mais
-// n'est plus obligatoire à chaque déploiement depuis le passage en
-// stale-while-revalidate.
+// Bumper CACHE_NAME force un renouvellement immédiat (correctif urgent). Un
+// déploiement ordinaire n'en a pas besoin : le stale-while-revalidate rafraîchit.
 const CACHE_PREFIXE = 'sorties-escalade-v';
-// v7 : ajout des modules hors-ligne.js, sw-client.js et demarrer-*.js à la
-// coquille. Un nouveau module ne peut PAS attendre le rafraîchissement
-// paresseux — s'il n'est pas pré-caché, le premier chargement hors ligne
-// échoue à l'import et fait tomber toute la carte (constaté en test). C'est
-// le cas type qui justifie encore un bump.
-const CACHE_NAME = `${CACHE_PREFIXE}8`;
+// À bumper quand un module est ajouté à la coquille : un module absent du
+// cache fait échouer l'import au premier chargement hors ligne, et toute la
+// carte tombe. Le rafraîchissement paresseux ne le rattrape pas.
+const CACHE_NAME = `${CACHE_PREFIXE}9`;
 
 // Cache SÉPARÉ du fond de carte, à ne surtout pas fusionner avec la coquille :
 // il n'est pas versionné par CACHE_NAME, sans quoi bumper la coquille pour
@@ -35,6 +32,12 @@ const PRECACHE = [
   './assets/js/carte.js',
   './assets/js/actions-fiche.js',
   './assets/js/carte-utils.js',
+  './assets/js/couche-falaises.js',
+  './assets/js/etat.js',
+  './assets/js/filtres.js',
+  './assets/js/navigation.js',
+  './assets/js/panneau-lateral.js',
+  './assets/js/visibilite.js',
   './assets/js/demarrer-accueil.js',
   './assets/js/demarrer-sortie.js',
   './assets/js/donnees.js',
@@ -66,11 +69,8 @@ const PRECACHE = [
 ];
 
 // Sans ce pré-cache, la première ouverture d'une fiche paie une latence
-// réseau pleine pour ~2 Ko — très visible sur réseau faible. Le total reste
-// négligeable une fois compressé : 393 Ko bruts pour les deux lieux, mais
-// ~32 Ko sur le fil (ces fichiers compressent à 12:1). Autant tout prendre à
-// l'install. Le chiffre annoncé ici était « ~170 Ko » et datait d'un seul
-// lieu à moitié saisi ; c'est la taille BRUTE qui a triplé, pas le coût.
+// réseau pleine pour ~2 Ko, très visible sur réseau faible. Le coût réel est
+// la taille compressée (ces fichiers compressent à 12:1), pas la taille brute.
 // Les identifiants viennent de data.geojson : aucune liste à maintenir.
 function precacherRoutes() {
   const sorties = PRECACHE.filter((u) => u.endsWith('/data.geojson'));
@@ -82,9 +82,8 @@ function precacherRoutes() {
         .then((geo) => {
           if (!geo || !geo.features) return;
           const base = abs.slice(0, abs.lastIndexOf('/') + 1);
-          // new Set(...) : plusieurs falaises d'un même site partagent
-          // désormais la même URL routes/<slug>.json — sans dédup, ce fichier
-          // serait mis en cache une fois par falaise plutôt qu'une fois.
+          // new Set(...) : plusieurs falaises d'un même site partagent la même
+          // URL routes/<slug>.json, à ne mettre en cache qu'une fois.
           const urls = [...new Set(
             geo.features
               .filter((f) => f.properties && f.properties.categorie === 'falaise' && f.properties.routes)
@@ -110,13 +109,9 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Le ménage à l'activation ne touche QUE les anciennes versions de la
-// coquille (préfixe CACHE_PREFIXE). Avant, il supprimait tout cache dont le
-// nom différait de CACHE_NAME — donc aussi les tuiles du fond, qui vivaient
-// dans le même cache : bumper la version pour livrer une correction de code
-// effaçait au passage la zone que l'utilisateur avait pré-chargée avant de
-// partir. Un déploiement de routine ne doit jamais coûter la préparation
-// hors-ligne de quelqu'un.
+// Le ménage à l'activation ne touche que les anciennes versions de la coquille
+// (préfixe CACHE_PREFIXE). Le cache des tuiles reste : livrer du code ne doit
+// pas effacer la zone que l'utilisateur a pré-chargée avant de partir.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
