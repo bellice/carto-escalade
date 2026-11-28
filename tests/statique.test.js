@@ -1423,7 +1423,11 @@ describe('Ce que le site publie', () => {
   // sont toujours là sur le disque.
   test("aucun dossier de lieu n'est exclu par erreur", async () => {
     const conf = await lire('_config.yml');
-    const exclus = LIEUX.filter((l) => new RegExp(`^\s*-\s*${l}/?\s*$`, 'm').test(conf));
+    // Un \s dans un gabarit `…` vaut la lettre « s » : l'ancienne regex ne
+    // correspondait jamais, et le test restait vert quel que soit _config.yml.
+    // On compare donc des lignes, sans construire d'expression régulière.
+    const lignes = conf.split('\n').map((ligne) => ligne.trim().replace(/^-\s+/, '- '));
+    const exclus = LIEUX.filter((l) => lignes.includes(`- ${l}`) || lignes.includes(`- ${l}/`));
     assert.deepEqual(exclus, [],
       `_config.yml exclut ${exclus.join(', ')} — ces cartes ne seraient plus publiées.`);
   });
