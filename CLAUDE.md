@@ -24,6 +24,15 @@ protègent, pas ici.
   (Playwright, bout en bout, ~3 min) dès que le push touche `assets/`, un
   `index.html` ou un `data.geojson` ; inutile pour un changement de doc seul.
 
+## Composants et JavaScript
+
+Texte complet : [README.md](README.md), section « Règles du projet ».
+
+- **Custom Elements sans Shadow DOM par défaut.** Le Shadow DOM n'est permis
+  que si les conditions a à d du README sont réunies.
+- **Accueil fonctionnel sans JS.** Les pages carte font exception, documentée :
+  `<noscript>` et liste statique des secteurs.
+
 ## Écriture
 
 - **Aucune mention de Claude ou Anthropic** dans un commit, une PR, ou le

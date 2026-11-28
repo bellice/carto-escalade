@@ -6,6 +6,53 @@ Palette, typographie et composants : voir [`charte-graphique.html`](charte-graph
 (ouvrir directement dans un navigateur — s'appuie sur les vraies feuilles de
 style du site, reste à jour tant que les tokens ne changent pas de nom).
 
+## Règles du projet
+
+Le site s'appuie sur les standards du web : HTML sémantique, CSS natif,
+JavaScript en modules ES, aucune dépendance en production. Ces règles
+complètent celles de [`CLAUDE.md`](CLAUDE.md) (contraintes techniques,
+écriture, attribution).
+
+### Fonctionne sans JavaScript
+
+L'accueil reste utilisable sans JavaScript. Il l'est déjà.
+
+Les pages carte font exception : la carte WebGL de MapLibre a besoin de
+JavaScript, et on ne cherche pas à la faire fonctionner sans. Elles offrent
+en revanche un repli minimal :
+
+- un `<noscript>` avec un message clair ;
+- la liste statique des secteurs du lieu, écrite en HTML à la génération des
+  pages (pas par du JavaScript) et visible dans ce repli.
+
+À ce jour, ce repli reste à écrire.
+
+### Composants (Custom Elements)
+
+Un composant réutilisable est un Custom Element natif, sans Shadow DOM par
+défaut. Il reste ainsi soumis aux feuilles de style globales, et ses
+références ARIA restent valides dans le document.
+
+Le Shadow DOM n'est autorisé que si les quatre conditions suivantes sont
+réunies :
+
+- a. le composant est purement présentationnel ;
+- b. il n'a aucune référence ARIA sortante (`aria-labelledby`,
+  `aria-describedby`, `aria-controls`, etc.), car les IDREF ne traversent pas
+  la frontière du shadow root ;
+- c. il ne dépend d'aucune feuille CSS globale, car les styles globaux ne
+  s'appliquent pas à l'intérieur du shadow root ;
+- d. son contenu est inséré par le composant lui-même et non par un tiers
+  (MapLibre injecte le contenu des popups dans son propre DOM).
+
+En cas de doute, pas de Shadow DOM.
+
+### Conventions de commit
+
+- Un commit par étape logique.
+- Aucune ligne d'attribution (`Co-Authored-By`, etc.) : règle de
+  `CLAUDE.md`, vérifiée par le hook `.claude/hooks/bloquer-mention-ia.sh`.
+
 ## Structure
 
 ```
