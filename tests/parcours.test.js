@@ -2276,3 +2276,186 @@ describe('Composant <bouton-gps>', () => {
     }
   });
 });
+
+// <poignee-fiche> (assets/js/poignee-fiche.js) : la poignée qui replie la fiche mobile.
+describe('Composant <poignee-fiche>', () => {
+  const MOBILE = { viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true };
+
+  async function ouvrirMobile(page, repere = REPERES.lesRoches) {
+    await exposerCarte(page);
+    await page.goto(serveur.base + CHEMIN_SORTIE, { waitUntil: 'domcontentloaded' });
+    await attendreCarte(page);
+    await ouvrirFalaise(page, repere);
+  }
+
+  // État observable d'une fiche : ce que lit un lecteur d'écran et ce que voit l'œil.
+  const lire = (page) => page.evaluate(() => {
+    const contenu = document.querySelector('.maplibregl-popup-content');
+    const bouton = document.querySelector('.popup .poignee-fiche');
+    const rc = contenu.getBoundingClientRect();
+    const rb = bouton.getBoundingClientRect();
+    return {
+      reduite: contenu.classList.contains('fiche-reduite'),
+      ariaExpanded: bouton.getAttribute('aria-expanded'),
+      nom: bouton.getAttribute('aria-label'),
+      texte: bouton.querySelector('.poignee-texte').textContent,
+      maxHauteur: Number.parseFloat(getComputedStyle(contenu).maxHeight),
+      hauteur: rc.height, bas: rc.bottom, hautBouton: rb.top - rc.top,
+      hauteurFenetre: window.innerHeight,
+    };
+  });
+
+  test('replie et déplie la fiche mobile au clic, à Entrée et à Espace', { timeout: 120000 }, async () => {
+    const contexte = await navigateur.newContext(MOBILE);
+    const page = await contexte.newPage();
+    const erreurs = [];
+    page.on('pageerror', (e) => erreurs.push(e.message));
+    try {
+      await ouvrirMobile(page);
+      const poignee = page.locator('.popup .poignee-fiche').first();
+
+      const structure = await page.evaluate(() => {
+        const hote = document.querySelector('.popup poignee-fiche');
+        return { defini: customElements.get('poignee-fiche') !== undefined, ombre: hote.shadowRoot, enfant: hote.querySelector('button')?.className };
+      });
+      assert.equal(structure.defini, true, '<poignee-fiche> doit être défini à l\'ouverture de la première fiche');
+      assert.equal(structure.ombre, null, 'Pas de Shadow DOM');
+      assert.equal(structure.enfant, 'poignee-fiche', 'Le <button> natif doit être dans <poignee-fiche>');
+
+      const deplie = await lire(page);
+      assert.deepEqual([deplie.reduite, deplie.ariaExpanded, deplie.nom, deplie.texte], [false, 'true', 'Réduire la fiche', 'Réduire'], 'Fiche ouverte : dépliée');
+      assert.ok(Math.abs(deplie.maxHauteur - Math.min(0.45 * deplie.hauteurFenetre, 380)) < 1, `plafond déplié attendu : min(45vh, 380px), obtenu ${deplie.maxHauteur}px`);
+
+      const modes = [
+        ['clic', () => poignee.click()],
+        ['Entrée', async () => { await poignee.focus(); await page.keyboard.press('Enter'); }],
+        ['Espace', async () => { await poignee.focus(); await page.keyboard.press('Space'); }],
+        ['clic', () => poignee.click()],
+      ];
+      let replie = false;
+      for (const [mode, activer] of modes) {
+        await activer();
+        replie = !replie;
+        await page.waitForTimeout(450); // transition de la feuille : 0,2 s
+        const e = await lire(page);
+        assert.equal(e.reduite, replie, `${mode} : classe fiche-reduite ${replie ? 'attendue' : 'absente'}`);
+        assert.equal(e.ariaExpanded, String(!replie), `${mode} : aria-expanded`);
+        assert.equal(e.nom, replie ? 'Agrandir la fiche' : 'Réduire la fiche', `${mode} : nom accessible`);
+        assert.equal(e.texte, replie ? 'Agrandir' : 'Réduire', `${mode} : texte`);
+        const attendu = replie ? Math.min(0.25 * e.hauteurFenetre, 220) : Math.min(0.45 * e.hauteurFenetre, 380);
+        assert.ok(Math.abs(e.maxHauteur - attendu) < 1, `${mode} : plafond de hauteur attendu ${attendu}px, obtenu ${e.maxHauteur}px`);
+        // Position : la feuille reste ancrée en bas, la poignée en haut de la feuille.
+        assert.ok(Math.abs(e.bas - deplie.bas) < 1.5, `${mode} : la feuille doit rester ancrée en bas (${e.bas} contre ${deplie.bas})`);
+        assert.ok(Math.abs(e.hautBouton - deplie.hautBouton) < 1.5, `${mode} : la poignée doit rester en haut de la feuille`);
+        assert.equal(replie ? e.hauteur < deplie.hauteur : Math.abs(e.hauteur - deplie.hauteur) < 1.5, true, `${mode} : hauteur de la feuille`);
+      }
+
+      // Focus au clavier : le même contour de 2 px que les autres boutons.
+      await poignee.focus();
+      await page.keyboard.press('Shift+Tab');
+      await page.keyboard.press('Tab');
+      const focus = await page.evaluate(() => {
+        const el = document.activeElement;
+        const cs = getComputedStyle(el);
+        return { estPoignee: el.matches('poignee-fiche > button.poignee-fiche'), style: cs.outlineStyle, largeur: cs.outlineWidth };
+      });
+      assert.equal(focus.estPoignee, true, 'Le focus clavier doit atteindre le <button>');
+      assert.notEqual(focus.style, 'none', 'La poignée focalisée doit avoir un contour visible');
+      assert.equal(focus.largeur, '2px', 'Contour de 2 px, comme les autres boutons');
+      assert.deepEqual(erreurs, [], 'Aucune erreur de page');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  test('l\'état replié ou déplié est partagé d\'une fiche à l\'autre', { timeout: 120000 }, async () => {
+    const contexte = await navigateur.newContext(MOBILE);
+    const page = await contexte.newPage();
+    try {
+      await ouvrirMobile(page, REPERES.lesRoches);
+      const titre = () => page.evaluate(() => document.querySelector('.popup h3').textContent);
+      const premiere = await titre();
+      await page.locator('.popup .poignee-fiche').first().click();
+      await page.waitForTimeout(450);
+      assert.equal((await lire(page)).reduite, true, 'Première fiche repliée');
+
+      // Une autre fiche s'ouvre repliée : le choix suit l'utilisateur.
+      await ouvrirFalaise(page, REPERES.laTour);
+      assert.notEqual(await titre(), premiere, 'Une autre fiche doit être ouverte');
+      let e = await lire(page);
+      assert.deepEqual([e.reduite, e.ariaExpanded, e.nom, e.texte], [true, 'false', 'Agrandir la fiche', 'Agrandir'], 'La deuxième fiche s\'ouvre repliée');
+
+      await page.locator('.popup .poignee-fiche').first().click();
+      await page.waitForTimeout(450);
+      assert.equal((await lire(page)).reduite, false, 'Deuxième fiche dépliée');
+
+      // Et dépliée pour la suivante.
+      await ouvrirFalaise(page, REPERES.chironne);
+      e = await lire(page);
+      assert.deepEqual([e.reduite, e.ariaExpanded, e.nom, e.texte], [false, 'true', 'Réduire la fiche', 'Réduire'], 'La troisième fiche s\'ouvre dépliée');
+
+      // Le détail des voies déplie localement, puis restaure l'état choisi (replié).
+      await page.locator('.popup .poignee-fiche').first().click();
+      await page.waitForTimeout(450);
+      await page.locator('.btn-voir-detail-voies').first().click({ timeout: 8000 });
+      await page.waitForSelector('.fiche-voies-detail', { timeout: 5000 });
+      assert.equal((await lire(page)).reduite, false, 'Le détail des voies déplie la fiche');
+      await page.locator('.btn-retour-fiche').click();
+      await page.waitForTimeout(450);
+      e = await lire(page);
+      assert.deepEqual([e.reduite, e.ariaExpanded, e.texte], [true, 'false', 'Agrandir'], 'Au retour du détail, l\'état replié choisi est restauré');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  // Amélioration progressive : le module est importé sans bloquer la carte. S'il
+  // manque, la carte démarre et la poignée reste un <button> natif, focusable.
+  test('sans le module du composant, la poignée reste un bouton natif qui ne replie pas', { timeout: 120000 }, async () => {
+    const contexte = await navigateur.newContext(MOBILE);
+    const page = await contexte.newPage();
+    const erreurs = [];
+    page.on('pageerror', (e) => erreurs.push(e.message));
+    try {
+      await page.route('**/assets/js/poignee-fiche.js', (route) => route.abort());
+      await ouvrirMobile(page);
+      assert.equal(await page.evaluate(() => customElements.get('poignee-fiche') !== undefined), false, 'Le composant ne doit pas être défini');
+      const poignee = page.locator('.popup .poignee-fiche').first();
+      await poignee.focus();
+      assert.equal(await page.evaluate(() => document.activeElement.matches('button.poignee-fiche')), true, 'Le bouton natif doit rester focusable');
+      await page.keyboard.press('Enter');
+      await poignee.click();
+      await page.waitForTimeout(450);
+      const e = await lire(page);
+      assert.deepEqual([e.reduite, e.ariaExpanded, e.texte], [false, 'true', 'Réduire'], 'Sans le composant, rien ne se replie');
+      assert.deepEqual(erreurs, [], 'Un clic sur le bouton natif ne doit produire aucune erreur');
+    } finally {
+      await contexte.close();
+    }
+  });
+
+  // Une fiche peut s'ouvrir avant la définition du composant (import() sans blocage).
+  // L'attribut `reduite`, posé par l'application, est alors lu à la mise à niveau.
+  test('l\'état posé avant la définition du composant est rendu à sa mise à niveau', { timeout: 120000 }, async () => {
+    const contexte = await navigateur.newContext(MOBILE);
+    const page = await contexte.newPage();
+    try {
+      await page.route('**/assets/js/poignee-fiche.js', async (route) => {
+        await new Promise((resoudre) => setTimeout(resoudre, 12000));
+        await route.continue();
+      });
+      await ouvrirMobile(page);
+      assert.equal(await page.evaluate(() => customElements.get('poignee-fiche') !== undefined), false, 'Le test suppose la fiche ouverte avant la définition');
+      // Ce que fait synchroniserPoignee quand la fiche s'ouvre alors que l'état partagé est « replié ».
+      await page.evaluate(() => document.querySelector('.popup poignee-fiche').setAttribute('reduite', ''));
+      assert.equal((await lire(page)).ariaExpanded, 'true', 'Avant la définition, le bouton natif ne reflète rien');
+
+      await page.waitForFunction(() => customElements.get('poignee-fiche') !== undefined, null, { timeout: 30000 });
+      await page.waitForFunction(() => document.querySelector('.popup .poignee-fiche').getAttribute('aria-expanded') === 'false', null, { timeout: 3000 });
+      const e = await lire(page);
+      assert.deepEqual([e.ariaExpanded, e.nom, e.texte], ['false', 'Agrandir la fiche', 'Agrandir'], 'À la mise à niveau, la poignée doit refléter l\'attribut');
+    } finally {
+      await contexte.close();
+    }
+  });
+});

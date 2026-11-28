@@ -53,8 +53,11 @@ réunies :
 
 En cas de doute, pas de Shadow DOM.
 
-Le premier composant est `<bouton-gps>` (`assets/js/bouton-gps.js`) : il
-enveloppe un vrai `<button>` écrit dans le HTML et lui ajoute la copie. Un
+Les composants sont `<bouton-gps>` (`assets/js/bouton-gps.js`) et
+`<poignee-fiche>` (`assets/js/poignee-fiche.js`) : chacun enveloppe un vrai
+`<button>` écrit dans le HTML et lui ajoute son comportement. `<poignee-fiche>`
+ne décide pas de l'état de la fiche : il émet `basculer-fiche` et observe
+l'attribut `reduite`, que l'application lui rend. Un
 composant vit à plat dans `assets/js/`, comme les autres modules : plusieurs
 tests lisent ce dossier sans descendre dans les sous-dossiers.
 
@@ -106,6 +109,7 @@ assets/
     rose-des-vents.js → rose des vents SVG de l'orientation
     liens-acces.js   → itinéraire, bouton GPS, liens secondaires
     bouton-gps.js    → Custom Element <bouton-gps> : copie des coordonnées GPS
+    poignee-fiche.js → Custom Element <poignee-fiche> : poignée de repli de la fiche mobile
     champs-fiche.js  → colonnes et lignes d'information de la fiche
     histogramme.js   → histogramme « 1 case = 1 voie » des cotations
     detail-voies.js  → liste détaillée des voies (tri cotation / position)

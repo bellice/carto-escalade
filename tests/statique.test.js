@@ -1297,6 +1297,34 @@ describe('Composants (Custom Elements)', () => {
       'actions-fiche.js ne doit plus câbler la copie GPS');
   });
 
+  test('<poignee-fiche> vit dans un fichier dédié, sans Shadow DOM, enveloppe un <button> et ne décide pas de l\'état', async () => {
+    const composant = await code('assets/js/poignee-fiche.js');
+    assert.match(composant, /customElements\.define\(\s*['"]poignee-fiche['"]/, 'poignee-fiche.js doit définir <poignee-fiche>');
+    assert.doesNotMatch(composant, /attachShadow|shadowRoot/,
+      'Pas de Shadow DOM : le composant dépend des feuilles globales (README, « Composants »)');
+    assert.match(composant, /querySelector\(\s*['"]button['"]\s*\)/,
+      'Le composant doit enrober un <button> déjà présent dans le HTML, pas simuler un bouton');
+    // Il observe, il ne décide pas : ni l'état partagé ni la classe de la fiche ne sont de son ressort.
+    assert.doesNotMatch(composant, /fiche-reduite|ficheReduite|etat\.js|classList/,
+      'Le composant ne doit toucher ni à l\'état replié/déplié ni à la classe de la fiche : il émet « basculer-fiche » et observe `reduite`');
+    assert.match(composant, /observedAttributes[\s\S]*['"]reduite['"]/, 'Le composant doit observer l\'attribut `reduite`');
+    assert.match(await code('assets/js/popups.js'), /<poignee-fiche><button type="button" class="poignee-fiche"/,
+      'popups.js doit écrire un vrai <button> dans <poignee-fiche>');
+    // La décision reste dans le code de la fiche, déclenchée par l'événement et non par un clic intercepté.
+    const actions = await code('assets/js/actions-fiche.js');
+    assert.doesNotMatch(actions, /closest\(\s*['"]\.poignee-fiche['"]\s*\)/, 'actions-fiche.js ne doit plus intercepter le clic sur la poignée');
+    assert.match(actions, /addEventListener\(\s*['"]basculer-fiche['"]/, 'actions-fiche.js doit écouter « basculer-fiche »');
+  });
+
+  test('<poignee-fiche> est chargé sans bloquer la carte et préchargé par les pages', async () => {
+    assert.match(await code('assets/js/demarrer-sortie.js'), /import\(\s*['"]\.\/poignee-fiche\.js['"]\s*\)/,
+      'demarrer-sortie.js doit importer le composant par import() : un import statique ferait tomber la carte si le module manque');
+    for (const lieu of LIEUX) {
+      assert.match(await lire(`${lieu}/index.html`), /rel="modulepreload" href="\.\.\/assets\/js\/poignee-fiche\.js"/,
+        `${lieu} : préchargement de poignee-fiche.js absent`);
+    }
+  });
+
   test('aucun Custom Element n\'utilise le Shadow DOM', async () => {
     for (const nom of await readdir(join(RACINE, 'assets/js'))) {
       const source = await code(`assets/js/${nom}`);

@@ -1,7 +1,9 @@
 // actions-fiche.js — toutes les actions déclenchées DEPUIS le contenu d'une
 // fiche (popup mobile ou panneau desktop) : poignée, détail des voies, tri,
 // réessai, partage, navigation vers un secteur ou un parking. La copie des
-// coordonnées GPS est le Custom Element <bouton-gps> (bouton-gps.js).
+// coordonnées GPS est le Custom Element <bouton-gps> (bouton-gps.js), et le
+// bouton de la poignée l'est aussi : <poignee-fiche> (poignee-fiche.js) émet
+// « basculer-fiche », dont la décision reste ici.
 //
 // UN SEUL écouteur délégué, posé une fois, qui retrouve sa cible par closest()
 // à chaque clic — plutôt que ré-attacher des écouteurs sur des nœuds précis à
@@ -33,16 +35,6 @@ export function cablerActionsFiche({
   urlRoute, lireFicheReduite, ecrireFicheReduite, popupCourante, allerVers,
 }) {
   document.addEventListener('click', (e) => {
-    const poignee = e.target.closest('.poignee-fiche');
-    if (poignee) {
-      const contenu = poignee.closest('.maplibregl-popup-content');
-      if (!contenu) return;
-      const reduite = contenu.classList.toggle('fiche-reduite');
-      ecrireFicheReduite(reduite);
-      synchroniserPoignee(poignee, reduite);
-      return;
-    }
-
     // Détail des voies : swap de contenu dans la MÊME fiche, voir marqueurs.js.
     const btnDetail = e.target.closest('.btn-voir-detail-voies');
     if (btnDetail) {
@@ -113,5 +105,17 @@ export function cablerActionsFiche({
       }
       allerVers(lienSecteur.dataset.nom, origineCle);
     }
+  });
+
+  // La poignée ne décide pas : elle signale qu'on a activé son bouton. On
+  // bascule ici l'état replié/déplié, partagé avec le reste de la carte (voir
+  // etat.js), puis on le lui rend par synchroniserPoignee.
+  document.addEventListener('basculer-fiche', (e) => {
+    const poignee = e.target.closest('poignee-fiche');
+    const contenu = poignee && poignee.closest('.maplibregl-popup-content');
+    if (!contenu) return;
+    const reduite = contenu.classList.toggle('fiche-reduite');
+    ecrireFicheReduite(reduite);
+    synchroniserPoignee(poignee, reduite);
   });
 }

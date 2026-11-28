@@ -158,12 +158,14 @@ export function masquerDetailVoies(popupEl, ficheReduite) {
   if (scrollable) scrollable.scrollTop = 0;
 }
 
+// Rend l'état replié/déplié à la poignée : <poignee-fiche> (poignee-fiche.js)
+// observe l'attribut `reduite` et en tire aria-expanded, le nom et le texte.
+// `poignee` est le <button> ou le composant lui-même (closest les trouve tous
+// deux). L'attribut est posé même si le composant n'est pas encore défini : il
+// est lu à sa mise à niveau.
 export function synchroniserPoignee(poignee, reduire) {
-  poignee.setAttribute('aria-expanded', String(!reduire));
-  const texte = reduire ? 'Agrandir' : 'Réduire';
-  poignee.setAttribute('aria-label', texte + ' la fiche');
-  const spanTexte = poignee.querySelector('.poignee-texte');
-  if (spanTexte) spanTexte.textContent = texte;
+  const composant = poignee.closest('poignee-fiche');
+  if (composant) composant.toggleAttribute('reduite', reduire);
 }
 
 // Pose l'état replié/déplié partagé (estFicheReduite) sur une fiche qui

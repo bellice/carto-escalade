@@ -138,9 +138,11 @@
    peut aussi vouloir lire/noter sans rien coller ensuite. Le mot "Copier" à
    droite est un texte réel, pas juste un aria-label — une case grisée seule
    ne suffit pas à dire "on peut taper ici" (même leçon que .poignee-fiche). */
-/* <bouton-gps> (assets/js/bouton-gps.js) enveloppe le bouton : display: contents
-   lui retire sa boîte, la mise en page reste celle du bouton seul. */
-bouton-gps { display: contents; }
+/* <bouton-gps> (assets/js/bouton-gps.js) et <poignee-fiche> (poignee-fiche.js)
+   enveloppent un bouton : display: contents leur retire leur boîte, la mise en
+   page reste celle du bouton seul (la poignée reste positionnée par rapport à
+   la fiche, pas à son composant). */
+bouton-gps, poignee-fiche { display: contents; }
 /* Annonce pour les lecteurs d'écran, jamais affichée. */
 .visuellement-cache {
   position: absolute;

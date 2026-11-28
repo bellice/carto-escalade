@@ -11,6 +11,11 @@ import { construireCoinInfos } from './rose-des-vents.js';
 import { lienItineraire, boutonGps, construireActionsSecondaires } from './liens-acces.js';
 import { col, champBloc, colonneHauteur, champParkingAssocie, champLiensFalaises, libelleRoche, styleGrimpe } from './champs-fiche.js';
 
+// Poignée de la fiche mobile, commune aux trois popups. <poignee-fiche>
+// (poignee-fiche.js) lui ajoute le repli ; sans lui, c'est un <button> natif.
+// Sans attribut `reduite` : fiche dépliée, ce que dit le HTML ci-dessous.
+const POIGNEE_FICHE = '<poignee-fiche><button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"><span class="poignee-texte">Réduire</span></button></poignee-fiche>';
+
 // Groupe "Topo papier" (voir escalade/db/schema/01_falaise.sql, 00_source.sql) :
 // but de retrouver ce secteur dans le topo qu'on a sous la main en
 // préparant une sortie — ET de faire savoir qu'un topo payant existe
@@ -136,7 +141,7 @@ export function popupFalaise(p, lat, lon, cle) {
 
   return `
     <div class="popup" data-cle="${escapeHtml(cle)}">
-      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"><span class="poignee-texte">Réduire</span></button>
+      ${POIGNEE_FICHE}
       <div class="popup-entete">
         <div class="popup-titre-bloc">
           <span class="cat-tag falaise">Secteur</span>
@@ -166,7 +171,7 @@ export function popupParking(p, lat, lon, parkingInfos, cle) {
 
   return `
     <div class="popup" data-cle="${escapeHtml(cle)}">
-      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"><span class="poignee-texte">Réduire</span></button>
+      ${POIGNEE_FICHE}
       <span class="cat-tag parking">Parking</span>
       ${site ? `<span class="badge-site">${escapeHtml(site)}</span>` : ''}
       <h3>${escapeHtml(p.nom)}</h3>
@@ -181,7 +186,7 @@ export function popupParking(p, lat, lon, parkingInfos, cle) {
 export function popupGite(p, lat, lon, cle) {
   return `
     <div class="popup" data-cle="${escapeHtml(cle)}">
-      <button type="button" class="poignee-fiche" aria-expanded="true" aria-label="Réduire la fiche"><span class="poignee-texte">Réduire</span></button>
+      ${POIGNEE_FICHE}
       <span class="cat-tag gite">Gîte</span>
       <h3>${escapeHtml(p.nom)}</h3>
       <div class="actions">
