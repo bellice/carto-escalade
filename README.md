@@ -122,7 +122,8 @@ assets/
     utils.js         → escapeHtml (sûr en attribut) + urlSure (schémas
                        autorisés pour les href issus des données)
 docs/
-  architecture.md    → jetons de design, seuil de bascule mobile (640 px)
+  architecture.md    → jetons de design, seuil de bascule mobile (640 px),
+                       limites de mesure (cache, service worker, WebKit)
 vallee-drome-diois/          → un dossier par LIEU, pas par sortie : les falaises
                        ne bougent pas, la date et le gîte si
     index.html       → page carte de ce lieu
@@ -148,6 +149,9 @@ couverture théorique — détail et raisons dans [`tests/LISEZMOI.md`](tests/LI
 Le réflexe le plus rentable : lancer `npm run test:statique` avant un commit,
 il attrape à lui seul la perte des temps de trajet, un module oublié au
 pré-cache et une régression de contraste.
+
+Les mesures de cache et de réseau faites en local ont des limites (certificat
+auto-signé, WebKit de Playwright) : voir [Limites de mesure](docs/architecture.md#limites-de-mesure).
 
 Playwright n'est utilisé que par les tests : **le site reste sans dépendance**
 (aucun `node_modules` en production, MapLibre est copié dans le dépôt). Le
