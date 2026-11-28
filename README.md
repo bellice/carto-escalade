@@ -251,15 +251,18 @@ cartes, et `--lieu` ne nommait que le dossier de destination.
    valeur de `lieu` (ex. `presquile-crozon`). Un gîte est facultatif : sans
    hébergement pour ce lieu, la carte masque d'elle-même le curseur « Trajet
    depuis le gîte » et la clé de légende correspondante.
-2. Dupliquer `vallee-drome-diois/` en `<lieu>/`, puis changer **trois
-   libellés** dans son `index.html` — le reste (chemins `../`, CSP,
-   `modulepreload`, `data-donnees`) est relatif et fonctionne tel quel :
+2. Ajouter une entrée dans `outils/lieux.json`, puis lancer `npm run generer`.
+   La page `<lieu>/index.html` est écrite à partir de
+   `outils/gabarit-carte.html` : chemins `../`, CSP, `modulepreload` et le
+   reste viennent du gabarit. Ne pas modifier une page à la main, un test
+   échoue dès qu'elle diffère du gabarit. L'entrée porte :
 
-   | où | quoi | exemple |
+   | champ | rôle | exemple |
    |---|---|---|
-   | `<title>` | le nom complet | `Presqu'île de Crozon - Tokelau` |
-   | `<span class="titre-long">` | le nom complet | `Presqu'île de Crozon` |
-   | `<span class="titre-court">` | la forme courte | `Crozon` |
+   | `slug` | nom du dossier du lieu | `presquile-crozon` |
+   | `titreLong` | nom complet, repris dans `<title>` et `<h1>` | `Presqu’île de Crozon` |
+   | `titreCourt` | forme courte, dans le `<h1>` | `Crozon` |
+   | `commentaire` | facultatif : tableau de lignes, commentaire HTML posé avant le `<h1>` | |
 
    **Pourquoi deux libellés.** L'en-tête de la carte affiche le nom complet à
    partir de 641px et la forme courte en dessous (voir `.titre-long` dans

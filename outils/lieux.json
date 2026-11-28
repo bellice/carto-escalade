@@ -1,0 +1,36 @@
+[
+  {
+    "slug": "cassis-ciotat",
+    "titreLong": "Cassis et La Ciotat",
+    "titreCourt": "Cassis-La Ciotat",
+    "commentaire": [
+      "Court : \"Cassis-La Ciotat\", pas une seule des deux communes — Port",
+      "Miou (Cassis) est un vrai secteur au même titre que les 94 autres",
+      "côté La Ciotat/Ceyreste/Carnoux, ne pas l'effacer du titre affiché",
+      "sur mobile juste parce qu'il est minoritaire. Seul \"et\" disparaît,",
+      "comme \"Vallée de la\"/\"Presqu'île de\" ailleurs sur le site : un",
+      "qualificatif retiré, jamais un nom propre. Rationale complet :",
+      "redaction.html."
+    ]
+  },
+  {
+    "slug": "dentelles-montmirail",
+    "titreLong": "Dentelles de Montmirail",
+    "titreCourt": "Les Dentelles",
+    "commentaire": [
+      "Court : \"Les Dentelles\", pas \"Montmirail\" — ce dernier existe aussi",
+      "comme toponyme dans la Marne et la Sarthe, \"Les Dentelles\" ne prête",
+      "à aucune confusion et c'est déjà le nom d'usage local du massif."
+    ]
+  },
+  {
+    "slug": "presquile-crozon",
+    "titreLong": "Presqu’île de Crozon",
+    "titreCourt": "Crozon"
+  },
+  {
+    "slug": "vallee-drome-diois",
+    "titreLong": "Vallée de la Drôme et Diois",
+    "titreCourt": "Drôme et Diois"
+  }
+]

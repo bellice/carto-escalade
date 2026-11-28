@@ -1091,6 +1091,25 @@ describe('Pages HTML', () => {
     }
   });
 
+  // Les pages carte sont écrites par outils/generer-pages.js à partir du gabarit
+  // et de outils/lieux.json. Une page retouchée à la main, ou un gabarit modifié
+  // sans régénération, ferait diverger les lieux sans rien signaler.
+  test('les pages carte correspondent au gabarit (npm run generer)', () => {
+    try {
+      execFileSync(process.execPath, [join(RACINE, 'outils/generer-pages.js'), '--verifier'], { encoding: 'utf8', stdio: 'pipe' });
+    } catch (erreur) {
+      assert.fail(String(erreur.stderr || erreur.stdout || erreur.message));
+    }
+  });
+
+  // Un lieu qui a ses données mais pas d'entrée dans lieux.json garderait une
+  // page écrite à la main, que le test précédent ne regarde pas.
+  test('lieux.json décrit exactement les lieux qui ont un data.geojson', async () => {
+    const slugs = JSON.parse(await lire('outils/lieux.json')).map((lieu) => lieu.slug).sort();
+    assert.deepEqual(slugs, LIEUX,
+      'Lieu publié sans entrée dans outils/lieux.json, ou entrée sans data.geojson : sa page ne serait pas générée.');
+  });
+
   // Sur CHAQUE page carte : un lieu dupliqué dont on aurait rogné la CSP en la
   // recopiant repartirait avec une carte vide, sans erreur visible.
   test('la CSP de chaque page carte autorise le worker MapLibre depuis le CDN', async () => {
