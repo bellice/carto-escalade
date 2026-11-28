@@ -11,3 +11,5 @@ bloquer-mention-ia.sh text eol=lf
 *.ico binary
 *.woff binary
 *.woff2 binary
+
+assets/vendor/** -text

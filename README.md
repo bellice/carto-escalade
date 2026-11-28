@@ -112,8 +112,8 @@ vallee-drome-diois/          → un dossier par LIEU, pas par sortie : les falai
                        demande à l'ouverture de la popup d'une de ses falaises)
 ```
 
-`maplibre-gl` 6.4.1 est chargé depuis le CDN jsDelivr (pas vendu en local —
-voir « Hors-ligne » pour la raison) mais **pré-caché par le service worker**.
+`maplibre-gl` 6.20.0 est copié dans `assets/vendor/maplibre/` (voir « Mise à
+jour de MapLibre »), servi par le site et **pré-caché par le service worker**.
 
 ## Tests
 
@@ -129,8 +129,11 @@ Le réflexe le plus rentable : lancer `npm run test:statique` avant un commit,
 il attrape à lui seul la perte des temps de trajet, un module oublié au
 pré-cache et une régression de contraste.
 
-Playwright n'est utilisé que par les tests : **le site reste sans dépendance
-et sans étape de build**, GitHub Pages le sert tel quel.
+Playwright n'est utilisé que par les tests : **le site reste sans dépendance**
+(aucun `node_modules` en production, MapLibre est copié dans le dépôt). Le
+déploiement ne fait que retirer les commentaires du JS, du CSS et du HTML
+(`outils/construire-site.js`, voir « Déployer sur GitHub Pages »). Pour
+développer, un simple serveur statique sur le dépôt suffit.
 
 ## Rendu des falaises (couche native, phase 3)
 
@@ -160,8 +163,9 @@ clavier pour y naviguer.
 `npm run build` produit le même `_site/` en local. Il copie le dépôt sans les
 fichiers de `_config.yml` (liste `exclude`) et retire les commentaires du JS,
 du CSS et du HTML (environ 92 Ko sur le fil par visite, pour 41 Ko de code).
-Rien d'autre n'est transformé, et les données sont copiées à l'octet près. Pour
-lancer les tests de parcours sur ce qui est réellement publié :
+Rien d'autre n'est transformé : les données et la copie de MapLibre
+(`assets/vendor/`) sont publiées à l'octet près. Pour lancer les tests de
+parcours sur ce qui est réellement publié :
 `SITE_RACINE=_site npm run test:parcours`.
 
 ### Domaine `tokelau.fr`
@@ -195,12 +199,17 @@ profondeur — le site construit du HTML à partir des données (`innerHTML` dan
 
 Directive par directive, ce qui n'est pas évident :
 
-- **`worker-src` DOIT inclure jsdelivr.** MapLibre v6 charge
-  `maplibre-gl-worker.mjs` directement depuis l'URL du CDN, pas depuis un
-  blob. L'omettre laisse la carte **vide et silencieuse** : une violation CSP
-  survenue dans un worker ne remonte pas au document, donc rien n'apparaît en
-  console. Trouvé en bissectant des variantes de CSP ; un test statique le
-  verrouille désormais.
+- **Aucune origine de CDN.** MapLibre est servi par le site
+  (`assets/vendor/maplibre/`), donc `script-src`, `style-src`, `connect-src`,
+  `worker-src` et `child-src` n'en citent aucune. La seule origine tierce
+  restante est `tiles.openfreemap.org` (tuiles et style du fond de carte).
+- **`worker-src` est `'self'` seul.** MapLibre charge
+  `maplibre-gl-worker.mjs` depuis son URL de même origine, sans blob. Une
+  directive trop stricte laisse la carte **vide et silencieuse** : une
+  violation CSP survenue dans un worker ne remonte pas au document, donc rien
+  n'apparaît en console. Un test statique verrouille la directive.
+- **`img-src` garde `blob:`.** MapLibre décode certaines images PNG par une
+  URL `blob:`.
 - **`style-src` garde `'unsafe-inline'`.** MapLibre pose des styles en ligne
   sur ses marqueurs et ses popups ; l'interdire casse la carte. L'injection de
   style est par ailleurs sans commune mesure avec celle de script.
@@ -211,6 +220,34 @@ Directive par directive, ce qui n'est pas évident :
   hors de portée ici.
 - La page d'accueil, purement statique, applique une politique plus stricte
   encore : aucune origine tierce.
+
+## Mise à jour de MapLibre
+
+MapLibre est copié dans `assets/vendor/maplibre/` : `maplibre-gl.mjs`,
+`maplibre-gl-worker.mjs`, `maplibre-gl.css` et la licence. Version actuelle :
+6.20.0.
+
+```sh
+node outils/maj-maplibre.js 6.20.0
+```
+
+Le script télécharge le paquet npm de la version demandée, vérifie son
+`integrity` contre celle du registre (en cas d'écart, rien n'est copié), puis
+ne copie que ces fichiers, plus `maplibre-gl-shared.mjs` si un module de cette
+version le référence. Il est le seul à utiliser le réseau : ni le site ni les
+tests n'en ont besoin.
+
+Après une mise à jour :
+
+- `sw.js` : incrémenter `CACHE_NAME` et reporter la version dans l'entrée du
+  worker (`maplibre-gl-worker.mjs?v=<version>`). MapLibre demande le worker
+  avec sa version en paramètre, et le pré-cache doit porter la même chaîne.
+  Un test statique le vérifie.
+- Lancer `npm test`.
+
+Les fichiers de `assets/vendor/` ne se modifient pas à la main : leurs octets
+sont ceux du paquet npm. `.gitattributes` les exclut de la normalisation des
+fins de ligne et le build les publie tels quels.
 
 ## Ajouter un lieu
 
@@ -408,14 +445,17 @@ CRS : **EPSG:4326** obligatoire.
   servant le cache instantanément (aucun aller-retour réseau, important en
   contexte faible réseau) tout en se rafraîchissant en arrière-plan pour la
   visite suivante.
-- **`maplibre-gl` reste servi par le CDN** (et non vendu en local) : le build
-  ESM 6.4.1 ne charge pas ses tuiles vectorielles quand il est servi depuis le
-  **même domaine** que la page (constaté en test : `styleLoaded` reste faux,
-  aucune tuile demandée — alors que le même code servi cross-origin fonctionne).
-  Pour ne pas perdre l'offline de la lib, ses 4 fichiers (`.mjs`, `-shared`,
-  `-worker`, `.css`) sont **ajoutés au pré-cache** du service worker : ils
-  sont donc disponibles hors-ligne dès l'install, sans dépendre du CDN au
-  moment de l'usage.
+- **`maplibre-gl` est servi par le site** (`assets/vendor/maplibre/`), pas par
+  un CDN. Une version antérieure de ce document notait que le build ESM 6.4.1
+  ne chargeait pas ses tuiles vectorielles servi depuis le même domaine que la
+  page. Ce blocage ne se reproduit plus dans les conditions testées : les
+  versions 6.4.1 et 6.20.0, sous Chromium (service worker actif ou bloqué),
+  Firefox et WebKit de Playwright sous Windows (service worker bloqué). Tuiles,
+  style et worker se chargent en 200. Ses fichiers sont **ajoutés au pré-cache**
+  du service worker : ils sont disponibles hors-ligne dès l'install.
+  Sur le moteur WebKit de Playwright, la carte n'atteignait pas l'état « prête »
+  avec le CDN et l'atteint avec la copie locale. Le risque est supprimé sur ce
+  moteur seulement ; Safari réel reste à confirmer.
 - **Tuiles / fond de carte** (OpenFreeMap, cross-origin) : **cache d'abord**,
   dans un cache **séparé** (`sorties-escalade-tuiles-v1`) — les tuiles sont
   versionnées (immuables, le numéro de modèle est dans l'URL) : une fois

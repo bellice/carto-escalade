@@ -19,7 +19,7 @@ import { enregistrerServiceWorker } from './sw-client.js';
 // immédiate : pas de fenêtre où des contrôles s'afficheraient sans style.
 const feuille = document.createElement('link');
 feuille.rel = 'stylesheet';
-feuille.href = 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css';
+feuille.href = new URL('../vendor/maplibre/maplibre-gl.css', import.meta.url).href;
 document.head.appendChild(feuille);
 
 const conteneur = document.getElementById('map');

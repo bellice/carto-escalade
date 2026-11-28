@@ -26,10 +26,13 @@
   <meta name="robots" content="noindex, nofollow" />
 
   <!-- CSP en <meta> : GitHub Pages n'autorise pas d'en-têtes HTTP.
-       PIÈGE : worker-src DOIT inclure jsdelivr — MapLibre v6 charge
-       maplibre-gl-worker.mjs depuis le CDN, et une violation CSP survenue
-       dans un worker ne remonte PAS au document : l'omettre laisse la carte
+       MapLibre est servi par le site (assets/vendor/maplibre/) : son worker
+       se charge depuis son URL de même origine, sans blob:, donc worker-src
+       'self' suffit. PIÈGE : une violation CSP survenue dans un worker ne
+       remonte PAS au document ; une directive trop stricte laisse la carte
        vide sans la moindre erreur en console.
+       img-src garde blob: : MapLibre décode certaines images PNG par une URL
+       blob:.
        style-src garde 'unsafe-inline' (MapLibre pose des styles en ligne sur
        ses marqueurs) ; script-src peut s'en passer, les scripts inline ayant
        été externalisés. frame-ancestors est absent volontairement : cette
@@ -37,13 +40,13 @@
        portée sur GitHub Pages. Rationnel complet : README.md. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' https://cdn.jsdelivr.net;
-    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://tiles.openfreemap.org;
     font-src 'self' data:;
-    connect-src 'self' https://tiles.openfreemap.org https://cdn.jsdelivr.net;
-    worker-src 'self' blob: https://cdn.jsdelivr.net;
-    child-src 'self' blob: https://cdn.jsdelivr.net;
+    connect-src 'self' https://tiles.openfreemap.org;
+    worker-src 'self';
+    child-src 'self';
     base-uri 'none';
     form-action 'none';
     object-src 'none'
@@ -55,15 +58,11 @@
   <link rel="apple-touch-icon" href="../icones/apple-touch-icon.png" />
   <meta name="theme-color" content="#fbfaf6" />
 
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://tiles.openfreemap.org" />
 
   <!-- Sans ces indices, le graphe d'imports ES ne se découvre qu'au fil du
-       parsing de chaque module, en 2-3 aller-retours séquentiels.
-       crossorigin est requis sur maplibre-gl.mjs (autre origine) : sans lui
-       le navigateur le retélécharge à l'import réel. -->
-  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs" crossorigin />
-  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl-shared.mjs" crossorigin />
+       parsing de chaque module, en 2-3 aller-retours séquentiels. -->
+  <link rel="modulepreload" href="../assets/vendor/maplibre/maplibre-gl.mjs" />
   <link rel="modulepreload" href="../assets/js/carte.js" />
   <link rel="modulepreload" href="../assets/js/etat.js" />
   <link rel="modulepreload" href="../assets/js/visibilite.js" />
@@ -91,15 +90,16 @@
        fichier serait téléchargé deux fois. -->
   <link rel="preload" href="data.geojson" as="fetch" crossorigin />
 
-  <!-- preload et NON stylesheet : une feuille de style tierce bloque le
-       PREMIER RENDU jusqu’à ce que le CDN réponde. Mesuré à 200ms de
-       latence : 388ms contre 84ms sans elle — un aller-retour d’écran
-       blanc avant même que « Chargement de la carte… » ne s’affiche.
+  <!-- preload et NON stylesheet : une feuille de style bloque le PREMIER
+       RENDU jusqu’à la fin de son téléchargement. Mesuré à 200ms de
+       latence, avec la feuille servie par un CDN : 388ms contre 84ms sans
+       elle — un aller-retour d’écran blanc avant même que « Chargement de
+       la carte… » ne s’affiche.
        Le preload lance le téléchargement tout de suite sans rien bloquer ;
        demarrer-sortie.js la promeut en feuille de style juste avant que
        MapLibre ne crée son DOM. URL identique, donc le pré-cache du
        service worker la couvre toujours. -->
-  <link rel="preload" as="style" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css" />
+  <link rel="preload" as="style" href="../assets/vendor/maplibre/maplibre-gl.css" />
   <link rel="stylesheet" href="../assets/style.css" />
   <link rel="stylesheet" href="../assets/css/marqueurs.css" />
   <link rel="stylesheet" href="../assets/css/mise-en-page.css" />

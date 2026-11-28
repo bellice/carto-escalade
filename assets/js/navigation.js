@@ -1,7 +1,7 @@
 // navigation.js — passer d'un point à un autre : fiche falaise, caméra, clic sur
 // la carte, libellés cliquables, touche Échap.
 
-import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
+import * as maplibregl from '../vendor/maplibre/maplibre-gl.mjs';
 import {
   appliquerAntiCollisionSecteurs, appliquerAntiCollisionSites, appliquerFiltresEtSecteurs, appliquerVisibiliteSecteurs, appliquerVisibiliteSites, definirFalaiseSelectionnee, enSurbrillance,
 } from './visibilite.js';

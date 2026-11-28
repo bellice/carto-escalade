@@ -201,7 +201,8 @@ export function construire(source, destination) {
       if (exclus.has(rel)) continue;
       if (statSync(chemin).isDirectory()) { copier(chemin); continue; }
       const extension = nom.slice(nom.lastIndexOf('.'));
-      const traiter = TRAITEMENTS[extension];
+      // Code tiers copié tel quel : retirer ses commentaires en changerait les octets.
+      const traiter = rel.startsWith('assets/vendor/') ? undefined : TRAITEMENTS[extension];
       const cible = join(sortie, rel);
       bilan.fichiers++;
       if (!traiter) { cpSync(chemin, cible); continue; }

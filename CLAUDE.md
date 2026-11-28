@@ -16,7 +16,9 @@ protègent, pas ici.
   (`.github/workflows/pages.yml`) retire les commentaires du JS, du CSS et du
   HTML avec `outils/construire-site.js` (Node seul), et rien d'autre : pas de
   bundler, pas de transpileur, pas de renommage, pas de `node_modules` en
-  production. Les exclusions sont dans `_config.yml`. Les commentaires pèsent
+  production. MapLibre est copié dans `assets/vendor/maplibre/` (jamais chargé
+  depuis un CDN), publié tel quel ; mise à jour : README. Les exclusions sont
+  dans `_config.yml`. Les commentaires pèsent
   plus que le code sur le fil, d'où cette étape ; ils restent la
   documentation du dépôt, on n'y renonce pas pour gagner des octets.
 - **Tests avant tout push.** `test:statique` (structure du dépôt,

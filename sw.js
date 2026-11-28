@@ -12,7 +12,7 @@ const CACHE_PREFIXE = 'sorties-escalade-v';
 // À bumper quand un module est ajouté à la coquille : un module absent du
 // cache fait échouer l'import au premier chargement hors ligne, et toute la
 // carte tombe. Le rafraîchissement paresseux ne le rattrape pas.
-const CACHE_NAME = `${CACHE_PREFIXE}11`;
+const CACHE_NAME = `${CACHE_PREFIXE}12`;
 
 // Cache SÉPARÉ du fond de carte, à ne surtout pas fusionner avec la coquille :
 // il n'est pas versionné par CACHE_NAME, sans quoi bumper la coquille pour
@@ -20,9 +20,9 @@ const CACHE_NAME = `${CACHE_PREFIXE}11`;
 const CACHE_TUILES = 'sorties-escalade-tuiles-v1';
 
 // Liste MANUELLE : une entrée par dossier sortie/ (page + data.geojson) — un
-// oubli casse le hors-ligne de cette sortie, en silence. maplibre-gl vient du
-// CDN mais ses 4 fichiers sont pré-cachés ici, sans quoi la lib dépendrait du
-// réseau. Les routes/*.json, elles, sont ajoutées dynamiquement (precacherRoutes).
+// oubli casse le hors-ligne de cette sortie, en silence. maplibre-gl est servi
+// par le site (assets/vendor/maplibre/) et pré-caché ici comme le reste de la
+// coquille. Les routes/*.json, elles, sont ajoutées dynamiquement (precacherRoutes).
 const PRECACHE = [
   './',
   './index.html',
@@ -62,11 +62,11 @@ const PRECACHE = [
   './assets/js/detail-voies.js',
   './assets/js/symboles.js',
   './assets/js/utils.js',
-  // maplibre-gl (CDN, pré-caché pour l'offline) :
-  'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs',
-  'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl-shared.mjs',
-  'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl-worker.mjs',
-  'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.css',
+  // maplibre-gl, servi par le site. Le worker est demandé avec ?v=<version> :
+  // l'entrée porte la même chaîne, sinon le cache ne la retrouve pas hors ligne.
+  './assets/vendor/maplibre/maplibre-gl.mjs',
+  './assets/vendor/maplibre/maplibre-gl-worker.mjs?v=6.20.0',
+  './assets/vendor/maplibre/maplibre-gl.css',
   // Style du fond de carte (OpenFreeMap) : pré-caché pour charger sans
   // attendre le réseau à la 1re ouverture. Les tuiles ne sont PAS pré-cachées
   // (leurs URLs dépendent du modèle du jour) : mises en cache au fil des vues.

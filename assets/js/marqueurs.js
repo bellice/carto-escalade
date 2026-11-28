@@ -1,7 +1,7 @@
 // marqueurs.js — création des marqueurs MapLibre (falaise/parking/gîte) :
 // DOM, accessibilité, popup attachée, gestion d'ouverture/fermeture.
 
-import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
+import * as maplibregl from '../vendor/maplibre/maplibre-gl.mjs';
 import { cleFalaise, libelleFalaise, secteurDistinct, categoriserEnsoleillement, deriverStyles } from './donnees.js';
 import { popupFalaise, popupParking, popupGite } from './popups.js';
 import { construireHistogramme } from './histogramme.js';

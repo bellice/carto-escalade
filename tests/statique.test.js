@@ -1112,7 +1112,7 @@ describe('Pages HTML', () => {
 
   // Sur CHAQUE page carte : un lieu dupliqué dont on aurait rogné la CSP en la
   // recopiant repartirait avec une carte vide, sans erreur visible.
-  test('la CSP de chaque page carte autorise le worker MapLibre depuis le CDN', async () => {
+  test('la CSP de chaque page carte n\'autorise aucun CDN et garde le worker de MapLibre en même origine', async () => {
     for (const lieu of LIEUX) {
       const html = await lire(`${lieu}/index.html`);
       // On extrait la valeur de l'attribut content, PAS le HTML brut : le
@@ -1123,15 +1123,53 @@ describe('Pages HTML', () => {
       assert.ok(balise, `${lieu} : balise CSP introuvable`);
       const politique = balise[1];
 
-      const directive = /worker-src[^;]*/.exec(politique);
+      assert.doesNotMatch(politique, /jsdelivr/, `${lieu} : la CSP cite encore jsDelivr, MapLibre est servi par le site.`);
+      // Le worker se charge depuis son URL de même origine : 'self' seul. Une
+      // directive trop stricte laisse la carte vide SANS violation visible
+      // dans la console (une violation dans un worker ne remonte pas).
+      const directive = /worker-src([^;]*)/.exec(politique);
       assert.ok(directive, `${lieu} : worker-src absent de la CSP`);
-      // Piège vérifié : MapLibre charge maplibre-gl-worker.mjs directement
-      // depuis jsdelivr. L'omettre laisse la carte vide SANS aucune violation
-      // visible dans la console (une violation dans un worker ne remonte pas).
-      assert.match(directive[0], /cdn\.jsdelivr\.net/,
-        `${lieu} : worker-src doit inclure le CDN, sinon la carte reste vide, silencieusement.`);
+      assert.equal(directive[1].trim(), "'self'", `${lieu} : worker-src doit être 'self' seul (ni CDN ni blob:).`);
       assert.doesNotMatch(politique, /script-src[^;]*unsafe-inline/,
         `${lieu} : script-src ne doit pas autoriser unsafe-inline (scripts externalisés).`);
+    }
+  });
+
+  // MapLibre est copié dans le dépôt (outils/maj-maplibre.js). Un fichier
+  // oublié ou une version incohérente casserait la carte, souvent sans erreur
+  // visible : le worker, en particulier, échoue en silence.
+  test('MapLibre est servi par le site : fichiers présents, importés localement, pré-cachés', async () => {
+    const dossier = join(RACINE, 'assets/vendor/maplibre');
+    const presents = (await readdir(dossier)).sort();
+    for (const nom of ['LICENSE.txt', 'maplibre-gl-worker.mjs', 'maplibre-gl.css', 'maplibre-gl.mjs']) {
+      assert.ok(presents.includes(nom), `assets/vendor/maplibre/${nom} absent (voir outils/maj-maplibre.js)`);
+    }
+    // Tout module voisin cité en import relatif doit exister, sinon 404 silencieux.
+    for (const nom of presents.filter((f) => f.endsWith('.mjs'))) {
+      const source = await lire(`assets/vendor/maplibre/${nom}`);
+      for (const [, voisin] of source.matchAll(/["'`]\.\/(maplibre-gl[\w.-]*\.mjs)/g)) {
+        assert.ok(presents.includes(voisin), `${nom} importe ./${voisin}, absent de assets/vendor/maplibre/`);
+      }
+    }
+    // Aucun import de module distant dans le code du site.
+    for (const fichier of await readdir(join(RACINE, 'assets/js'))) {
+      const source = await lire(`assets/js/${fichier}`);
+      assert.doesNotMatch(source, /from\s+['"]https?:/, `assets/js/${fichier} importe un module distant`);
+    }
+    // Le pré-cache porte la version réelle : le worker est demandé avec ?v=<version>.
+    const version = /\/blob\/v(\d+\.\d+\.\d+)\/LICENSE/.exec(await lire('assets/vendor/maplibre/maplibre-gl.mjs'))?.[1];
+    assert.ok(version, 'version de MapLibre introuvable dans l\'en-tête de maplibre-gl.mjs');
+    const sw = await lire('sw.js');
+    for (const entree of ['maplibre-gl.mjs', 'maplibre-gl.css', `maplibre-gl-worker.mjs?v=${version}`]) {
+      assert.ok(sw.includes(`'./assets/vendor/maplibre/${entree}'`),
+        `sw.js : './assets/vendor/maplibre/${entree}' absent du PRECACHE (version vendue : ${version})`);
+    }
+    // Les pages chargent la copie locale.
+    for (const lieu of LIEUX) {
+      const html = (await lire(`${lieu}/index.html`)).replace(/<!--[\s\S]*?-->/g, '');
+      assert.match(html, /rel="modulepreload" href="\.\.\/assets\/vendor\/maplibre\/maplibre-gl\.mjs"/, `${lieu} : préchargement local du module absent`);
+      assert.match(html, /rel="preload" as="style" href="\.\.\/assets\/vendor\/maplibre\/maplibre-gl\.css"/, `${lieu} : préchargement local de la feuille absent`);
+      assert.doesNotMatch(html, /jsdelivr/, `${lieu} : référence encore jsDelivr`);
     }
   });
 });
@@ -1188,6 +1226,19 @@ describe('Site construit (outils/construire-site.js)', () => {
     }
   });
 
+  // Le build retire les commentaires du CSS : appliqué à la feuille de MapLibre,
+  // il changerait les octets d'un code tiers qu'on veut publier tel que le paquet
+  // npm le livre.
+  test('la copie de MapLibre est publiée sans modification', async () => {
+    const vendu = join('assets', 'vendor', 'maplibre');
+    const noms = await readdir(join(RACINE, vendu));
+    assert.ok(noms.includes('maplibre-gl.css') && noms.includes('maplibre-gl.mjs'), 'copie de MapLibre introuvable');
+    for (const nom of noms) {
+      const [source, publie] = await Promise.all([readFile(join(RACINE, vendu, nom)), readFile(join(dossier, vendu, nom))]);
+      assert.ok(source.equals(publie), `${vendu}/${nom} a été modifié par la construction`);
+    }
+  });
+
   test('plus aucun commentaire dans le JS, le CSS et le HTML publiés', async () => {
     const fichiers = [];
     const parcourir = async (rel) => {
@@ -1221,7 +1272,8 @@ describe('Site construit (outils/construire-site.js)', () => {
 
   test('tout ce que le service worker pré-cache existe dans le site publié', async () => {
     const sw = await readFile(join(dossier, 'sw.js'), 'utf8');
-    const locaux = [...sw.matchAll(/'\.\/([^']+)'/g)].map((m) => m[1]).filter((p) => !p.endsWith('/'));
+    // Sans la chaîne de requête : le worker de MapLibre est demandé avec ?v=<version>.
+    const locaux = [...sw.matchAll(/'\.\/([^']+)'/g)].map((m) => m[1].split('?')[0]).filter((p) => !p.endsWith('/'));
     for (const rel of locaux) assert.equal(await existe(rel), true, `${rel} est pré-caché mais absent du site publié`);
   });
 

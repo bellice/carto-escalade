@@ -2,7 +2,7 @@
    Chaque page sortie importe initCarte(dataUrl) et l'appelle avec le chemin
    vers son propre data.geojson. */
 
-import * as maplibregl from 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.4.1/dist/maplibre-gl.mjs';
+import * as maplibregl from '../vendor/maplibre/maplibre-gl.mjs';
 import {
   calculerMaxima, calculerTempsDepuisGite, indexerParkingInfos, indexerSources,
 } from './donnees.js';
